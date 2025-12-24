@@ -132,6 +132,24 @@ State: count = 1
 
 APK location: `sample-android/build/outputs/apk/debug/sample-android-debug.apk`
 
+### Build KMM Sample (Android)
+
+```bash
+./gradlew :sample-shared:androidApp:assembleDebug
+```
+
+APK location: `sample-shared/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
+
+### KMM Sample Structure
+
+```
+sample-shared/
+├── shared/           # Shared Kotlin code (commonMain)
+│   └── CounterStore  # Shared business logic
+├── androidApp/       # Android UI (Compose)
+└── iosApp/           # iOS UI (SwiftUI) - see iosApp/README.md
+```
+
 ## License
 
 ```

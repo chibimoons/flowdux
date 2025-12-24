@@ -17,3 +17,5 @@ rootProject.name = "flowdux-root"
 include(":flowdux")
 include(":sample-jvm")
 include(":sample-android")
+include(":sample-shared:shared")
+include(":sample-shared:androidApp")
