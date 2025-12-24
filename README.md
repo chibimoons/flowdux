@@ -106,6 +106,26 @@ store.dispatch(CounterAction.Increment)
 store.dispatch(CounterAction.Add(10))
 ```
 
+### FlowHolderAction (Wrap Existing Flow as Actions)
+
+Use `FlowHolderAction` to wrap existing Flows (Repository, Socket) and convert them to Actions.
+No side effects in the Action—just holds and transforms the Flow:
+
+```kotlin
+// FlowHolderAction wraps an existing Flow and converts to Flow<Action>
+data class ObserveUser(
+    private val userFlow: Flow<User>
+) : UserAction, FlowHolderAction {
+    override fun toFlowAction(): Flow<Action> =
+        userFlow.map { user -> SetUser(user) }
+}
+
+// Usage: pass the Flow from Repository/Socket
+val repositoryFlow = userRepository.getUser(123)  // Side effect here
+store.dispatch(ObserveUser(repositoryFlow))       // Just wraps the Flow
+// State updates: cached user -> fresh user from API
+```
+
 ## Sample Apps
 
 ### Run JVM Console Sample
@@ -121,6 +141,11 @@ Output:
 State: count = 0
 > Dispatching Increment
 State: count = 1
+...
+> Dispatching ObserveCount - FlowHolderAction
+  (Repository Flow emits: cache -> api)
+State: count = 10 [cache]
+State: count = 42 [api]
 ...
 ```
 
@@ -139,6 +164,21 @@ APK location: `sample-android/build/outputs/apk/debug/sample-android-debug.apk`
 ```
 
 APK location: `sample-shared/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
+
+### Build KMM Sample (iOS)
+
+**Prerequisites:** Xcode 15+ with command line tools
+
+```bash
+# Build shared framework
+./gradlew :sample-shared:shared:linkDebugFrameworkIosSimulatorArm64
+
+# Build iOS app
+xcodebuild -project sample-shared/iosApp/iosApp.xcodeproj \
+  -target iosApp -sdk iphonesimulator -arch arm64 build
+```
+
+App location: `sample-shared/iosApp/build/Debug-iphonesimulator/iosApp.app`
 
 ### KMM Sample Structure
 

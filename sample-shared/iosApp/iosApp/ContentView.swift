@@ -58,18 +58,22 @@ struct ContentView: View {
 
 class CounterViewModel: ObservableObject {
     private let store: CounterStore
+    private var watcher: Closeable?
     @Published var count: Int = 0
 
     init() {
-        // Note: In production, you'd use a proper scope management
         store = CounterStore(scope: MainScope())
 
-        // Observe state changes
-        store.state.watch { [weak self] state in
+        // Observe state changes using watchState
+        watcher = store.watchState { [weak self] state in
             DispatchQueue.main.async {
-                self?.count = Int(state?.count ?? 0)
+                self?.count = Int(state.count)
             }
         }
+    }
+
+    deinit {
+        watcher?.close()
     }
 
     func increment() { store.increment() }
