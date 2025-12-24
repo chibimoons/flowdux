@@ -15,3 +15,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "flowdux-root"
 include(":flowdux")
+include(":sample-jvm")
+include(":sample-android")

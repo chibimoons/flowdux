@@ -106,8 +106,34 @@ store.dispatch(CounterAction.Increment)
 store.dispatch(CounterAction.Add(10))
 
 // Clean up
-store.clear()
+store.cancel()
 ```
+
+## Sample Apps
+
+### Run JVM Console Sample
+
+```bash
+./gradlew :sample-jvm:run
+```
+
+Output:
+```
+=== Flowdux Sample: Counter ===
+
+State: count = 0
+> Dispatching Increment
+State: count = 1
+...
+```
+
+### Build Android Sample
+
+```bash
+./gradlew :sample-android:assembleDebug
+```
+
+APK location: `sample-android/build/outputs/apk/debug/sample-android-debug.apk`
 
 ## License
 

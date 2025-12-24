@@ -28,6 +28,9 @@ kotlin {
     }
 
     jvm {
+        compilations.all {
+            kotlinOptions.jvmTarget = "17"
+        }
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
         }
