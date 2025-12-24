@@ -104,9 +104,6 @@ store.state.collect { state ->
 // Dispatch actions
 store.dispatch(CounterAction.Increment)
 store.dispatch(CounterAction.Add(10))
-
-// Clean up
-store.cancel()
 ```
 
 ## Sample Apps

@@ -1,7 +1,10 @@
 package io.flowdux
 
 import app.cash.turbine.test
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -962,15 +965,16 @@ class StoreTest {
     // ==================== Scope Cancellation Tests ====================
 
     @Test
-    fun `store scope cancellation does not affect external channel producer`() =
+    fun `scope cancellation does not affect external channel producer`() =
         runTest {
             val externalChannel = Channel<Int>(Channel.UNLIMITED)
+            val storeScope = CoroutineScope(coroutineContext + Job())
 
             val store = createStore(
                 initialState = CounterState(),
                 reducer = counterReducer,
                 errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
+                scope = storeScope,
             )
 
             store.state.test {
@@ -987,7 +991,7 @@ class StoreTest {
                 cancelAndIgnoreRemainingEvents()
             }
 
-            store.cancel()
+            storeScope.cancel()
 
             assertFalse(externalChannel.isClosedForSend)
             assertFalse(externalChannel.isClosedForReceive)
@@ -998,10 +1002,11 @@ class StoreTest {
         }
 
     @Test
-    fun `store cancel stops collecting from FlowHolderAction`() =
+    fun `scope cancel stops collecting from FlowHolderAction`() =
         runTest {
             val externalChannel = Channel<Int>(Channel.UNLIMITED)
             val receivedValues = mutableListOf<Int>()
+            val storeScope = CoroutineScope(coroutineContext + Job())
 
             val trackingReducer = Reducer<CounterState, CounterAction> { state, action ->
                 when (action) {
@@ -1017,7 +1022,7 @@ class StoreTest {
                 initialState = CounterState(),
                 reducer = trackingReducer,
                 errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
+                scope = storeScope,
             )
 
             store.state.test {
@@ -1038,7 +1043,7 @@ class StoreTest {
 
             val valuesBefore = receivedValues.toList()
 
-            store.cancel()
+            storeScope.cancel()
 
             externalChannel.send(100)
             externalChannel.send(200)

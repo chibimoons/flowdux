@@ -16,9 +16,4 @@ class CounterViewModel : ViewModel() {
     fun increment() = store.dispatch(CounterAction.Increment)
     fun decrement() = store.dispatch(CounterAction.Decrement)
     fun reset() = store.dispatch(CounterAction.Reset)
-
-    override fun onCleared() {
-        super.onCleared()
-        store.cancel()
-    }
 }

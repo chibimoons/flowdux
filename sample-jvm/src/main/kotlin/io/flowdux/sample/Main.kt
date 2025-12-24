@@ -31,47 +31,50 @@ val counterReducer = buildReducer<CounterState, CounterAction> {
     }
 }
 
-fun main() = runBlocking {
+fun main() {
     println("=== Flowdux Sample: Counter ===\n")
+
+    val scope = CoroutineScope(Dispatchers.Default)
 
     val store = createStore(
         initialState = CounterState(),
         reducer = counterReducer,
-        scope = this
+        scope = scope
     )
 
     // Collect state changes in background
-    val job = launch {
+    scope.launch {
         store.state.collect { state ->
             println("State: count = ${state.count}")
         }
     }
 
-    // Give collector time to start
-    delay(100)
+    runBlocking {
+        // Give collector time to start
+        delay(100)
 
-    println("\n> Dispatching Increment")
-    store.dispatch(CounterAction.Increment)
-    delay(100)
+        println("\n> Dispatching Increment")
+        store.dispatch(CounterAction.Increment)
+        delay(100)
 
-    println("\n> Dispatching Increment")
-    store.dispatch(CounterAction.Increment)
-    delay(100)
+        println("\n> Dispatching Increment")
+        store.dispatch(CounterAction.Increment)
+        delay(100)
 
-    println("\n> Dispatching Add(10)")
-    store.dispatch(CounterAction.Add(10))
-    delay(100)
+        println("\n> Dispatching Add(10)")
+        store.dispatch(CounterAction.Add(10))
+        delay(100)
 
-    println("\n> Dispatching Decrement")
-    store.dispatch(CounterAction.Decrement)
-    delay(100)
+        println("\n> Dispatching Decrement")
+        store.dispatch(CounterAction.Decrement)
+        delay(100)
 
-    println("\n> Dispatching Reset")
-    store.dispatch(CounterAction.Reset)
-    delay(100)
+        println("\n> Dispatching Reset")
+        store.dispatch(CounterAction.Reset)
+        delay(100)
 
-    println("\n=== Final State: count = ${store.currentState.count} ===")
+        println("\n=== Final State: count = ${store.currentState.count} ===")
+    }
 
-    job.cancel()
-    store.cancel()
+    scope.cancel()
 }

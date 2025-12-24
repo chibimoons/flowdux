@@ -4,7 +4,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -27,9 +26,8 @@ class Store<S : State, A : Action>(
     private val reducer: Reducer<S, A>,
     private val middlewares: List<Middleware<S, A>>,
     private val errorProcessor: ErrorProcessor<A>,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
 ) {
-    private val scope = CoroutineScope(scope.coroutineContext + SupervisorJob())
     private val actionFlow = Channel<A>()
 
     private val stateFlow = actionFlow
@@ -73,10 +71,6 @@ class Store<S : State, A : Action>(
         return mutex.withLock {
             reducer.reduce(currentState, action)
         }
-    }
-
-    fun cancel() {
-        scope.cancel()
     }
 }
 
