@@ -4,9 +4,6 @@ options:
   deploymentTarget:
     iOS: "15.0"
 
-settings:
-  DEVELOPMENT_TEAM: ""
-
 targets:
   iosApp:
     type: application
@@ -20,6 +17,9 @@ targets:
       CURRENT_PROJECT_VERSION: "1"
       GENERATE_INFOPLIST_FILE: YES
       SWIFT_VERSION: "5.0"
+      CODE_SIGN_IDENTITY: ""
+      CODE_SIGNING_REQUIRED: "NO"
+      CODE_SIGNING_ALLOWED: "NO"
       FRAMEWORK_SEARCH_PATHS:
         - "$(inherited)"
         - "$(SRCROOT)/../shared/build/bin/iosSimulatorArm64/debugFramework"
