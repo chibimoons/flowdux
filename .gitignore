@@ -21,3 +21,8 @@ build/
 
 # Local configuration
 local.properties
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
