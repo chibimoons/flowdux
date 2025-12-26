@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Flowdux Architecture</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      color: #eee;
+      margin-bottom: 30px;
+    }
+    .mermaid {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Flowdux Architecture</h1>
+  <div class="mermaid">
+flowchart TB
+    subgraph UI["🖥️ UI / ViewModel"]
+        dispatch["dispatch(Action)"]
+        observe["state.collect { }"]
+    end
+
+    subgraph Store["📦 Store"]
+        channel["Channel&lt;Action&gt;"]
+
+        subgraph Pipeline["Action Pipeline"]
+            direction TB
+            middleware["🔧 Middleware Chain\n(Side Effects, API calls)"]
+            flowHolder{"FlowHolderAction?"}
+            toFlow["toFlowAction()\nFlow → Actions"]
+            passThrough["Pass Through"]
+            errorProc["🛡️ ErrorProcessor\ncatch errors → Action"]
+            reducer["⚙️ Reducer\n(State, Action) → NewState"]
+        end
+
+        stateFlow["StateFlow&lt;State&gt;"]
+    end
+
+    dispatch --> channel
+    channel --> middleware
+    middleware --> flowHolder
+    flowHolder -->|Yes| toFlow
+    flowHolder -->|No| passThrough
+    toFlow --> errorProc
+    passThrough --> errorProc
+    errorProc --> reducer
+    reducer --> stateFlow
+    stateFlow --> observe
+
+    style UI fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style Store fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style Pipeline fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style middleware fill:#c8e6c9,stroke:#388e3c
+    style reducer fill:#ffcdd2,stroke:#d32f2f
+    style errorProc fill:#fff9c4,stroke:#fbc02d
+    style stateFlow fill:#b3e5fc,stroke:#0288d1
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'default',
+      flowchart: {
+        useMaxWidth: false,
+        htmlLabels: true,
+        curve: 'basis'
+      }
+    });
+  </script>
+</body>
+</html>

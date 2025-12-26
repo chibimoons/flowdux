@@ -2,7 +2,7 @@
 
 A lightweight Redux-style state management library for Kotlin Multiplatform with Middleware support.
 
-[![](https://jitpack.io/v/lantert/flowdux.svg)](https://jitpack.io/#lantert/flowdux)
+[![](https://jitpack.io/v/chibimoons/flowdux.svg)](https://jitpack.io/#chibimoons/flowdux)
 
 ## Features
 
@@ -11,6 +11,49 @@ A lightweight Redux-style state management library for Kotlin Multiplatform with
 - Error handling with ErrorProcessor
 - Built on Kotlin Coroutines and Flow
 - Kotlin Multiplatform support (JVM, iOS)
+
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph UI["UI / ViewModel"]
+        dispatch["dispatch(Action)"]
+        observe["state.collect { }"]
+    end
+
+    subgraph Store["Store"]
+        channel["Channel〈Action〉"]
+
+        subgraph Pipeline["Action Pipeline"]
+            middleware["Middleware Chain"]
+            flowHolder{"FlowHolderAction?"}
+            toFlow["toFlowAction()"]
+            pass["Pass Through"]
+            errorProc["ErrorProcessor"]
+            reducer["Reducer"]
+        end
+
+        stateFlow["StateFlow〈State〉"]
+    end
+
+    dispatch --> channel
+    channel --> middleware
+    middleware --> flowHolder
+    flowHolder -->|Yes| toFlow
+    flowHolder -->|No| pass
+    toFlow --> errorProc
+    pass --> errorProc
+    errorProc --> reducer
+    reducer --> stateFlow
+    stateFlow --> observe
+```
+
+| Component | Role |
+|-----------|------|
+| **Middleware** | Side effects (API calls, logging), action transformation |
+| **FlowHolderAction** | Convert existing Flow to Action stream |
+| **ErrorProcessor** | Convert errors to Actions |
+| **Reducer** | Pure function: (State, Action) → NewState |
 
 ## Installation
 
@@ -28,7 +71,7 @@ Add the dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.lantert:flowdux:1.0.0")
+    implementation("com.github.chibimoons:flowdux:1.0.0")
 }
 ```
 
