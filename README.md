@@ -29,10 +29,10 @@ flowchart TB
             flowHolder{"FlowHolderAction?"}
             toFlow["toFlowAction()"]
             pass["Pass Through"]
-            errorProc["ErrorProcessor"]
             reducer["Reducer"]
         end
 
+        errorProc["ErrorProcessor"]
         stateFlow["StateFlow〈State〉"]
     end
 
@@ -41,9 +41,11 @@ flowchart TB
     middleware --> flowHolder
     flowHolder -->|Yes| toFlow
     flowHolder -->|No| pass
-    toFlow --> errorProc
-    pass --> errorProc
-    errorProc --> reducer
+    toFlow --> reducer
+    pass --> reducer
+    toFlow -.->|Error| errorProc
+    pass -.->|Error| errorProc
+    errorProc -.-> reducer
     reducer --> stateFlow
     stateFlow --> observe
 ```
@@ -52,7 +54,7 @@ flowchart TB
 |-----------|------|
 | **Middleware** | Side effects (API calls, logging), action transformation |
 | **FlowHolderAction** | Convert existing Flow to Action stream |
-| **ErrorProcessor** | Convert errors to Actions |
+| **ErrorProcessor** | Catch errors and convert to Actions |
 | **Reducer** | Pure function: (State, Action) → NewState |
 
 ## Installation
