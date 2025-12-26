@@ -1,0 +1,22 @@
+name: Trigger JitPack Build
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  trigger-jitpack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger JitPack build
+        run: |
+          echo "Triggering JitPack build for ${{ github.event.release.tag_name }}"
+          curl -sL https://jitpack.io/com/github/${{ github.repository }}/${{ github.event.release.tag_name }}/build.log || true
+
+      - name: Wait for build
+        run: sleep 30
+
+      - name: Check build status
+        run: |
+          STATUS=$(curl -s "https://jitpack.io/api/builds/com.github.${{ github.repository_owner }}/${{ github.event.repository.name }}/${{ github.event.release.tag_name }}" | jq -r '.status')
+          echo "JitPack build status: $STATUS"
