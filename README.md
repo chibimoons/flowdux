@@ -24,15 +24,16 @@ flowchart TB
     subgraph Store["Store"]
         channel["Channel〈Action〉"]
 
-        subgraph Pipeline["Action Pipeline"]
+        subgraph processAction["processAction()"]
             middleware["Middleware Chain"]
             flowHolder{"FlowHolderAction?"}
             toFlow["toFlowAction()"]
             pass["Pass Through"]
-            reducer["Reducer"]
+            catchBlock[".catch { }"]
+            errorProc["ErrorProcessor"]
         end
 
-        errorProc["ErrorProcessor"]
+        reducer["Reducer"]
         stateFlow["StateFlow〈State〉"]
     end
 
@@ -43,8 +44,10 @@ flowchart TB
     flowHolder -->|No| pass
     toFlow --> reducer
     pass --> reducer
-    toFlow -.->|Error| errorProc
-    pass -.->|Error| errorProc
+    middleware -.->|Error| catchBlock
+    toFlow -.->|Error| catchBlock
+    pass -.->|Error| catchBlock
+    catchBlock --> errorProc
     errorProc -.-> reducer
     reducer --> stateFlow
     stateFlow --> observe
