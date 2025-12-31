@@ -9,6 +9,7 @@ typealias ActionProcessor<S, A> = suspend FlowCollector<A>.(S, A) -> Unit
 typealias ActionProcessorMap<S, A> = Map<KClass<*>, ActionProcessor<S, A>>
 
 interface Middleware<S : State, A : Action> {
+    val name: String get() = this::class.simpleName ?: "Unknown"
     val processors: ActionProcessorMap<S, A>
 
     fun process(

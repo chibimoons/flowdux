@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.flatMapConcat
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -26,6 +27,7 @@ class Store<S : State, A : Action>(
     private val reducer: Reducer<S, A>,
     private val middlewares: List<Middleware<S, A>>,
     private val errorProcessor: ErrorProcessor<A>,
+    private val logger: StoreLogger<S, A>,
     private val scope: CoroutineScope,
 ) {
     private val actionFlow = Channel<A>()
@@ -39,20 +41,29 @@ class Store<S : State, A : Action>(
     private fun processAction(a: A): Flow<A> = middlewares
         .fold(flowOf(a)) { flow, middleware ->
             flow.flatMapConcat { currentAction ->
+                logger.onMiddlewareProcessing(middleware.name, currentAction)
                 middleware.process(
                     getState = { currentState },
                     action = currentAction,
                 )
             }
         }
+        .onEach { logger.onMiddlewaresCompleted(it) }
         .flatMapMerge {
             if (it is FlowHolderAction) {
-                it.toFlowAction() as Flow<A>
+                (it.toFlowAction() as Flow<A>)
+                    .onEach { logger.onFlowHolderActionEmitted(it) }
             } else {
                 flowOf(it)
             }
         }
-        .catch { emitAll(errorProcessor.process(it)) }
+        .catch {
+            logger.onErrorOccurred(it)
+            emitAll(
+                errorProcessor.process(it)
+                        .onEach { logger.onErrorHandled(it)  }
+            )
+        }
 
 
     val state: StateFlow<S> = stateFlow
@@ -62,6 +73,7 @@ class Store<S : State, A : Action>(
     private val mutex = Mutex()
 
     fun dispatch(action: A) {
+        logger.onActionDispatched(action)
         scope.launch {
             actionFlow.send(action)
         }
@@ -69,7 +81,9 @@ class Store<S : State, A : Action>(
 
     private suspend fun reduceAction(currentState: S, action: A): S {
         return mutex.withLock {
-            reducer.reduce(currentState, action)
+            val newState = reducer.reduce(currentState, action)
+            logger.onStateReduced(action, currentState, newState)
+            newState
         }
     }
 }
@@ -79,6 +93,7 @@ fun <S : State, A : Action> createStore(
     middlewares: List<Middleware<S, A>> = emptyList(),
     reducer: Reducer<S, A>,
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
+    logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ): Store<S, A> =
     Store(
@@ -86,5 +101,6 @@ fun <S : State, A : Action> createStore(
         reducer = reducer,
         middlewares = middlewares,
         errorProcessor = errorProcessor,
+        logger = logger,
         scope = scope,
     )
