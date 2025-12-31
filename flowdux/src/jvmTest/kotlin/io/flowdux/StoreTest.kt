@@ -1224,4 +1224,92 @@ class StoreTest {
             store.close()
             store.close() // Should not throw
         }
+
+    // ==================== Middleware Passthrough Tests ====================
+
+    @Test
+    fun `middleware passes through unregistered actions to reducer`() =
+        runTest {
+            val middleware = object : Middleware<CounterState, CounterAction> {
+                override val processors = buildProcessors {
+                    on<CounterAction.FetchData> { state, action ->
+                        emit(CounterAction.Add(100))
+                    }
+                }
+            }
+
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // Unregistered action should pass through to reducer
+                store.dispatch(CounterAction.Increment)
+                assertEquals(1, awaitItem().count)
+
+                store.dispatch(CounterAction.Add(5))
+                assertEquals(6, awaitItem().count)
+
+                // Registered action should be handled by middleware
+                store.dispatch(CounterAction.FetchData("test"))
+                assertEquals(106, awaitItem().count)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `multiple middlewares pass through unregistered actions`() =
+        runTest {
+            val firstMiddleware = object : Middleware<CounterState, CounterAction> {
+                override val processors = buildProcessors {
+                    on<CounterAction.FetchData> { _, action ->
+                        emit(CounterAction.Add(10))
+                    }
+                }
+            }
+
+            val secondMiddleware = object : Middleware<CounterState, CounterAction> {
+                override val processors = buildProcessors {
+                    on<CounterAction.Reset> { _, _ ->
+                        emit(CounterAction.SetValue(0))
+                    }
+                }
+            }
+
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                middlewares = listOf(firstMiddleware, secondMiddleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // Unregistered in both middlewares - should pass through
+                store.dispatch(CounterAction.Increment)
+                assertEquals(1, awaitItem().count)
+
+                store.dispatch(CounterAction.Increment)
+                assertEquals(2, awaitItem().count)
+
+                // Registered in first middleware
+                store.dispatch(CounterAction.FetchData("test"))
+                assertEquals(12, awaitItem().count)
+
+                // Registered in second middleware
+                store.dispatch(CounterAction.Reset)
+                assertEquals(0, awaitItem().count)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

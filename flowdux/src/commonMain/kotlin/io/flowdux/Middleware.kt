@@ -16,7 +16,12 @@ interface Middleware<S : State, A : Action> {
         getState: () -> S,
         action: A,
     ): Flow<A> = flow {
-        processors[action::class]?.invoke(this, getState(), action)
+        val processor = processors[action::class]
+        if (processor != null) {
+            processor.invoke(this, getState(), action)
+        } else {
+            emit(action)
+        }
     }
 
     class ActionProcessorBuilder<S, A> {
