@@ -1133,4 +1133,95 @@ class StoreTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    // ==================== Store Close Tests ====================
+
+    @Test
+    fun `close cancels scope and stops processing actions`() =
+        runTest {
+            val storeScope = CoroutineScope(coroutineContext + Job())
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                store.dispatch(CounterAction.Increment)
+                assertEquals(1, awaitItem().count)
+
+                store.close()
+
+                // After close, dispatch should not update state
+                store.dispatch(CounterAction.Increment)
+                expectNoEvents()
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `close stops FlowHolderAction stream collection`() =
+        runTest {
+            val storeScope = CoroutineScope(coroutineContext + Job())
+            val valueChannel = Channel<Int>(Channel.UNLIMITED)
+            val receivedValues = mutableListOf<Int>()
+
+            val trackingReducer = Reducer<CounterState, CounterAction> { state, action ->
+                when (action) {
+                    is CounterAction.Add -> {
+                        receivedValues.add(action.value)
+                        state.copy(count = state.count + action.value)
+                    }
+                    else -> counterReducer.reduce(state, action)
+                }
+            }
+
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = trackingReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                store.dispatch(CounterAction.StreamConnected(valueChannel.receiveAsFlow()))
+
+                valueChannel.send(10)
+                assertEquals(10, awaitItem().count)
+
+                store.close()
+
+                valueChannel.send(20)
+                valueChannel.send(30)
+                advanceUntilIdle()
+
+                // Values after close should not be received
+                assertEquals(listOf(10), receivedValues)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            valueChannel.close()
+        }
+
+    @Test
+    fun `close can be called multiple times safely`() =
+        runTest {
+            val storeScope = CoroutineScope(coroutineContext + Job())
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
+
+            store.close()
+            store.close() // Should not throw
+        }
 }
