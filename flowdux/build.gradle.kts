@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.flowdux"
-version = "1.1.0"
+version = "1.2.0"
 
 kotlin {
     jvm()
