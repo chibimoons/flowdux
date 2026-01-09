@@ -76,7 +76,7 @@ Add the dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.chibimoons:flowdux:1.0.0")
+    implementation("com.github.chibimoons:flowdux:1.2.1.1")
 }
 ```
 
@@ -169,8 +169,8 @@ data class ObserveUser(
 }
 
 // Usage: pass the Flow from Repository/Socket
-val repositoryFlow = userRepository.getUser(123)  // Side effect here
-store.dispatch(ObserveUser(repositoryFlow))       // Just wraps the Flow
+val repositoryFlow = userRepository.getUser(123)  // Flow creation (cold)
+store.dispatch(ObserveUser(repositoryFlow))       // Store collects it
 // State updates: cached user -> fresh user from API
 ```
 

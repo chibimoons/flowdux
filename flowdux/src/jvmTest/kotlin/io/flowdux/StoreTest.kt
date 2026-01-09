@@ -1264,6 +1264,116 @@ class StoreTest {
             }
         }
 
+    // ==================== Duplicate State Emission Tests ====================
+
+    @Test
+    fun `store does not emit duplicate states`() =
+        runTest {
+            var emissionCount = 0
+
+            val store = createStore(
+                initialState = CounterState(count = 5),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(5, awaitItem().count)
+                emissionCount++
+
+                // Dispatch action that sets the same value
+                store.dispatch(CounterAction.SetValue(5))
+
+                // No new emission should occur because state is the same
+                expectNoEvents()
+
+                // Dispatch action that actually changes the state
+                store.dispatch(CounterAction.SetValue(10))
+                assertEquals(10, awaitItem().count)
+                emissionCount++
+
+                // Dispatch same value again
+                store.dispatch(CounterAction.SetValue(10))
+                expectNoEvents()
+
+                // Change state and verify emission
+                store.dispatch(CounterAction.Increment)
+                assertEquals(11, awaitItem().count)
+                emissionCount++
+
+                assertEquals(3, emissionCount)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `store does not emit when reducer returns same state reference`() =
+        runTest {
+            // FetchData action returns the same state (state unchanged)
+            val store = createStore(
+                initialState = CounterState(count = 0),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // FetchData returns state unchanged
+                store.dispatch(CounterAction.FetchData("test"))
+                expectNoEvents()
+
+                // StreamConnected also returns state unchanged
+                store.dispatch(CounterAction.StreamConnected(emptyFlow()))
+                expectNoEvents()
+
+                // Actual state change should emit
+                store.dispatch(CounterAction.Increment)
+                assertEquals(1, awaitItem().count)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `consecutive identical state updates are deduplicated`() =
+        runTest {
+            val emissions = mutableListOf<Int>()
+
+            val store = createStore(
+                initialState = CounterState(count = 0),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                emissions.add(awaitItem().count)
+
+                // Multiple actions that result in same state
+                store.dispatch(CounterAction.SetValue(10))
+                emissions.add(awaitItem().count)
+
+                store.dispatch(CounterAction.SetValue(10))
+                store.dispatch(CounterAction.SetValue(10))
+                store.dispatch(CounterAction.SetValue(10))
+
+                // Give time for potential emissions
+                expectNoEvents()
+
+                store.dispatch(CounterAction.SetValue(20))
+                emissions.add(awaitItem().count)
+
+                // Only initial, first change, and final change should be recorded
+                assertEquals(listOf(0, 10, 20), emissions)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
     @Test
     fun `multiple middlewares pass through unregistered actions`() =
         runTest {
