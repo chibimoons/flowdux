@@ -252,23 +252,6 @@ class AnalyticsMiddleware : Middleware<AppState, AppAction> {
 
 Use cases: Analytics events, scroll handling, rate limiting
 
-### Key-based Grouping
-
-Actions with the same key share cancellation/throttling behavior. Use different keys for independent behavior:
-
-```kotlin
-// User fetches and product fetches are independent
-on<FetchUser>(takeLatest("user")) { state, action ->
-    val user = userApi.fetch(action.userId)
-    emit(UserLoaded(user))
-}
-
-on<FetchProduct>(takeLatest("product")) { state, action ->
-    val product = productApi.fetch(action.productId)
-    emit(ProductLoaded(product))
-}
-```
-
 ### Strategy Groups
 
 Use `group` to share a strategy instance across multiple action types. Actions within the same group will coordinate their execution (e.g., one action can cancel another):
