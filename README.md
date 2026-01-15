@@ -76,7 +76,7 @@ Add the dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.chibimoons:flowdux:1.2.1.1")
+    implementation("com.github.chibimoons:flowdux:1.3.0")
 }
 ```
 
