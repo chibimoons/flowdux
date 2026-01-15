@@ -491,7 +491,7 @@ The next time you find yourself wrestling with how to connect your repository's 
 *flowdux is a lightweight Redux-style state management library for Kotlin Multiplatform. Find it on [GitHub](https://github.com/chibimoons/flowdux) and start managing state with elegance.*
 
 ```kotlin
-implementation("com.github.chibimoons:flowdux:1.2.1.1")
+implementation("com.github.chibimoons:flowdux:1.3.0")
 ```
 
 ---
