@@ -6,11 +6,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlin.time.Duration.Companion.milliseconds
 
 // State
 data class CounterState(
     val count: Int = 0,
-    val source: String = ""
+    val source: String = "",
+    val searchResults: List<String> = emptyList(),
+    val isLoading: Boolean = false
 ) : State
 
 // Simulated Repository that emits cached data first, then fresh API data
@@ -38,6 +41,50 @@ sealed interface CounterAction : Action {
         override fun toFlowAction(): Flow<Action> =
             countFlow.map { (value, source) -> SetCount(value, source) }
     }
+
+    // Execution Strategy Examples
+    data class Search(val query: String) : CounterAction
+    data class SearchResult(val results: List<String>) : CounterAction
+    data class FetchData(val id: String) : CounterAction
+    data class FetchSuccess(val id: String, val value: Int) : CounterAction
+    object SubmitForm : CounterAction
+    object SubmitSuccess : CounterAction
+}
+
+// Simulated Search API
+object SearchApi {
+    suspend fun search(query: String): List<String> {
+        delay(300) // Simulate network delay
+        return listOf("$query-result-1", "$query-result-2", "$query-result-3")
+    }
+}
+
+// Middleware with Execution Strategies
+class ExecutionStrategyMiddleware : Middleware<CounterState, CounterAction> {
+    override val processors = buildProcessors {
+        // takeLatest: Only the latest search executes, previous ones are canceled
+        on<CounterAction.Search>(takeLatest("search")) { _, action ->
+            println("    [takeLatest] Searching for: ${action.query}")
+            val results = SearchApi.search(action.query)
+            println("    [takeLatest] Search completed: ${action.query}")
+            emit(CounterAction.SearchResult(results))
+        }
+
+        // debounce: Wait 200ms of no input before executing
+        on<CounterAction.FetchData>(debounce(200.milliseconds)) { _, action ->
+            println("    [debounce] Fetching data: ${action.id}")
+            delay(100)
+            emit(CounterAction.FetchSuccess(action.id, 42))
+        }
+
+        // takeLeading: Ignore subsequent submissions while one is processing
+        on<CounterAction.SubmitForm>(takeLeading("submit")) { _, _ ->
+            println("    [takeLeading] Processing form submission...")
+            delay(500) // Simulate slow API
+            println("    [takeLeading] Form submitted!")
+            emit(CounterAction.SubmitSuccess)
+        }
+    }
 }
 
 // Reducer
@@ -57,6 +104,15 @@ val counterReducer = buildReducer<CounterState, CounterAction> {
     on<CounterAction.SetCount> { state, action ->
         state.copy(count = action.value, source = action.source)
     }
+    on<CounterAction.SearchResult> { state, action ->
+        state.copy(searchResults = action.results)
+    }
+    on<CounterAction.FetchSuccess> { state, action ->
+        state.copy(count = action.value, source = "fetch-${action.id}")
+    }
+    on<CounterAction.SubmitSuccess> { state, _ ->
+        state.copy(source = "submitted")
+    }
 }
 
 fun main() {
@@ -67,6 +123,7 @@ fun main() {
     val store = createStore(
         initialState = CounterState(),
         reducer = counterReducer,
+        middlewares = listOf(ExecutionStrategyMiddleware()),
         scope = scope
     )
 
@@ -74,7 +131,8 @@ fun main() {
     scope.launch {
         store.state.collect { state ->
             val sourceInfo = if (state.source.isNotEmpty()) " [${state.source}]" else ""
-            println("State: count = ${state.count}$sourceInfo")
+            val searchInfo = if (state.searchResults.isNotEmpty()) " results=${state.searchResults}" else ""
+            println("State: count = ${state.count}$sourceInfo$searchInfo")
         }
     }
 
@@ -106,7 +164,47 @@ fun main() {
         store.dispatch(CounterAction.Reset)
         delay(100)
 
-        println("\n=== Done ===")
+        // ==================== Execution Strategy Examples ====================
+
+        println("\n" + "=".repeat(50))
+        println("=== Execution Strategy Examples ===")
+        println("=".repeat(50))
+
+        // takeLatest Example: Rapid search - only latest completes
+        println("\n> takeLatest: Rapid search (only latest completes)")
+        println("  Dispatching Search('a'), Search('ab'), Search('abc') rapidly...")
+        store.dispatch(CounterAction.Search("a"))
+        delay(50)
+        store.dispatch(CounterAction.Search("ab"))
+        delay(50)
+        store.dispatch(CounterAction.Search("abc"))
+        delay(500) // Wait for final search to complete
+        println("  Result: Only 'abc' search completed!")
+
+        // debounce Example: Wait for typing to stop
+        println("\n> debounce: Wait 200ms after last input")
+        println("  Dispatching FetchData rapidly...")
+        store.dispatch(CounterAction.FetchData("1"))
+        delay(50)
+        store.dispatch(CounterAction.FetchData("2"))
+        delay(50)
+        store.dispatch(CounterAction.FetchData("3"))
+        delay(400) // Wait for debounce + fetch
+        println("  Result: Only last FetchData executed after 200ms quiet period!")
+
+        // takeLeading Example: Prevent double submission
+        println("\n> takeLeading: Prevent double form submission")
+        println("  Dispatching SubmitForm 3 times rapidly...")
+        store.dispatch(CounterAction.SubmitForm)
+        delay(50)
+        store.dispatch(CounterAction.SubmitForm) // ignored
+        delay(50)
+        store.dispatch(CounterAction.SubmitForm) // ignored
+        delay(600) // Wait for submission to complete
+        println("  Result: Only first submission processed, others ignored!")
+
+        println("\n" + "=".repeat(50))
+        println("=== Done ===")
     }
 
     scope.cancel()

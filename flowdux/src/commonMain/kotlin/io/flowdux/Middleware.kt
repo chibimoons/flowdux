@@ -40,6 +40,37 @@ interface Middleware<S : State, A : Action> {
             processors[T::class] = { _, _ -> processor() }
         }
 
+        /**
+         * Registers an action processor with an execution strategy.
+         *
+         * @param strategy The execution strategy to apply (e.g., takeLatest, takeLeading, debounce, throttle)
+         * @param processor The action processor function
+         */
+        inline fun <reified T : A> on(
+            strategy: ExecutionStrategy,
+            noinline processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+        ) {
+            val wrappedProcessor = strategy.wrap(processor)
+            @Suppress("UNCHECKED_CAST")
+            processors[T::class] = wrappedProcessor as ActionProcessor<S, A>
+        }
+
+        /**
+         * Registers an action processor with an execution strategy (no state/action parameters).
+         *
+         * @param strategy The execution strategy to apply (e.g., takeLatest, takeLeading, debounce, throttle)
+         * @param processor The action processor function
+         */
+        inline fun <reified T : A> on(
+            strategy: ExecutionStrategy,
+            noinline processor: suspend FlowCollector<A>.() -> Unit
+        ) {
+            val wrappedProcessor: suspend FlowCollector<A>.(S, T) -> Unit = { _, _ -> processor() }
+            val wrapped = strategy.wrap(wrappedProcessor)
+            @Suppress("UNCHECKED_CAST")
+            processors[T::class] = wrapped as ActionProcessor<S, A>
+        }
+
         fun build() = processors.toMap()
     }
 
