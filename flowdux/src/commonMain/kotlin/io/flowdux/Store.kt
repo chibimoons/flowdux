@@ -19,8 +19,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class Store<S : State, A : Action>(
@@ -71,8 +69,6 @@ class Store<S : State, A : Action>(
 
     val currentState: S get() = stateFlow.value
 
-    private val mutex = Mutex()
-
     fun dispatch(action: A) {
         logger.onActionDispatched(action)
         scope.launch {
@@ -85,12 +81,10 @@ class Store<S : State, A : Action>(
         scope.cancel()
     }
 
-    private suspend fun reduceAction(currentState: S, action: A): S {
-        return mutex.withLock {
-            val newState = reducer.reduce(currentState, action)
-            logger.onStateReduced(action, currentState, newState)
-            newState
-        }
+    private fun reduceAction(currentState: S, action: A): S {
+        val newState = reducer.reduce(currentState, action)
+        logger.onStateReduced(action, currentState, newState)
+        return newState
     }
 }
 
