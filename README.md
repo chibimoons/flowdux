@@ -8,6 +8,8 @@ A lightweight Redux-style state management library for Kotlin Multiplatform with
 
 - Redux-style state management with Reducer pattern
 - Middleware support for side effects
+- Execution strategies (takeLatest, takeLeading, debounce, throttle)
+- Strategy groups for cross-action coordination
 - Error handling with ErrorProcessor
 - Built on Kotlin Coroutines and Flow
 - Kotlin Multiplatform support (JVM, iOS)
@@ -56,6 +58,7 @@ flowchart TB
 | Component | Role |
 |-----------|------|
 | **Middleware** | Side effects (API calls, logging), action transformation |
+| **ExecutionStrategy** | Control concurrent action processing (takeLatest, debounce, etc.) |
 | **FlowHolderAction** | Convert existing Flow to Action stream |
 | **ErrorProcessor** | Catch errors and convert to Actions |
 | **Reducer** | Pure function: (State, Action) → NewState |
@@ -266,6 +269,41 @@ on<FetchProduct>(takeLatest("product")) { state, action ->
 }
 ```
 
+### Strategy Groups
+
+Use `group` to share a strategy instance across multiple action types. Actions within the same group will coordinate their execution (e.g., one action can cancel another):
+
+```kotlin
+class SearchMiddleware : Middleware<AppState, AppAction> {
+    override val processors = buildProcessors {
+        // SearchAction and RefreshAction share the same takeLatest instance
+        // Dispatching RefreshAction will cancel an in-progress SearchAction
+        group(takeLatest("search")) {
+            on<SearchAction> { state, action ->
+                val results = searchApi.search(action.query)
+                emit(SearchResults(results))
+            }
+            on<RefreshAction> { state, action ->
+                val results = searchApi.refresh()
+                emit(SearchResults(results))
+            }
+        }
+
+        // Debounce across multiple input types
+        group(debounce(300.milliseconds)) {
+            on<TextChanged> { state, action ->
+                emit(ValidateInput(action.text))
+            }
+            on<FilterChanged> { state, action ->
+                emit(ApplyFilter(action.filter))
+            }
+        }
+    }
+}
+```
+
+**Important:** Each action type can only be registered once per middleware. Duplicate registrations will throw `DuplicateProcessorException`.
+
 ## Sample Apps
 
 ### Run JVM Console Sample
@@ -310,6 +348,13 @@ State: count = 42 [api]
     [takeLeading] Processing form submission...
     [takeLeading] Form submitted!
   Result: Only first submission processed, others ignored!
+
+> Strategy Group: LoadUser and RefreshUser share takeLatest
+  Dispatching LoadUser, then RefreshUser (cancels LoadUser)...
+    [group] Loading user: 123
+    [group] Refreshing user...
+    [group] User refreshed!
+  Result: LoadUser was canceled, only RefreshUser completed!
 ```
 
 ### Build Android Sample

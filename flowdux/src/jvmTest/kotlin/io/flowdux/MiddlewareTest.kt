@@ -308,4 +308,46 @@ class MiddlewareTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `duplicate processor registration throws exception`() {
+        org.junit.jupiter.api.assertThrows<Middleware.DuplicateProcessorException> {
+            object : Middleware<CounterState, CounterAction> {
+                override val processors = buildProcessors {
+                    on<CounterAction.Increment> { _, _ -> emit(CounterAction.Increment) }
+                    on<CounterAction.Increment> { _, _ -> emit(CounterAction.Increment) } // Duplicate!
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `duplicate processor in group throws exception`() {
+        org.junit.jupiter.api.assertThrows<Middleware.DuplicateProcessorException> {
+            object : Middleware<CounterState, CounterAction> {
+                override val processors = buildProcessors {
+                    on<CounterAction.Increment> { _, _ -> emit(CounterAction.Increment) }
+                    group(takeLatest("test")) {
+                        on<CounterAction.Increment> { _, _ -> emit(CounterAction.Increment) } // Duplicate!
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `duplicate processor across groups throws exception`() {
+        org.junit.jupiter.api.assertThrows<Middleware.DuplicateProcessorException> {
+            object : Middleware<CounterState, CounterAction> {
+                override val processors = buildProcessors {
+                    group(takeLatest("group1")) {
+                        on<CounterAction.Increment> { _, _ -> emit(CounterAction.Increment) }
+                    }
+                    group(takeLatest("group2")) {
+                        on<CounterAction.Increment> { _, _ -> emit(CounterAction.Increment) } // Duplicate!
+                    }
+                }
+            }
+        }
+    }
 }
