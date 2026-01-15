@@ -287,6 +287,29 @@ State: count = 1
 State: count = 10 [cache]
 State: count = 42 [api]
 ...
+
+==================================================
+=== Execution Strategy Examples ===
+==================================================
+
+> takeLatest: Rapid search (only latest completes)
+  Dispatching Search('a'), Search('ab'), Search('abc') rapidly...
+    [takeLatest] Searching for: a
+    [takeLatest] Searching for: ab
+    [takeLatest] Searching for: abc
+    [takeLatest] Search completed: abc
+  Result: Only 'abc' search completed!
+
+> debounce: Wait 200ms after last input
+  Dispatching FetchData rapidly...
+    [debounce] Fetching data: 3
+  Result: Only last FetchData executed after 200ms quiet period!
+
+> takeLeading: Prevent double form submission
+  Dispatching SubmitForm 3 times rapidly...
+    [takeLeading] Processing form submission...
+    [takeLeading] Form submitted!
+  Result: Only first submission processed, others ignored!
 ```
 
 ### Build Android Sample
