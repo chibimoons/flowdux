@@ -49,6 +49,11 @@ sealed interface CounterAction : Action {
     data class FetchSuccess(val id: String, val value: Int) : CounterAction
     object SubmitForm : CounterAction
     object SubmitSuccess : CounterAction
+
+    // Strategy Group Examples
+    data class LoadUser(val userId: String) : CounterAction
+    object RefreshUser : CounterAction
+    data class UserLoaded(val userName: String) : CounterAction
 }
 
 // Simulated Search API
@@ -84,6 +89,23 @@ class ExecutionStrategyMiddleware : Middleware<CounterState, CounterAction> {
             println("    [takeLeading] Form submitted!")
             emit(CounterAction.SubmitSuccess)
         }
+
+        // Strategy Group: Different action types share the same strategy instance
+        // LoadUser and RefreshUser will cancel each other
+        group(takeLatest("user-data")) {
+            on<CounterAction.LoadUser> { _, action ->
+                println("    [group] Loading user: ${action.userId}")
+                delay(300) // Simulate API call
+                println("    [group] User loaded: ${action.userId}")
+                emit(CounterAction.UserLoaded("User-${action.userId}"))
+            }
+            on<CounterAction.RefreshUser> { _, _ ->
+                println("    [group] Refreshing user...")
+                delay(300) // Simulate API call
+                println("    [group] User refreshed!")
+                emit(CounterAction.UserLoaded("RefreshedUser"))
+            }
+        }
     }
 }
 
@@ -112,6 +134,9 @@ val counterReducer = buildReducer<CounterState, CounterAction> {
     }
     on<CounterAction.SubmitSuccess> { state, _ ->
         state.copy(source = "submitted")
+    }
+    on<CounterAction.UserLoaded> { state, action ->
+        state.copy(source = action.userName)
     }
 }
 
@@ -202,6 +227,15 @@ fun main() {
         store.dispatch(CounterAction.SubmitForm) // ignored
         delay(600) // Wait for submission to complete
         println("  Result: Only first submission processed, others ignored!")
+
+        // Strategy Group Example: Different action types share same strategy
+        println("\n> Strategy Group: LoadUser and RefreshUser share takeLatest")
+        println("  Dispatching LoadUser, then RefreshUser (cancels LoadUser)...")
+        store.dispatch(CounterAction.LoadUser("123"))
+        delay(100) // Let LoadUser start
+        store.dispatch(CounterAction.RefreshUser) // Cancels LoadUser
+        delay(400) // Wait for RefreshUser to complete
+        println("  Result: LoadUser was canceled, only RefreshUser completed!")
 
         println("\n" + "=".repeat(50))
         println("=== Done ===")
