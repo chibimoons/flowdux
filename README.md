@@ -174,6 +174,98 @@ store.dispatch(ObserveUser(repositoryFlow))       // Store collects it
 // State updates: cached user -> fresh user from API
 ```
 
+## Execution Strategies
+
+FlowDux provides execution strategies to control how concurrent actions are processed in middleware.
+
+### takeLatest(key)
+
+Cancels previous processing when a new action with the same key arrives. Only the latest action's result is emitted.
+
+```kotlin
+class SearchMiddleware : Middleware<AppState, AppAction> {
+    override val processors = buildProcessors {
+        on<AppAction.Search>(takeLatest("search")) { state, action ->
+            val results = searchApi.search(action.query)
+            emit(AppAction.SearchResults(results))
+        }
+    }
+}
+```
+
+Use cases: Search, API refresh, pagination with pull-to-refresh
+
+### takeLeading(key)
+
+Ignores new actions while one with the same key is still processing. Only the first action in a series executes.
+
+```kotlin
+class SubmitMiddleware : Middleware<AppState, AppAction> {
+    override val processors = buildProcessors {
+        on<AppAction.Submit>(takeLeading("submit")) { state, action ->
+            // Prevents duplicate submissions
+            val result = api.submit(action.data)
+            emit(AppAction.SubmitSuccess(result))
+        }
+    }
+}
+```
+
+Use cases: Form submission, payment processing, preventing double-clicks
+
+### debounce(duration)
+
+Delays execution. If another action arrives before the delay completes, the previous action is canceled and the timer restarts.
+
+```kotlin
+class AutosaveMiddleware : Middleware<AppState, AppAction> {
+    override val processors = buildProcessors {
+        on<AppAction.TextChanged>(debounce(500.milliseconds)) { state, action ->
+            // Only saves after user stops typing for 500ms
+            api.save(action.text)
+            emit(AppAction.SaveComplete)
+        }
+    }
+}
+```
+
+Use cases: Search autocomplete, autosave, input validation
+
+### throttle(duration)
+
+Limits execution rate. Executes the first action immediately, then ignores subsequent actions until the time window passes.
+
+```kotlin
+class AnalyticsMiddleware : Middleware<AppState, AppAction> {
+    override val processors = buildProcessors {
+        on<AppAction.Scroll>(throttle(1000.milliseconds)) { state, action ->
+            // Logs scroll position at most once per second
+            analytics.logScroll(action.position)
+            emit(action)
+        }
+    }
+}
+```
+
+Use cases: Analytics events, scroll handling, rate limiting
+
+### Key-based Grouping
+
+Actions with the same key share cancellation/throttling behavior. Use different keys for independent behavior:
+
+```kotlin
+// User fetches and product fetches are independent
+on<FetchUser>(takeLatest("user")) { state, action ->
+    val user = userApi.fetch(action.userId)
+    emit(UserLoaded(user))
+}
+
+on<FetchProduct>(takeLatest("product")) { state, action ->
+    val product = productApi.fetch(action.productId)
+    emit(ProductLoaded(product))
+}
+```
+
 ## Sample Apps
 
 ### Run JVM Console Sample
