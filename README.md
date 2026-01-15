@@ -132,6 +132,16 @@ on<BatchAction> { state, action ->
 }
 ```
 
+**Note:** Actions without a registered processor in middleware automatically pass through to the Reducer:
+
+```kotlin
+// Middleware only handles FetchUser
+on<FetchUser> { state, action -> ... }
+
+// Other actions (Increment, Reset, etc.) pass through directly to Reducer
+store.dispatch(Increment)  // → Middleware (no processor) → Reducer
+```
+
 ## Installation
 
 Add JitPack repository to your `settings.gradle.kts`:
