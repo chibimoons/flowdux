@@ -65,10 +65,10 @@ interface Middleware<S : State, A : Action> {
             strategy: ExecutionStrategy,
             noinline processor: suspend FlowCollector<A>.() -> Unit
         ) {
-            val wrappedProcessor: suspend FlowCollector<A>.(S, T) -> Unit = { _, _ -> processor() }
-            val wrapped = strategy.wrap(wrappedProcessor)
+            val baseProcessor: suspend FlowCollector<A>.(S, T) -> Unit = { _, _ -> processor() }
+            val wrappedProcessor = strategy.wrap(baseProcessor)
             @Suppress("UNCHECKED_CAST")
-            processors[T::class] = wrapped as ActionProcessor<S, A>
+            processors[T::class] = wrappedProcessor as ActionProcessor<S, A>
         }
 
         fun build() = processors.toMap()
