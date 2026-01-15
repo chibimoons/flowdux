@@ -491,7 +491,7 @@ data class GetChat(...)
 *flowdux는 Kotlin Multiplatform을 위한 경량 Redux 스타일 상태 관리 라이브러리입니다. [GitHub](https://github.com/chibimoons/flowdux)에서 찾아보시고 우아하게 상태를 관리해 보세요.*
 
 ```kotlin
-implementation("com.github.chibimoons:flowdux:1.3.0")
+implementation("com.github.chibimoons:flowdux:1.4.0")
 ```
 
 ---
