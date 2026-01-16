@@ -260,6 +260,20 @@ if (!store.isClosed) {
 
 **Note:** Dispatching after `close()` is logged via `StoreLogger.onDispatchAfterClose()` and may indicate a bug in your application.
 
+### Logging
+
+Use `DebugStoreLogger` for development debugging:
+
+```kotlin
+val store = createStore(
+    initialState = CounterState(),
+    reducer = counterReducer,
+    logger = DebugStoreLogger("MyStore")
+)
+```
+
+> **Warning:** `DebugStoreLogger` prints the entire State and Action objects via `println()`. Do not use in production as it may expose sensitive information (tokens, passwords, personal data). Use `NoOpStoreLogger` (default) or implement a custom `StoreLogger` with proper filtering for production.
+
 ### FlowHolderAction (Wrap Existing Flow as Actions)
 
 Use `FlowHolderAction` to wrap existing Flows (Repository, Socket) and convert them to Actions.

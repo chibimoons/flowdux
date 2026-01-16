@@ -62,17 +62,11 @@ class Store<S : State, A : Action>(
         }
         .catch { error ->
             logger.onErrorOccurred(error)
-            try {
-                emitAll(
-                    errorProcessor.process(error)
-                        .onEach { logger.onErrorHandled(it) }
-                )
-            } catch (e: Exception) {
-                logger.onErrorOccurred(e)
-                // ErrorProcessor failed - swallow to prevent flow termination
-            }
+            emitAll(
+                errorProcessor.process(error)
+                    .onEach { logger.onErrorHandled(it) }
+            )
         }
-
 
     val state: StateFlow<S> = stateFlow
 

@@ -26,3 +26,41 @@ class NoOpStoreLogger<S : State, A : Action> : StoreLogger<S, A> {
     override fun onStateReduced(action: A, previousState: S, newState: S) {}
     override fun onDispatchAfterClose(action: A) {}
 }
+
+class DebugStoreLogger<S : State, A : Action>(
+    private val tag: String = "Store"
+) : StoreLogger<S, A> {
+    override fun onActionDispatched(action: A) {
+        println("[$tag] Dispatched: $action")
+    }
+
+    override fun onMiddlewareProcessing(middlewareName: String, action: A) {
+        println("[$tag] Middleware($middlewareName) processing: $action")
+    }
+
+    override fun onMiddlewaresCompleted(action: A) {
+        println("[$tag] Middlewares completed: $action")
+    }
+
+    override fun onFlowHolderActionEmitted(action: A) {
+        println("[$tag] FlowHolderAction emitted: $action")
+    }
+
+    override fun onErrorOccurred(throwable: Throwable) {
+        println("[$tag] Error: ${throwable.message}")
+    }
+
+    override fun onErrorHandled(action: A) {
+        println("[$tag] Error handled with: $action")
+    }
+
+    override fun onStateReduced(action: A, previousState: S, newState: S) {
+        println("[$tag] State reduced: $action")
+        println("[$tag]   Previous: $previousState")
+        println("[$tag]   New: $newState")
+    }
+
+    override fun onDispatchAfterClose(action: A) {
+        println("[$tag] WARNING: Dispatch after close: $action")
+    }
+}
