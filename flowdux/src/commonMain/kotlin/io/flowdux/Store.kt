@@ -6,6 +6,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,9 @@ class Store<S : State, A : Action>(
     private val scope: CoroutineScope,
 ) {
     private val actionFlow = Channel<A>()
+    private var _isClosed = false
+
+    val isClosed: Boolean get() = _isClosed
 
     private val stateFlow = actionFlow
         .receiveAsFlow()
@@ -56,27 +60,37 @@ class Store<S : State, A : Action>(
                 flowOf(it)
             }
         }
-        .catch {
-            logger.onErrorOccurred(it)
+        .catch { error ->
+            logger.onErrorOccurred(error)
             emitAll(
-                errorProcessor.process(it)
-                        .onEach { logger.onErrorHandled(it)  }
+                errorProcessor.process(error)
+                    .onEach { logger.onErrorHandled(it) }
             )
         }
-
 
     val state: StateFlow<S> = stateFlow
 
     val currentState: S get() = stateFlow.value
 
     fun dispatch(action: A) {
-        logger.onActionDispatched(action)
+        if (_isClosed) {
+            logger.onDispatchAfterClose(action)
+            return
+        }
         scope.launch {
-            actionFlow.send(action)
+            try {
+                logger.onActionDispatched(action)
+                actionFlow.send(action)
+            } catch (e: ClosedSendChannelException) {
+                // Race condition: close() called between isClosed check and send
+                logger.onDispatchAfterClose(action)
+            }
         }
     }
 
     fun close() {
+        if (_isClosed) return
+        _isClosed = true
         actionFlow.close()
         scope.cancel()
     }

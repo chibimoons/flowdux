@@ -50,6 +50,10 @@ class CounterViewModel : ViewModel() {
             ) {
                 Log.d(TAG, "[REDUCE] $action: $previousState -> $newState")
             }
+
+            override fun onDispatchAfterClose(action: CounterAction) {
+                Log.w(TAG, "[DISPATCH_AFTER_CLOSE] $action")
+            }
         }
     )
 
