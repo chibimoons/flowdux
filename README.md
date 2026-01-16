@@ -236,6 +236,30 @@ store.dispatch(CounterAction.Increment)
 store.dispatch(CounterAction.Add(10))
 ```
 
+### Store Lifecycle
+
+Always call `close()` when the store is no longer needed to release resources:
+
+```kotlin
+// In ViewModel
+override fun onCleared() {
+    store.close()
+    super.onCleared()
+}
+```
+
+**isClosed Property:**
+
+Check `isClosed` before dispatching if there's a possibility the store may be closed:
+
+```kotlin
+if (!store.isClosed) {
+    store.dispatch(action)
+}
+```
+
+**Note:** Dispatching after `close()` is logged via `StoreLogger.onDispatchAfterClose()` and may indicate a bug in your application.
+
 ### FlowHolderAction (Wrap Existing Flow as Actions)
 
 Use `FlowHolderAction` to wrap existing Flows (Repository, Socket) and convert them to Actions.

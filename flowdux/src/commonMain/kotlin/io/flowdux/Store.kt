@@ -6,6 +6,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,9 @@ class Store<S : State, A : Action>(
     private val scope: CoroutineScope,
 ) {
     private val actionFlow = Channel<A>()
+    private var _isClosed = false
+
+    val isClosed: Boolean get() = _isClosed
 
     private val stateFlow = actionFlow
         .receiveAsFlow()
@@ -56,12 +60,17 @@ class Store<S : State, A : Action>(
                 flowOf(it)
             }
         }
-        .catch {
-            logger.onErrorOccurred(it)
-            emitAll(
-                errorProcessor.process(it)
-                        .onEach { logger.onErrorHandled(it)  }
-            )
+        .catch { error ->
+            logger.onErrorOccurred(error)
+            try {
+                emitAll(
+                    errorProcessor.process(error)
+                        .onEach { logger.onErrorHandled(it) }
+                )
+            } catch (e: Exception) {
+                logger.onErrorOccurred(e)
+                // ErrorProcessor failed - swallow to prevent flow termination
+            }
         }
 
 
@@ -70,13 +79,19 @@ class Store<S : State, A : Action>(
     val currentState: S get() = stateFlow.value
 
     fun dispatch(action: A) {
-        logger.onActionDispatched(action)
         scope.launch {
-            actionFlow.send(action)
+            try {
+                logger.onActionDispatched(action)
+                actionFlow.send(action)
+            } catch (e: ClosedSendChannelException) {
+                logger.onDispatchAfterClose(action)
+            }
         }
     }
 
     fun close() {
+        if (_isClosed) return
+        _isClosed = true
         actionFlow.close()
         scope.cancel()
     }

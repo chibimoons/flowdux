@@ -8,6 +8,12 @@ interface StoreLogger<S : State, A : Action> {
     fun onErrorOccurred(throwable: Throwable)
     fun onErrorHandled(action: A)
     fun onStateReduced(action: A, previousState: S, newState: S)
+
+    /**
+     * Called when dispatch() is invoked after the store has been closed.
+     * This may indicate a bug in the application - consider checking isClosed before dispatching.
+     */
+    fun onDispatchAfterClose(action: A)
 }
 
 class NoOpStoreLogger<S : State, A : Action> : StoreLogger<S, A> {
@@ -18,4 +24,5 @@ class NoOpStoreLogger<S : State, A : Action> : StoreLogger<S, A> {
     override fun onErrorOccurred(throwable: Throwable) {}
     override fun onErrorHandled(action: A) {}
     override fun onStateReduced(action: A, previousState: S, newState: S) {}
+    override fun onDispatchAfterClose(action: A) {}
 }
