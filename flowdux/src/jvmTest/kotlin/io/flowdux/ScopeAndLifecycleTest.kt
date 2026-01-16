@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -198,6 +199,65 @@ class ScopeAndLifecycleTest {
 
             store.close()
             store.close() // Should not throw
+        }
+
+    @Test
+    fun `isClosed returns false before close and true after close`() =
+        runTest {
+            val storeScope = CoroutineScope(coroutineContext + Job())
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
+
+            assertFalse(store.isClosed)
+
+            store.close()
+
+            assertTrue(store.isClosed)
+        }
+
+    @Test
+    fun `dispatch after close calls onDispatchAfterClose logger`() =
+        runTest {
+            val storeScope = CoroutineScope(coroutineContext + Job())
+            val dispatchedAfterClose = mutableListOf<CounterAction>()
+
+            val testLogger = object : StoreLogger<CounterState, CounterAction> {
+                override fun onActionDispatched(action: CounterAction) {}
+                override fun onMiddlewareProcessing(middlewareName: String, action: CounterAction) {}
+                override fun onMiddlewaresCompleted(action: CounterAction) {}
+                override fun onFlowHolderActionEmitted(action: CounterAction) {}
+                override fun onErrorOccurred(throwable: Throwable) {}
+                override fun onErrorHandled(action: CounterAction) {}
+                override fun onStateReduced(action: CounterAction, previousState: CounterState, newState: CounterState) {}
+                override fun onDispatchAfterClose(action: CounterAction) {
+                    dispatchedAfterClose.add(action)
+                }
+            }
+
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                logger = testLogger,
+                scope = storeScope,
+            )
+
+            store.close()
+
+            // Dispatch after close
+            store.dispatch(CounterAction.Increment)
+            store.dispatch(CounterAction.Add(5))
+
+            // Wait for coroutines to complete
+            advanceUntilIdle()
+
+            assertEquals(2, dispatchedAfterClose.size)
+            assertEquals(CounterAction.Increment, dispatchedAfterClose[0])
+            assertEquals(CounterAction.Add(5), dispatchedAfterClose[1])
         }
 
     // ==================== Duplicate State Emission Tests ====================

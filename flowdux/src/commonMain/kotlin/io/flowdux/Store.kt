@@ -79,11 +79,16 @@ class Store<S : State, A : Action>(
     val currentState: S get() = stateFlow.value
 
     fun dispatch(action: A) {
+        if (_isClosed) {
+            logger.onDispatchAfterClose(action)
+            return
+        }
         scope.launch {
             try {
                 logger.onActionDispatched(action)
                 actionFlow.send(action)
             } catch (e: ClosedSendChannelException) {
+                // Race condition: close() called between isClosed check and send
                 logger.onDispatchAfterClose(action)
             }
         }
