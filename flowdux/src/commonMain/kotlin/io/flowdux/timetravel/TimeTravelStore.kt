@@ -8,7 +8,6 @@ import io.flowdux.NoOpStoreLogger
 import io.flowdux.Reducer
 import io.flowdux.State
 import io.flowdux.Store
-import io.flowdux.StoreLogger
 import io.flowdux.createStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -158,15 +157,7 @@ fun <S : State, A : Action> createTimeTravelStore(
         reducer.reduce(timeTravelStore.currentState, action)
     }
 
-    val historyLogger = object : StoreLogger<S, A> {
-        override fun onActionDispatched(action: A) {}
-        override fun onMiddlewareProcessing(middlewareName: String, action: A) {}
-        override fun onMiddlewaresCompleted(action: A) {}
-        override fun onFlowHolderActionEmitted(action: A) {}
-        override fun onErrorOccurred(throwable: Throwable) {}
-        override fun onErrorHandled(action: A) {}
-        override fun onDispatchAfterClose(action: A) {}
-
+    val historyLogger = object : NoOpStoreLogger<S, A>() {
         override fun onStateReduced(action: A, previousState: S, newState: S) {
             timeTravelStore.recordStateChange(action, timeTravelStore.currentState, newState)
         }
