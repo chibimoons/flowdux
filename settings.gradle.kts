@@ -15,6 +15,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "flowdux-root"
 include(":flowdux")
+include(":flowdux-timetravel")
 include(":sample-jvm")
 include(":sample-android")
 include(":sample-shared:shared")

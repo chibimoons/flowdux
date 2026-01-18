@@ -16,7 +16,7 @@ interface StoreLogger<S : State, A : Action> {
     fun onDispatchAfterClose(action: A)
 }
 
-class NoOpStoreLogger<S : State, A : Action> : StoreLogger<S, A> {
+open class NoOpStoreLogger<S : State, A : Action> : StoreLogger<S, A> {
     override fun onActionDispatched(action: A) {}
     override fun onMiddlewareProcessing(middlewareName: String, action: A) {}
     override fun onMiddlewaresCompleted(action: A) {}
