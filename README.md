@@ -159,7 +159,7 @@ Add the dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.chibimoons:flowdux:1.6.0")
+    implementation("com.github.chibimoons:flowdux:1.6.1")
 }
 ```
 
@@ -411,7 +411,7 @@ Time travel debugging is available as a separate module:
 
 ```kotlin
 // build.gradle.kts
-implementation("com.github.chibimoons.flowdux:flowdux-timetravel:1.6.0")
+implementation("com.github.chibimoons.flowdux:flowdux-timetravel:1.6.1")
 ```
 
 ```kotlin
