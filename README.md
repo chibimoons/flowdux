@@ -285,14 +285,14 @@ store.dispatch(ObserveUser(repositoryFlow))       // Store collects it
 
 FlowDux provides execution strategies to control how concurrent actions are processed in middleware.
 
-### takeLatest(key)
+### takeLatest()
 
-Cancels previous processing when a new action with the same key arrives. Only the latest action's result is emitted.
+Cancels previous processing when a new action arrives. Only the latest action's result is emitted.
 
 ```kotlin
 class SearchMiddleware : Middleware<AppState, AppAction> {
     override val processors = buildProcessors {
-        on<AppAction.Search>(takeLatest("search")) { state, action ->
+        on<AppAction.Search>(takeLatest()) { state, action ->
             val results = searchApi.search(action.query)
             emit(AppAction.SearchResults(results))
         }
@@ -302,14 +302,14 @@ class SearchMiddleware : Middleware<AppState, AppAction> {
 
 Use cases: Search, API refresh, pagination with pull-to-refresh
 
-### takeLeading(key)
+### takeLeading()
 
-Ignores new actions while one with the same key is still processing. Only the first action in a series executes.
+Ignores new actions while one is still processing. Only the first action in a series executes.
 
 ```kotlin
 class SubmitMiddleware : Middleware<AppState, AppAction> {
     override val processors = buildProcessors {
-        on<AppAction.Submit>(takeLeading("submit")) { state, action ->
+        on<AppAction.Submit>(takeLeading()) { state, action ->
             // Prevents duplicate submissions
             val result = api.submit(action.data)
             emit(AppAction.SubmitSuccess(result))
@@ -365,7 +365,7 @@ class SearchMiddleware : Middleware<AppState, AppAction> {
     override val processors = buildProcessors {
         // SearchAction and RefreshAction share the same takeLatest instance
         // Dispatching RefreshAction will cancel an in-progress SearchAction
-        group(takeLatest("search")) {
+        group(takeLatest()) {
             on<SearchAction> { state, action ->
                 val results = searchApi.search(action.query)
                 emit(SearchResults(results))

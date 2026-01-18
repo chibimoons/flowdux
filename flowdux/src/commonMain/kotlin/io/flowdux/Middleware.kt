@@ -97,7 +97,7 @@ interface Middleware<S : State, A : Action> {
          *
          * Example:
          * ```
-         * group(takeLatest("search")) {
+         * group(takeLatest()) {
          *     on<SearchAction> { state, action -> ... }
          *     on<RefreshAction> { state, action -> ... }
          * }

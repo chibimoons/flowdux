@@ -56,7 +56,7 @@ class ExecutionStrategyTest {
 
             val middleware = object : Middleware<TestState, TestAction> {
                 override val processors = buildProcessors {
-                    on<TestAction.Fetch>(takeLatest("fetch")) { state, action ->
+                    on<TestAction.Fetch>(takeLatest()) { state, action ->
                         executionOrder.add("start-${action.id}")
                         delay(100)
                         executionOrder.add("end-${action.id}")
@@ -107,12 +107,12 @@ class ExecutionStrategyTest {
             val middleware = object : Middleware<TestState, TestAction> {
                 override val processors = buildProcessors {
                     // Use separate takeLatest instances for different key groups
-                    on<TestAction.Fetch>(takeLatest("fetch")) { state, action ->
+                    on<TestAction.Fetch>(takeLatest()) { state, action ->
                         delay(100)
                         completedActionsA.add(action.id)
                         emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
                     }
-                    on<TestAction.Search>(takeLatest("search")) { state, action ->
+                    on<TestAction.Search>(takeLatest()) { state, action ->
                         delay(100)
                         completedActionsB.add(action.query)
                         emit(TestAction.SearchResult(action.query, listOf(action.query)))
@@ -163,7 +163,7 @@ class ExecutionStrategyTest {
 
             val middleware = object : Middleware<TestState, TestAction> {
                 override val processors = buildProcessors {
-                    on<TestAction.Fetch>(takeLeading("fetch")) { state, action ->
+                    on<TestAction.Fetch>(takeLeading()) { state, action ->
                         executionCount.add(action.id)
                         delay(100)
                         emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
@@ -204,7 +204,7 @@ class ExecutionStrategyTest {
 
             val middleware = object : Middleware<TestState, TestAction> {
                 override val processors = buildProcessors {
-                    on<TestAction.Click>(takeLeading("click")) { state, action ->
+                    on<TestAction.Click>(takeLeading()) { state, action ->
                         executionOrder.add(action.buttonId)
                         delay(50)
                         emit(TestAction.ClickProcessed(action.buttonId))
@@ -433,12 +433,12 @@ class ExecutionStrategyTest {
 
             val middleware = object : Middleware<TestState, TestAction> {
                 override val processors = buildProcessors {
-                    on<TestAction.Fetch>(takeLatest("fetch")) { state, action ->
+                    on<TestAction.Fetch>(takeLatest()) { state, action ->
                         delay(50)
                         fetchExecutions.add(action.id)
                         emit(TestAction.FetchSuccess(action.id, action.id))
                     }
-                    on<TestAction.Click>(takeLeading("click")) { state, action ->
+                    on<TestAction.Click>(takeLeading()) { state, action ->
                         delay(50)
                         clickExecutions.add(action.buttonId)
                         emit(TestAction.ClickProcessed(action.buttonId))
@@ -487,7 +487,7 @@ class ExecutionStrategyTest {
             val middleware = object : Middleware<TestState, TestAction> {
                 override val processors = buildProcessors {
                     // Both Fetch and Search share the same takeLatest instance
-                    group(takeLatest("shared")) {
+                    group(takeLatest()) {
                         on<TestAction.Fetch> { _, action ->
                             executionOrder.add("fetch-start-${action.id}")
                             delay(100)
@@ -541,7 +541,7 @@ class ExecutionStrategyTest {
 
             val middleware = object : Middleware<TestState, TestAction> {
                 override val processors = buildProcessors {
-                    group(takeLeading("shared")) {
+                    group(takeLeading()) {
                         on<TestAction.Fetch> { _, action ->
                             executionOrder.add("fetch-${action.id}")
                             delay(100)
@@ -589,14 +589,14 @@ class ExecutionStrategyTest {
 
             val middleware = object : Middleware<TestState, TestAction> {
                 override val processors = buildProcessors {
-                    group(takeLatest("groupA")) {
+                    group(takeLatest()) {
                         on<TestAction.Fetch> { _, action ->
                             delay(50)
                             groupAExecutions.add(action.id)
                             emit(TestAction.FetchSuccess(action.id, action.id))
                         }
                     }
-                    group(takeLatest("groupB")) {
+                    group(takeLatest()) {
                         on<TestAction.Search> { _, action ->
                             delay(50)
                             groupBExecutions.add(action.query)
