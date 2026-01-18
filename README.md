@@ -263,7 +263,12 @@ if (!store.isClosed) {
 
 ### Time Travel Debugging
 
-FlowDux provides a `TimeTravelStore` that records state history and enables navigation through past states for debugging purposes.
+Time travel debugging is available as a separate module:
+
+```kotlin
+// build.gradle.kts
+implementation("com.github.chibimoons.flowdux:flowdux-timetravel:1.4.0")
+```
 
 ```kotlin
 import io.flowdux.timetravel.createTimeTravelStore

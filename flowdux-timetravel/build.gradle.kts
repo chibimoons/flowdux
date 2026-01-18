@@ -15,7 +15,9 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(project(":flowdux"))
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.datetime)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -41,9 +43,9 @@ publishing {
     publications {
         withType<MavenPublication> {
             pom {
-                name.set("Flowdux")
-                description.set("A lightweight Redux-style state management library for Kotlin Multiplatform")
-                url.set("https://github.com/lantert/flowdux")
+                name.set("Flowdux Time Travel")
+                description.set("Time travel debugging extension for Flowdux")
+                url.set("https://github.com/chibimoons/flowdux")
 
                 licenses {
                     license {

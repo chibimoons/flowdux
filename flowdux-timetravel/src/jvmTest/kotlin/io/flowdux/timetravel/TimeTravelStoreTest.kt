@@ -1,8 +1,6 @@
-package io.flowdux
+package io.flowdux.timetravel
 
 import app.cash.turbine.test
-import io.flowdux.timetravel.StateSnapshot
-import io.flowdux.timetravel.createTimeTravelStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
