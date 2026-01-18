@@ -406,10 +406,9 @@ class TimeTravelStoreTest {
         )
 
         val store = createTimeTravelStore(
-            initialState = CounterState(),
+            initialHistory = savedHistory,
             reducer = counterReducer,
             errorProcessor = testErrorProcessor,
-            initialHistory = savedHistory,
             scope = backgroundScope,
         )
 
@@ -440,10 +439,9 @@ class TimeTravelStoreTest {
         )
 
         val store = createTimeTravelStore(
-            initialState = CounterState(),
+            initialHistory = savedHistory,
             reducer = counterReducer,
             errorProcessor = testErrorProcessor,
-            initialHistory = savedHistory,
             scope = backgroundScope,
         )
 
@@ -462,16 +460,15 @@ class TimeTravelStoreTest {
     }
 
     @Test
-    fun `empty initialHistory uses initialState`() = runTest {
-        val store = createTimeTravelStore(
-            initialState = CounterState(42),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            initialHistory = emptyList(),
-            scope = backgroundScope,
-        )
-
-        assertEquals(1, store.history.size)
-        assertEquals(42, store.currentState.count)
+    fun `empty initialHistory throws exception`() = runTest {
+        val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            createTimeTravelStore(
+                initialHistory = emptyList<StateSnapshot<CounterState, CounterAction>>(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+        }
+        assertEquals("initialHistory must not be empty", exception.message)
     }
 }

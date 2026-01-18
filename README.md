@@ -277,8 +277,7 @@ val store = createTimeTravelStore(
     initialState = CounterState(),
     reducer = counterReducer,
     middlewares = listOf(LoggingMiddleware()),
-    maxHistorySize = 100,       // Optional: limit history size (default: 100)
-    initialHistory = null       // Optional: restore from saved history
+    maxHistorySize = 100        // Optional: limit history size (default: 100)
 )
 
 // Use like a regular store
@@ -316,7 +315,7 @@ store.clear()
 
 **Restoring History:**
 
-You can restore a previous session's history using `initialHistory`:
+You can restore a previous session's history using a separate overload:
 
 ```kotlin
 // Save history (e.g., to JSON)
@@ -324,9 +323,8 @@ val savedHistory = store.history
 
 // Later, restore from saved history
 val restoredStore = createTimeTravelStore(
-    initialState = CounterState(),  // Fallback if history is empty
-    reducer = counterReducer,
-    initialHistory = savedHistory   // Restores state and history
+    initialHistory = savedHistory,  // Restores state and history
+    reducer = counterReducer
 )
 // restoredStore starts at the last state in savedHistory
 ```

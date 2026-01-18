@@ -21,8 +21,8 @@ import kotlinx.datetime.Clock
 
 class TimeTravelStore<S : State, A : Action> internal constructor(
     private val innerStore: Store<S, A>,
-    initialState: S,
     private val maxHistorySize: Int,
+    initialState: S?,
     initialHistory: List<StateSnapshot<S, A>>?,
 ) {
     private val mutex = Mutex()
@@ -44,23 +44,27 @@ class TimeTravelStore<S : State, A : Action> internal constructor(
     val canRedo: Boolean get() = _currentIndex < _history.size - 1
 
     init {
-        if (initialHistory.isNullOrEmpty()) {
-            _history.add(
-                StateSnapshot(
-                    index = 0,
-                    action = null,
-                    previousState = null,
-                    currentState = initialState,
-                    timestamp = currentTimeMillis()
+        when {
+            !initialHistory.isNullOrEmpty() -> {
+                _history.addAll(initialHistory.mapIndexed { idx, snapshot ->
+                    snapshot.copy(index = idx)
+                })
+                _currentIndex = _history.size - 1
+                _state = MutableStateFlow(_history.last().currentState)
+            }
+            initialState != null -> {
+                _history.add(
+                    StateSnapshot(
+                        index = 0,
+                        action = null,
+                        previousState = null,
+                        currentState = initialState,
+                        timestamp = currentTimeMillis()
+                    )
                 )
-            )
-            _state = MutableStateFlow(initialState)
-        } else {
-            _history.addAll(initialHistory.mapIndexed { idx, snapshot ->
-                snapshot.copy(index = idx)
-            })
-            _currentIndex = _history.size - 1
-            _state = MutableStateFlow(_history.last().currentState)
+                _state = MutableStateFlow(initialState)
+            }
+            else -> error("Either initialState or initialHistory must be provided")
         }
     }
 
@@ -148,8 +152,45 @@ fun <S : State, A : Action> createTimeTravelStore(
     middlewares: List<Middleware<S, A>> = emptyList(),
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
     maxHistorySize: Int = 100,
-    initialHistory: List<StateSnapshot<S, A>>? = null,
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+): TimeTravelStore<S, A> = createTimeTravelStoreInternal(
+    initialState = initialState,
+    initialHistory = null,
+    reducer = reducer,
+    middlewares = middlewares,
+    errorProcessor = errorProcessor,
+    maxHistorySize = maxHistorySize,
+    scope = scope,
+)
+
+fun <S : State, A : Action> createTimeTravelStore(
+    initialHistory: List<StateSnapshot<S, A>>,
+    reducer: Reducer<S, A>,
+    middlewares: List<Middleware<S, A>> = emptyList(),
+    errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
+    maxHistorySize: Int = 100,
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+): TimeTravelStore<S, A> {
+    require(initialHistory.isNotEmpty()) { "initialHistory must not be empty" }
+    return createTimeTravelStoreInternal(
+        initialState = null,
+        initialHistory = initialHistory,
+        reducer = reducer,
+        middlewares = middlewares,
+        errorProcessor = errorProcessor,
+        maxHistorySize = maxHistorySize,
+        scope = scope,
+    )
+}
+
+private fun <S : State, A : Action> createTimeTravelStoreInternal(
+    initialState: S?,
+    initialHistory: List<StateSnapshot<S, A>>?,
+    reducer: Reducer<S, A>,
+    middlewares: List<Middleware<S, A>>,
+    errorProcessor: ErrorProcessor<A>,
+    maxHistorySize: Int,
+    scope: CoroutineScope,
 ): TimeTravelStore<S, A> {
     lateinit var timeTravelStore: TimeTravelStore<S, A>
 
@@ -163,7 +204,7 @@ fun <S : State, A : Action> createTimeTravelStore(
         }
     }
 
-    val effectiveInitialState = initialHistory?.lastOrNull()?.currentState ?: initialState
+    val effectiveInitialState = initialHistory?.lastOrNull()?.currentState ?: initialState!!
 
     val innerStore = createStore(
         initialState = effectiveInitialState,
@@ -176,8 +217,8 @@ fun <S : State, A : Action> createTimeTravelStore(
 
     timeTravelStore = TimeTravelStore(
         innerStore = innerStore,
-        initialState = initialState,
         maxHistorySize = maxHistorySize,
+        initialState = initialState,
         initialHistory = initialHistory,
     )
 
