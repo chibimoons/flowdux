@@ -68,7 +68,7 @@ object SearchApi {
 class ExecutionStrategyMiddleware : Middleware<CounterState, CounterAction> {
     override val processors = buildProcessors {
         // takeLatest: Only the latest search executes, previous ones are canceled
-        on<CounterAction.Search>(takeLatest("search")) { _, action ->
+        on<CounterAction.Search>(takeLatest()) { _, action ->
             println("    [takeLatest] Searching for: ${action.query}")
             val results = SearchApi.search(action.query)
             println("    [takeLatest] Search completed: ${action.query}")
@@ -83,7 +83,7 @@ class ExecutionStrategyMiddleware : Middleware<CounterState, CounterAction> {
         }
 
         // takeLeading: Ignore subsequent submissions while one is processing
-        on<CounterAction.SubmitForm>(takeLeading("submit")) { _, _ ->
+        on<CounterAction.SubmitForm>(takeLeading()) { _, _ ->
             println("    [takeLeading] Processing form submission...")
             delay(500) // Simulate slow API
             println("    [takeLeading] Form submitted!")
@@ -92,7 +92,7 @@ class ExecutionStrategyMiddleware : Middleware<CounterState, CounterAction> {
 
         // Strategy Group: Different action types share the same strategy instance
         // LoadUser and RefreshUser will cancel each other
-        group(takeLatest("user-data")) {
+        group(takeLatest()) {
             on<CounterAction.LoadUser> { _, action ->
                 println("    [group] Loading user: ${action.userId}")
                 delay(300) // Simulate API call

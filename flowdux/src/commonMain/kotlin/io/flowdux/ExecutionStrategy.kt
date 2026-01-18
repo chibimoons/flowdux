@@ -25,23 +25,23 @@ sealed interface ExecutionStrategy {
 }
 
 /**
- * Cancels any previous execution with the same key when a new action arrives.
+ * Cancels any previous execution when a new action arrives.
  * Only the latest action's result will be emitted.
  *
- * @param key Grouping key - actions with the same key cancel each other
+ * Use [group] in middleware to coordinate cancellation across different action types.
  */
-class TakeLatest(private val key: Any) : ExecutionStrategy {
+class TakeLatest : ExecutionStrategy {
     private val mutex = Mutex()
-    private val jobs = mutableMapOf<Any, Job>()
+    private var currentJob: Job? = null
 
     override fun <S, A, T : A> wrap(
         processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
     ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
-        val currentJob = currentCoroutineContext()[Job]!!
+        val job = currentCoroutineContext()[Job]!!
 
         mutex.withLock {
-            jobs[key]?.cancel()
-            jobs[key] = currentJob
+            currentJob?.cancel()
+            currentJob = job
         }
 
         try {
@@ -50,8 +50,8 @@ class TakeLatest(private val key: Any) : ExecutionStrategy {
             throw e
         } finally {
             mutex.withLock {
-                if (jobs[key] === currentJob) {
-                    jobs.remove(key)
+                if (currentJob === job) {
+                    currentJob = null
                 }
             }
         }
@@ -59,23 +59,23 @@ class TakeLatest(private val key: Any) : ExecutionStrategy {
 }
 
 /**
- * Ignores new actions while one with the same key is still processing.
+ * Ignores new actions while one is still processing.
  * Only the first action in a series will execute.
  *
- * @param key Grouping key - actions with the same key are deduplicated
+ * Use [group] in middleware to coordinate across different action types.
  */
-class TakeLeading(private val key: Any) : ExecutionStrategy {
+class TakeLeading : ExecutionStrategy {
     private val mutex = Mutex()
-    private val activeKeys = mutableSetOf<Any>()
+    private var isActive = false
 
     override fun <S, A, T : A> wrap(
         processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
     ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
         val shouldExecute = mutex.withLock {
-            if (key in activeKeys) {
+            if (isActive) {
                 false
             } else {
-                activeKeys.add(key)
+                isActive = true
                 true
             }
         }
@@ -85,7 +85,7 @@ class TakeLeading(private val key: Any) : ExecutionStrategy {
                 processor(state, action)
             } finally {
                 mutex.withLock {
-                    activeKeys.remove(key)
+                    isActive = false
                 }
             }
         }
@@ -161,16 +161,16 @@ class Throttle(private val duration: Duration) : ExecutionStrategy {
 /**
  * Creates a [TakeLatest] strategy that cancels previous executions when a new action arrives.
  *
- * @param key Grouping key - actions with the same key cancel each other. Defaults to Unit.
+ * Use [group] in middleware to share a strategy instance across different action types.
  */
-fun takeLatest(key: Any = Unit): ExecutionStrategy = TakeLatest(key)
+fun takeLatest(): ExecutionStrategy = TakeLatest()
 
 /**
  * Creates a [TakeLeading] strategy that ignores new actions while one is processing.
  *
- * @param key Grouping key - actions with the same key are deduplicated. Defaults to Unit.
+ * Use [group] in middleware to share a strategy instance across different action types.
  */
-fun takeLeading(key: Any = Unit): ExecutionStrategy = TakeLeading(key)
+fun takeLeading(): ExecutionStrategy = TakeLeading()
 
 /**
  * Creates a [Debounce] strategy that delays execution until no new actions arrive.

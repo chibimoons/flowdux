@@ -327,7 +327,7 @@ class MiddlewareTest {
             object : Middleware<CounterState, CounterAction> {
                 override val processors = buildProcessors {
                     on<CounterAction.Increment> { _, _ -> emit(CounterAction.Increment) }
-                    group(takeLatest("test")) {
+                    group(takeLatest()) {
                         on<CounterAction.Increment> { _, _ -> emit(CounterAction.Increment) } // Duplicate!
                     }
                 }
@@ -340,10 +340,10 @@ class MiddlewareTest {
         org.junit.jupiter.api.assertThrows<Middleware.DuplicateProcessorException> {
             object : Middleware<CounterState, CounterAction> {
                 override val processors = buildProcessors {
-                    group(takeLatest("group1")) {
+                    group(takeLatest()) {
                         on<CounterAction.Increment> { _, _ -> emit(CounterAction.Increment) }
                     }
-                    group(takeLatest("group2")) {
+                    group(takeLatest()) {
                         on<CounterAction.Increment> { _, _ -> emit(CounterAction.Increment) } // Duplicate!
                     }
                 }
