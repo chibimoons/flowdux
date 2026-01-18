@@ -3,3 +3,6 @@ jdk:
 
 before_install:
   - chmod +x gradlew
+
+install:
+  - ./gradlew :flowdux:publishToMavenLocal :flowdux-timetravel:publishToMavenLocal -x kotlinNpmInstall -x kotlinStoreYarnLock -x jsTest -x wasmJsTest
