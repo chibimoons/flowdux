@@ -13,7 +13,7 @@ A lightweight Redux-style state management library for Kotlin Multiplatform with
 - Error handling with ErrorProcessor
 - Time travel debugging (undo/redo, state history)
 - Built on Kotlin Coroutines and Flow
-- Kotlin Multiplatform support (JVM, iOS)
+- Kotlin Multiplatform support (JVM, iOS, JS, WASM)
 
 ## Architecture
 
@@ -159,7 +159,7 @@ Add the dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.chibimoons:flowdux:1.5.0")
+    implementation("com.github.chibimoons:flowdux:1.6.0")
 }
 ```
 
@@ -411,7 +411,7 @@ Time travel debugging is available as a separate module:
 
 ```kotlin
 // build.gradle.kts
-implementation("com.github.chibimoons.flowdux:flowdux-timetravel:1.5.0")
+implementation("com.github.chibimoons.flowdux:flowdux-timetravel:1.6.0")
 ```
 
 ```kotlin
@@ -577,6 +577,32 @@ sample-shared/
 ├── androidApp/       # Android UI (Compose)
 └── iosApp/           # iOS UI (SwiftUI) - see iosApp/README.md
 ```
+
+### Run Web (JavaScript) Sample
+
+```bash
+./gradlew :sample-web:jsBrowserDevelopmentRun
+```
+
+Opens browser at `http://localhost:8080` with an interactive Counter app.
+
+### Run WebAssembly (WASM) Sample
+
+```bash
+./gradlew :sample-wasm:wasmJsBrowserDevelopmentRun
+```
+
+Opens browser at `http://localhost:8080` with an interactive Counter app (WASM version).
+
+## Platform Support
+
+| Platform | Status | Sample |
+|----------|--------|--------|
+| JVM | ✅ | `sample-jvm` |
+| Android | ✅ | `sample-android`, `sample-shared/androidApp` |
+| iOS | ✅ | `sample-shared/iosApp` |
+| JavaScript | ✅ | `sample-web` |
+| WebAssembly | ✅ | `sample-wasm` |
 
 ## License
 
