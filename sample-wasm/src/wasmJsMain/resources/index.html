@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flowdux Sample - WASM</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #1a1a2e;
+        }
+        .container {
+            background: #16213e;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #e94560;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        .wasm-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #654ea3, #e94560);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .counter-display {
+            font-size: 72px;
+            font-weight: bold;
+            text-align: center;
+            color: #e94560;
+            margin: 30px 0;
+            text-shadow: 0 0 20px rgba(233, 69, 96, 0.3);
+        }
+        .button-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #654ea3, #e94560);
+            color: white;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #f39c12, #e74c3c);
+            color: white;
+        }
+        .btn-danger {
+            background: #c0392b;
+            color: white;
+        }
+        .status {
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+            min-height: 20px;
+        }
+        .loading {
+            color: #f39c12;
+        }
+        .log-container {
+            margin-top: 30px;
+            border-top: 1px solid #0f3460;
+            padding-top: 20px;
+        }
+        .log-title {
+            font-weight: bold;
+            color: #e94560;
+            margin-bottom: 10px;
+        }
+        #log {
+            font-family: monospace;
+            font-size: 12px;
+            background: #0f3460;
+            color: #a0a0a0;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 0;
+            border-bottom: 1px solid #1a1a2e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Flowdux Counter <span class="wasm-badge">WASM</span></h1>
+        <div class="subtitle">WebAssembly Sample</div>
+
+        <div class="counter-display" id="counter">0</div>
+
+        <div class="button-row">
+            <button class="btn-primary" id="decrement">-</button>
+            <button class="btn-primary" id="increment">+</button>
+        </div>
+
+        <div class="button-row">
+            <button class="btn-secondary" id="incrementAsync">+1 Async</button>
+            <button class="btn-danger" id="reset">Reset</button>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="log-container">
+            <div class="log-title">Action Log</div>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script src="sample-wasm.js"></script>
+</body>
+</html>
