@@ -1,6 +1,7 @@
 package io.flowdux.sample
 
 import io.flowdux.*
+import io.flowdux.timetravel.createTimeTravelStore
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -236,6 +237,76 @@ fun main() {
         store.dispatch(CounterAction.RefreshUser) // Cancels LoadUser
         delay(400) // Wait for RefreshUser to complete
         println("  Result: LoadUser was canceled, only RefreshUser completed!")
+
+        // ==================== Time Travel Debugging ====================
+
+        println("\n" + "=".repeat(50))
+        println("=== Time Travel Debugging ===")
+        println("=".repeat(50))
+
+        val timeTravelScope = CoroutineScope(Dispatchers.Default)
+        val timeTravelStore = createTimeTravelStore(
+            initialState = CounterState(),
+            reducer = counterReducer,
+            scope = timeTravelScope
+        )
+
+        // Collect state changes
+        val stateJob = timeTravelScope.launch {
+            timeTravelStore.state.collect { state ->
+                println("  State: count = ${state.count}")
+            }
+        }
+        delay(50)
+
+        println("\n> Building history with dispatches...")
+        timeTravelStore.dispatch(CounterAction.Increment)
+        delay(50)
+        timeTravelStore.dispatch(CounterAction.Increment)
+        delay(50)
+        timeTravelStore.dispatch(CounterAction.Add(10))
+        delay(50)
+
+        println("\n> Current history: ${timeTravelStore.history.map { it.currentState.count }}")
+        println("  (index ${timeTravelStore.currentIndex} of ${timeTravelStore.history.size - 1})")
+
+        println("\n> Undo (go back one step)")
+        timeTravelStore.undo()
+        delay(50)
+        println("  Now at index ${timeTravelStore.currentIndex}, canUndo=${timeTravelStore.canUndo}, canRedo=${timeTravelStore.canRedo}")
+
+        println("\n> Undo again")
+        timeTravelStore.undo()
+        delay(50)
+        println("  Now at index ${timeTravelStore.currentIndex}")
+
+        println("\n> Redo (go forward one step)")
+        timeTravelStore.redo()
+        delay(50)
+        println("  Now at index ${timeTravelStore.currentIndex}")
+
+        println("\n> JumpTo(0) - go to initial state")
+        timeTravelStore.jumpTo(0)
+        delay(50)
+        println("  Now at index ${timeTravelStore.currentIndex}")
+
+        println("\n> JumpTo(3) - go to final state")
+        timeTravelStore.jumpTo(3)
+        delay(50)
+        println("  Now at index ${timeTravelStore.currentIndex}")
+
+        println("\n> Dispatch from past state (creates new branch)")
+        timeTravelStore.jumpTo(1)
+        delay(50)
+        println("  Jumped to index 1 (count=1)")
+        println("  History before: ${timeTravelStore.history.map { it.currentState.count }}")
+        timeTravelStore.dispatch(CounterAction.Add(100))
+        delay(50)
+        println("  History after:  ${timeTravelStore.history.map { it.currentState.count }}")
+        println("  Future states [2, 12] were discarded!")
+
+        stateJob.cancel()
+        timeTravelStore.close()
 
         println("\n" + "=".repeat(50))
         println("=== Done ===")
