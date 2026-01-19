@@ -18,14 +18,14 @@ searchBox.onTextChanged { query ->
 사용자가 "hello"를 입력하면 어떻게 될까요?
 
 ```
-요청: "h"     → 3번째로 응답 도착 → "h" 결과 표시     ❌
+요청: "h"     → 3번째로 응답 도착 → "h" 결과 표시
 요청: "he"    → 1번째로 응답 도착 → "he" 결과 표시
-요청: "hel"   → 4번째로 응답 도착 → "hel" 결과 표시   ❌
-요청: "hell"  → 2번째로 응답 도착 → "hell" 결과 표시
-요청: "hello" → 5번째로 응답 도착 → "hello" 결과 표시 ❌
+요청: "hel"   → 5번째로 응답 도착 → "hel" 결과 표시   ← 최종 상태!
+요청: "hell"  → 4번째로 응답 도착 → "hell" 결과 표시
+요청: "hello" → 2번째로 응답 도착 → "hello" 결과 표시
 ```
 
-결과가 깜빡거리고, 최종 상태가 사용자의 쿼리와 맞지 않을 수도 있습니다. 이것이 **레이스 컨디션 문제**입니다.
+결과가 깜빡거리고, 최종 상태는 "hello"가 아닌 "hel"을 보여줍니다. 이것이 **레이스 컨디션 문제**입니다 — 가장 마지막 입력이 아니라, 가장 느린 응답이 이깁니다.
 
 ---
 
@@ -88,7 +88,7 @@ class SearchMiddleware : Middleware<AppState, AppAction> {
 
 ## 4가지 전략
 
-### 1. takeLatest(key)
+### 1. takeLatest()
 
 **동작:** 새 액션이 도착하면 이전 처리를 취소합니다. 가장 최근 결과만 emit됩니다.
 
@@ -123,7 +123,7 @@ on<SearchAction>(takeLatest()) { state, action ->
 > // ❌ 취소 안 됨 - 블로킹 호출
 > val results = legacySdk.blockingSearch(query)
 > ```
-> 블로킹 작업의 경우, 취소 가능한 API와 함께 `withContext(Dispatchers.IO)` 또는 `suspendCancellableCoroutine`을 사용하세요.
+> `withContext(Dispatchers.IO)`는 UI 블로킹을 방지하지만, 그 자체로 블로킹 호출을 취소 가능하게 만들지는 않습니다. 취소 가능한 suspend API를 사용하거나, 레거시 코드를 연동할 때는 `suspendCancellableCoroutine`을 사용하세요.
 
 ---
 
@@ -287,24 +287,24 @@ sealed interface ExecutionStrategy {
 예를 들어 `TakeLatest`:
 
 ```kotlin
-class TakeLatest(private val key: Any) : ExecutionStrategy {
+class TakeLatest : ExecutionStrategy {
     private val mutex = Mutex()
-    private val jobs = mutableMapOf<Any, Job>()
+    private var currentJob: Job? = null
 
     override fun <S, A, T : A> wrap(processor: ...) = { state, action ->
-        val currentJob = currentCoroutineContext()[Job]!!
+        val job = currentCoroutineContext()[Job]!!
 
         mutex.withLock {
-            jobs[key]?.cancel()  // 이전 것 취소
-            jobs[key] = currentJob
+            currentJob?.cancel()  // 이전 것 취소
+            currentJob = job
         }
 
         try {
             processor(state, action)  // 실행
         } finally {
             mutex.withLock {
-                if (jobs[key] === currentJob) {
-                    jobs.remove(key)
+                if (currentJob === job) {
+                    currentJob = null
                 }
             }
         }
@@ -317,7 +317,7 @@ class TakeLatest(private val key: Any) : ExecutionStrategy {
 1. **스레드 안전을 위한 Mutex** — 전략 상태가 보호됨
 2. **Job 추적** — 현재 코루틴의 Job이 캡처되고 관리됨
 3. **finally에서 정리** — 취소 시에도 리소스가 해제됨
-4. **Key 기반 그룹화** — 같은 키 = 같은 취소 그룹
+4. **인스턴스 기반 그룹화** — `group()`을 사용해 액션 타입 간 전략 공유
 
 ---
 
@@ -331,9 +331,11 @@ class TakeLatest(private val key: Any) : ExecutionStrategy {
 | throttle | `throttle(duration)` | `throttle(ms, pattern, saga)` | `reaction`/`autorun` delay | 수동 타임스탬프 |
 | Strategy Group | `group(strategy) { }` | N/A | N/A | N/A |
 | 타입 안전성 | 완전한 Kotlin 타입 | 런타임 문자열 | 완전함 | 완전함 |
-| 멀티플랫폼 | KMP (JVM, iOS) | JS만 | 주로 JS | KMP |
+| 멀티플랫폼 | KMP (JVM, iOS, JS, WASM) | JS만 | 주로 JS | KMP |
 
-**flowdux만의 고유한 장점: Strategy Group** — flowdux는 액션 간 조율을 위한 타입 안전한 일급 DSL(`group { }`)을 제공합니다. redux-saga에서도 다중 패턴 watcher(예: `takeLatest([A, B], worker)`)로 유사한 조율이 가능하지만, 보통 단일 worker 함수 내에서 액션 타입 분기가 필요합니다.
+**flowdux의 Strategy Group** — flowdux의 `group { }` DSL은 각 핸들러를 분리한 채로 여러 액션 타입이 하나의 전략 인스턴스를 공유할 수 있게 합니다. Redux-saga도 배열 패턴(예: `takeLatest([A, B], worker)`)으로 유사한 조율이 가능하지만, 보통 단일 worker 함수 내에서 액션 타입 분기가 필요합니다.
+
+*참고: MobX는 액션 파이프라인이 아닌 reaction 기반 모델이어서 직접 비교가 어렵습니다. `reaction`/`autorun`의 "delay" 옵션이 throttle과 유사한 동작을 제공합니다.*
 
 ---
 
@@ -437,16 +439,16 @@ Execution Strategy는 상태 관리에서 동시성을 다루는 방식을 혁�
 - **조합 가능** — 전략이 그룹을 통해 함께 작동
 - **타입 안전** — 완전한 Kotlin 타입 시스템 지원
 - **테스트 가능** — 표준 코루틴 테스트 방식 그대로 사용
-- **멀티플랫폼** — JVM과 iOS에서 같은 코드 사용
+- **멀티플랫폼** — JVM, iOS, JS, WASM에서 같은 코드 사용
 
-보일러플레이트 취소 로직 작성을 멈추세요. 미들웨어 선언이 앱의 동작을 이야기하게 하세요.
+보일러플레이트 취소 로직 작성을 멈추세요. `group { }`으로 서로 다른 액션 타입을 같은 동시성 규칙으로 묶으세요. 미들웨어 선언이 앱의 동작을 이야기하게 하세요.
 
 ---
 
 *flowdux는 Kotlin Multiplatform을 위한 경량 Redux 스타일 상태 관리 라이브러리입니다. [GitHub](https://github.com/chibimoons/flowdux)에서 확인하세요.*
 
 ```kotlin
-implementation("com.github.chibimoons:flowdux:1.5.0")
+implementation("com.github.chibimoons:flowdux:1.6.1")
 ```
 
 ---
