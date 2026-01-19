@@ -18,14 +18,14 @@ searchBox.onTextChanged { query ->
 What happens when the user types "hello"?
 
 ```
-Request: "h"     → Response arrives 3rd  → Shows results for "h"  ❌
+Request: "h"     → Response arrives 3rd  → Shows results for "h"
 Request: "he"    → Response arrives 1st  → Shows results for "he"
-Request: "hel"   → Response arrives 4th  → Shows results for "hel" ❌
-Request: "hell"  → Response arrives 2nd  → Shows results for "hell"
-Request: "hello" → Response arrives 5th  → Shows results for "hello" ❌
+Request: "hel"   → Response arrives 5th  → Shows results for "hel"  ← Final state!
+Request: "hell"  → Response arrives 4th  → Shows results for "hell"
+Request: "hello" → Response arrives 2nd  → Shows results for "hello"
 ```
 
-The user sees flickering results, and the final state might not even match their query. This is the **race condition problem**.
+The user sees flickering results, and the final state shows "hel" instead of "hello". This is the **race condition problem** — the slowest response wins, not the latest input.
 
 ---
 
@@ -88,7 +88,7 @@ That's it. No manual job tracking, no cancellation logic, no race conditions.
 
 ## The Four Strategies
 
-### 1. takeLatest(key)
+### 1. takeLatest()
 
 **Behavior:** Cancels previous processing when a new action arrives. Only the latest result is emitted.
 
@@ -123,7 +123,7 @@ Action:                  Search("hello") ───────────> Sear
 > // ❌ Won't cancel - blocking call
 > val results = legacySdk.blockingSearch(query)
 > ```
-> For blocking operations, use `withContext(Dispatchers.IO)` with cancellable APIs or `suspendCancellableCoroutine`.
+> `withContext(Dispatchers.IO)` prevents UI blocking, but it doesn't make a blocking call cancellable by itself. Prefer cancellable suspend APIs, or use `suspendCancellableCoroutine` when bridging legacy code.
 
 ---
 
@@ -287,24 +287,24 @@ sealed interface ExecutionStrategy {
 For example, `TakeLatest`:
 
 ```kotlin
-class TakeLatest(private val key: Any) : ExecutionStrategy {
+class TakeLatest : ExecutionStrategy {
     private val mutex = Mutex()
-    private val jobs = mutableMapOf<Any, Job>()
+    private var currentJob: Job? = null
 
     override fun <S, A, T : A> wrap(processor: ...) = { state, action ->
-        val currentJob = currentCoroutineContext()[Job]!!
+        val job = currentCoroutineContext()[Job]!!
 
         mutex.withLock {
-            jobs[key]?.cancel()  // Cancel previous
-            jobs[key] = currentJob
+            currentJob?.cancel()  // Cancel previous
+            currentJob = job
         }
 
         try {
             processor(state, action)  // Execute
         } finally {
             mutex.withLock {
-                if (jobs[key] === currentJob) {
-                    jobs.remove(key)
+                if (currentJob === job) {
+                    currentJob = null
                 }
             }
         }
@@ -317,7 +317,7 @@ class TakeLatest(private val key: Any) : ExecutionStrategy {
 1. **Mutex for thread safety** — Strategy state is protected
 2. **Job tracking** — Current coroutine's Job is captured and managed
 3. **Cleanup in finally** — Resources are released even on cancellation
-4. **Key-based grouping** — Same key = same cancellation group
+4. **Instance-based grouping** — Use `group()` to share strategy across action types
 
 ---
 
@@ -331,9 +331,11 @@ class TakeLatest(private val key: Any) : ExecutionStrategy {
 | throttle | `throttle(duration)` | `throttle(ms, pattern, saga)` | `reaction`/`autorun` delay | Manual timestamp |
 | Strategy Groups | `group(strategy) { }` | N/A | N/A | N/A |
 | Type Safety | Full Kotlin types | Runtime strings | Full | Full |
-| Multiplatform | KMP (JVM, iOS) | JS only | JS primarily | KMP |
+| Multiplatform | KMP (JVM, iOS, JS, WASM) | JS only | JS primarily | KMP |
 
-**flowdux's unique advantage: Strategy Groups** — flowdux provides a first-class, type-safe DSL (`group { }`) for cross-action coordination. In redux-saga, similar coordination is possible via multi-pattern watchers (e.g., `takeLatest([A, B], worker)`), but typically requires action type branching inside a single worker function.
+**flowdux's Strategy Groups** — flowdux's `group { }` DSL lets you share a single strategy instance across multiple action types while keeping each handler separate. Redux-saga can achieve similar coordination via array patterns (e.g., `takeLatest([A, B], worker)`), but typically requires action type branching inside a single worker function.
+
+*Note: MobX uses a reaction-based model rather than an action pipeline, so direct comparison is difficult. The "delay" option in `reaction`/`autorun` provides throttle-like behavior.*
 
 ---
 
@@ -437,16 +439,16 @@ Execution Strategies transform how you handle concurrency in state management:
 - **Composable** — Strategies work together via groups
 - **Type-safe** — Full Kotlin type system support
 - **Testable** — Standard coroutine testing works
-- **Multiplatform** — Same code on JVM and iOS
+- **Multiplatform** — Same code on JVM, iOS, JS, and WASM
 
-Stop writing boilerplate cancellation logic. Let your middleware declarations tell the story of your app's behavior.
+Stop writing boilerplate cancellation logic. Use `group { }` to coordinate different action types under the same concurrency rule. Let your middleware declarations tell the story of your app's behavior.
 
 ---
 
 *flowdux is a lightweight Redux-style state management library for Kotlin Multiplatform. Find it on [GitHub](https://github.com/chibimoons/flowdux).*
 
 ```kotlin
-implementation("com.github.chibimoons:flowdux:1.5.0")
+implementation("com.github.chibimoons:flowdux:1.6.1")
 ```
 
 ---
