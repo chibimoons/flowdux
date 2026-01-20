@@ -415,20 +415,6 @@ group(takeLatest()) {
 }
 ```
 
-### 4. Combine Strategies When Needed
-
-```kotlin
-// Debounce input, then takeLatest for the API call
-on<SearchInputChanged>(debounce(300.milliseconds)) { state, action ->
-    emit(SearchAction(action.query))  // Triggers takeLatest search
-}
-
-on<SearchAction>(takeLatest()) { state, action ->
-    val results = api.search(action.query)
-    emit(SearchResults(results))
-}
-```
-
 ---
 
 ## Conclusion
