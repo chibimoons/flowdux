@@ -183,6 +183,130 @@ class Throttle(private val duration: Duration) : ExecutionStrategy {
     }
 }
 
+/**
+ * Retries the processor execution on failure.
+ *
+ * @param maxAttempts Maximum number of attempts (including the initial attempt)
+ * @param retryIf Optional predicate to determine if a specific exception should trigger a retry.
+ *                Defaults to retrying on all non-cancellation exceptions.
+ */
+class Retry(
+    private val maxAttempts: Int,
+    private val retryIf: (Throwable) -> Boolean = { true }
+) : ExecutionStrategy {
+    override val category = StrategyCategory.RESILIENCE
+
+    init {
+        require(maxAttempts >= 1) { "maxAttempts must be at least 1" }
+    }
+
+    override fun <S, A, T : A> wrap(
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+    ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
+        var lastException: Throwable? = null
+        var succeeded = false
+
+        for (attempt in 0 until maxAttempts) {
+            try {
+                processor(state, action)
+                succeeded = true
+                break // Success, exit loop
+            } catch (e: CancellationException) {
+                throw e // Don't retry on cancellation
+            } catch (e: Throwable) {
+                lastException = e
+                if (attempt == maxAttempts - 1 || !retryIf(e)) {
+                    throw e // Last attempt or non-retryable exception
+                }
+                // Continue to next attempt
+            }
+        }
+
+        // Should not reach here if succeeded, but just in case
+        if (!succeeded) {
+            lastException?.let { throw it }
+        }
+    }
+}
+
+/**
+ * Retries the processor execution on failure with exponential backoff.
+ *
+ * The delay between retries follows the formula: `initialDelay * (factor ^ attempt)`
+ * with optional jitter to prevent thundering herd problems.
+ *
+ * @param maxAttempts Maximum number of attempts (including the initial attempt)
+ * @param initialDelay The initial delay before the first retry
+ * @param maxDelay Maximum delay between retries (caps the exponential growth)
+ * @param factor Multiplier for exponential backoff (default: 2.0)
+ * @param jitter Random jitter factor (0.0 to 1.0) to add randomness to delays (default: 0.0)
+ * @param retryIf Optional predicate to determine if a specific exception should trigger a retry
+ */
+class RetryWithBackoff(
+    private val maxAttempts: Int,
+    private val initialDelay: Duration,
+    private val maxDelay: Duration = Duration.INFINITE,
+    private val factor: Double = 2.0,
+    private val jitter: Double = 0.0,
+    private val retryIf: (Throwable) -> Boolean = { true }
+) : ExecutionStrategy {
+    override val category = StrategyCategory.RESILIENCE
+
+    init {
+        require(maxAttempts >= 1) { "maxAttempts must be at least 1" }
+        require(factor >= 1.0) { "factor must be at least 1.0" }
+        require(jitter in 0.0..1.0) { "jitter must be between 0.0 and 1.0" }
+    }
+
+    override fun <S, A, T : A> wrap(
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+    ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
+        var lastException: Throwable? = null
+        var succeeded = false
+
+        for (attempt in 0 until maxAttempts) {
+            try {
+                processor(state, action)
+                succeeded = true
+                break // Success, exit loop
+            } catch (e: CancellationException) {
+                throw e // Don't retry on cancellation
+            } catch (e: Throwable) {
+                lastException = e
+                if (attempt == maxAttempts - 1 || !retryIf(e)) {
+                    throw e // Last attempt or non-retryable exception
+                }
+
+                // Calculate delay with exponential backoff
+                val baseDelay = initialDelay * factor.pow(attempt)
+                val cappedDelay = minOf(baseDelay, maxDelay)
+
+                // Apply jitter
+                val jitterAmount = if (jitter > 0.0) {
+                    val jitterRange = cappedDelay * jitter
+                    jitterRange * (kotlin.random.Random.nextDouble() * 2 - 1) // -jitter to +jitter
+                } else {
+                    Duration.ZERO
+                }
+
+                val finalDelay = (cappedDelay + jitterAmount).coerceAtLeast(Duration.ZERO)
+                delay(finalDelay)
+            }
+        }
+
+        // Should not reach here if succeeded, but just in case
+        if (!succeeded) {
+            lastException?.let { throw it }
+        }
+    }
+
+    private fun Double.pow(n: Int): Double {
+        var result = 1.0
+        repeat(n) { result *= this }
+        return result
+    }
+}
+
 // Convenience factory functions
 
 /**
@@ -226,6 +350,36 @@ fun throttle(duration: Duration): ExecutionStrategy = Throttle(duration)
  * @param timeMs The throttle window in milliseconds
  */
 fun throttle(timeMs: Long): ExecutionStrategy = Throttle(timeMs.milliseconds)
+
+/**
+ * Creates a [Retry] strategy that retries failed executions.
+ *
+ * @param maxAttempts Maximum number of attempts (including the initial attempt)
+ * @param retryIf Optional predicate to determine if a specific exception should trigger a retry
+ */
+fun retry(
+    maxAttempts: Int,
+    retryIf: (Throwable) -> Boolean = { true }
+): ExecutionStrategy = Retry(maxAttempts, retryIf)
+
+/**
+ * Creates a [RetryWithBackoff] strategy that retries failed executions with exponential backoff.
+ *
+ * @param maxAttempts Maximum number of attempts (including the initial attempt)
+ * @param initialDelay The initial delay before the first retry
+ * @param maxDelay Maximum delay between retries (caps the exponential growth)
+ * @param factor Multiplier for exponential backoff (default: 2.0)
+ * @param jitter Random jitter factor (0.0 to 1.0) to add randomness to delays (default: 0.0)
+ * @param retryIf Optional predicate to determine if a specific exception should trigger a retry
+ */
+fun retryWithBackoff(
+    maxAttempts: Int,
+    initialDelay: Duration,
+    maxDelay: Duration = Duration.INFINITE,
+    factor: Double = 2.0,
+    jitter: Double = 0.0,
+    retryIf: (Throwable) -> Boolean = { true }
+): ExecutionStrategy = RetryWithBackoff(maxAttempts, initialDelay, maxDelay, factor, jitter, retryIf)
 
 // Strategy chaining
 
