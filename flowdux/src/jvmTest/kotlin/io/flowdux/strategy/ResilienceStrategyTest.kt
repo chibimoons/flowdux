@@ -12,10 +12,15 @@ import io.flowdux.strategy.ExecutionStrategyTestBase.TestState
 import io.flowdux.strategy.ExecutionStrategyTestBase.testErrorProcessor
 import io.flowdux.strategy.ExecutionStrategyTestBase.testReducer
 import io.flowdux.then
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -362,5 +367,69 @@ class ResilienceStrategyTest {
             retry(3) then retryWithBackoff(3, 100.milliseconds)
         }
         assertTrue(exception.message!!.contains("RESILIENCE"))
+    }
+
+    @Test
+    fun `retryWithBackoff works with real dispatcher`() = runBlocking {
+        val attemptTimes = mutableListOf<Long>()
+        var attempt = 0
+        val startTime = System.currentTimeMillis()
+        val storeScope = CoroutineScope(Dispatchers.Default + Job())
+
+        val middleware = object : Middleware<TestState, TestAction> {
+            override val processors = buildProcessors {
+                on<TestAction.Fetch>(retryWithBackoff(
+                    maxAttempts = 3,
+                    initialDelay = 50.milliseconds,
+                    factor = 2.0
+                )) { _, action ->
+                    attemptTimes.add(System.currentTimeMillis() - startTime)
+                    attempt++
+                    if (attempt < 3) {
+                        throw RuntimeException("Simulated failure $attempt")
+                    }
+                    emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                }
+            }
+        }
+
+        val store = createStore(
+            initialState = TestState(),
+            reducer = testReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = testErrorProcessor,
+            scope = storeScope,
+        )
+
+        try {
+            store.state.test {
+                assertEquals(emptyList<String>(), awaitItem().values)
+
+                store.dispatch(TestAction.Fetch("1"))
+
+                // Wait for result (includes retries with backoff)
+                val result = awaitItem()
+                assertEquals(listOf("result-1"), result.values)
+
+                // Verify 3 attempts were made
+                assertEquals(3, attemptTimes.size)
+
+                // Verify exponential backoff timing with generous tolerance
+                // First attempt: immediate (0ms)
+                // Second attempt: after ~50ms delay
+                // Third attempt: after ~100ms delay (50ms * 2)
+                val delay1to2 = attemptTimes[1] - attemptTimes[0]
+                val delay2to3 = attemptTimes[2] - attemptTimes[1]
+
+                // Allow generous timing tolerance for real dispatcher
+                assertTrue(delay1to2 >= 30, "First delay should be at least 30ms but was $delay1to2")
+                assertTrue(delay2to3 >= 60, "Second delay should be at least 60ms but was $delay2to3")
+                assertTrue(delay2to3 > delay1to2, "Second delay should be longer than first (exponential backoff)")
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        } finally {
+            storeScope.cancel()
+        }
     }
 }

@@ -10,8 +10,13 @@ import io.flowdux.strategy.ExecutionStrategyTestBase.testReducer
 import io.flowdux.sequential
 import io.flowdux.takeLatest
 import io.flowdux.takeLeading
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -509,6 +514,115 @@ class ConcurrencyStrategyTest {
                 assertEquals(1, errorCount)
 
                 cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        @Test
+        fun `sequential works with real dispatcher`() = runBlocking {
+            val executionOrder = mutableListOf<String>()
+            val storeScope = CoroutineScope(Dispatchers.Default + Job())
+
+            val middleware = object : Middleware<TestState, TestAction> {
+                override val processors = buildProcessors {
+                    on<TestAction.Fetch>(sequential()) { _, action ->
+                        executionOrder.add("start-${action.id}")
+                        delay(50)
+                        executionOrder.add("end-${action.id}")
+                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                    }
+                }
+            }
+
+            val store = createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
+
+            try {
+                store.state.test {
+                    assertEquals(emptyList<String>(), awaitItem().values)
+
+                    // Dispatch multiple actions rapidly
+                    store.dispatch(TestAction.Fetch("1"))
+                    store.dispatch(TestAction.Fetch("2"))
+                    store.dispatch(TestAction.Fetch("3"))
+
+                    // Wait for all to complete with generous timing
+                    awaitItem() // result-1
+                    awaitItem() // result-2
+                    awaitItem() // result-3
+
+                    // Verify order: each action should start and end before the next starts
+                    assertEquals(
+                        listOf("start-1", "end-1", "start-2", "end-2", "start-3", "end-3"),
+                        executionOrder
+                    )
+
+                    cancelAndIgnoreRemainingEvents()
+                }
+            } finally {
+                storeScope.cancel()
+            }
+        }
+    }
+
+    @Nested
+    inner class RealDispatcherTests {
+
+        @Test
+        fun `takeLatest cancels previous execution with real dispatcher`() = runBlocking {
+            val executionOrder = mutableListOf<String>()
+            val storeScope = CoroutineScope(Dispatchers.Default + Job())
+
+            val middleware = object : Middleware<TestState, TestAction> {
+                override val processors = buildProcessors {
+                    on<TestAction.Fetch>(takeLatest()) { _, action ->
+                        executionOrder.add("start-${action.id}")
+                        delay(100)
+                        executionOrder.add("end-${action.id}")
+                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                    }
+                }
+            }
+
+            val store = createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
+
+            try {
+                store.state.test {
+                    assertEquals(emptyList<String>(), awaitItem().values)
+
+                    // Dispatch first action
+                    store.dispatch(TestAction.Fetch("1"))
+                    delay(30) // Let it start but not complete
+
+                    // Dispatch second action - should cancel first
+                    store.dispatch(TestAction.Fetch("2"))
+
+                    // Only second action should complete
+                    val result = awaitItem()
+                    assertEquals(listOf("result-2"), result.values)
+
+                    // Give some time for any pending operations
+                    delay(50)
+
+                    // Verify first was started but canceled
+                    assertTrue(executionOrder.contains("start-1"))
+                    assertFalse(executionOrder.contains("end-1"))
+                    assertTrue(executionOrder.contains("end-2"))
+
+                    cancelAndIgnoreRemainingEvents()
+                }
+            } finally {
+                storeScope.cancel()
             }
         }
     }
