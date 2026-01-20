@@ -12,9 +12,28 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
+ * Categories of execution strategies for validation during chaining.
+ */
+enum class StrategyCategory {
+    /** Timing strategies control when to execute (debounce, throttle) */
+    TIMING,
+    /** Concurrency strategies control how to handle concurrent executions (takeLatest, takeLeading) */
+    CONCURRENCY,
+    /** Resilience strategies control how to handle failures (retry, circuitBreaker) */
+    RESILIENCE,
+    /** Chained strategies composed of multiple strategies */
+    CHAINED
+}
+
+/**
  * Defines how action processors should handle concurrent executions.
  */
 sealed interface ExecutionStrategy {
+    /**
+     * The category of this strategy, used for validation during chaining.
+     */
+    val category: StrategyCategory
+
     /**
      * Creates a wrapper that applies this strategy to the given processor.
      * The wrapper manages the execution lifecycle according to the strategy.
@@ -31,6 +50,8 @@ sealed interface ExecutionStrategy {
  * Use [group] in middleware to coordinate cancellation across different action types.
  */
 class TakeLatest : ExecutionStrategy {
+    override val category = StrategyCategory.CONCURRENCY
+
     private val mutex = Mutex()
     private var currentJob: Job? = null
 
@@ -65,6 +86,8 @@ class TakeLatest : ExecutionStrategy {
  * Use [group] in middleware to coordinate across different action types.
  */
 class TakeLeading : ExecutionStrategy {
+    override val category = StrategyCategory.CONCURRENCY
+
     private val mutex = Mutex()
     private var isActive = false
 
@@ -99,6 +122,8 @@ class TakeLeading : ExecutionStrategy {
  * @param duration The debounce delay duration
  */
 class Debounce(private val duration: Duration) : ExecutionStrategy {
+    override val category = StrategyCategory.TIMING
+
     private val mutex = Mutex()
     private var pendingJob: Job? = null
 
@@ -131,6 +156,8 @@ class Debounce(private val duration: Duration) : ExecutionStrategy {
  * @param duration The throttle window duration
  */
 class Throttle(private val duration: Duration) : ExecutionStrategy {
+    override val category = StrategyCategory.TIMING
+
     private val mutex = Mutex()
     private val timeSource = TimeSource.Monotonic
     private var lastExecutionMark: TimeSource.Monotonic.ValueTimeMark? = null
@@ -199,3 +226,60 @@ fun throttle(duration: Duration): ExecutionStrategy = Throttle(duration)
  * @param timeMs The throttle window in milliseconds
  */
 fun throttle(timeMs: Long): ExecutionStrategy = Throttle(timeMs.milliseconds)
+
+// Strategy chaining
+
+/**
+ * A composed strategy that chains two strategies together.
+ *
+ * The first strategy wraps the second, meaning the first strategy's logic runs first (outer layer).
+ * For example, `debounce then takeLatest` will first apply debounce delay, then takeLatest cancellation.
+ *
+ * @param first The outer strategy (runs first)
+ * @param second The inner strategy (runs second)
+ * @throws IllegalArgumentException if both strategies belong to the same category
+ */
+class ChainedStrategy(
+    private val first: ExecutionStrategy,
+    private val second: ExecutionStrategy
+) : ExecutionStrategy {
+    override val category = StrategyCategory.CHAINED
+
+    private val categories: Set<StrategyCategory>
+
+    init {
+        val firstCategories = if (first is ChainedStrategy) first.categories else setOf(first.category)
+        val secondCategories = if (second is ChainedStrategy) second.categories else setOf(second.category)
+
+        val overlap = firstCategories.intersect(secondCategories)
+        require(overlap.isEmpty()) {
+            "Cannot chain strategies of the same category. " +
+                "Conflicting category: ${overlap.first()}. " +
+                "First: ${first::class.simpleName}, Second: ${second::class.simpleName}"
+        }
+
+        categories = firstCategories + secondCategories
+    }
+
+    override fun <S, A, T : A> wrap(
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+    ): suspend FlowCollector<A>.(state: S, action: T) -> Unit =
+        first.wrap(second.wrap(processor))
+}
+
+/**
+ * Chains this strategy with another strategy.
+ *
+ * The resulting strategy applies this strategy first (outer layer), then the next strategy.
+ * For example, `debounce(300.ms) then takeLatest()` will:
+ * 1. Wait for 300ms debounce period
+ * 2. Then apply takeLatest cancellation logic
+ *
+ * Strategies of the same category cannot be chained together (e.g., two TIMING or two CONCURRENCY strategies).
+ *
+ * @param next The strategy to chain after this one
+ * @return A new [ChainedStrategy] combining both strategies
+ * @throws IllegalArgumentException if both strategies belong to the same category
+ */
+infix fun ExecutionStrategy.then(next: ExecutionStrategy): ExecutionStrategy =
+    ChainedStrategy(this, next)
