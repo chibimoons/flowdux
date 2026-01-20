@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import io.flowdux.Middleware
 import io.flowdux.createStore
 import io.flowdux.debounce
+import io.flowdux.retry
 import io.flowdux.strategy.ExecutionStrategyTestBase.TestAction
 import io.flowdux.strategy.ExecutionStrategyTestBase.TestState
 import io.flowdux.strategy.ExecutionStrategyTestBase.testErrorProcessor
@@ -285,6 +286,70 @@ class StrategyGroupTest {
             }
         } finally {
             storeScope.cancel()
+        }
+    }
+
+    @Test
+    fun `group with retry retries failed actions within the group`() = runTest {
+        val attemptCounts = mutableMapOf<String, Int>()
+
+        val middleware = object : Middleware<TestState, TestAction> {
+            override val processors = buildProcessors {
+                group(retry(3)) {
+                    on<TestAction.Fetch> { _, action ->
+                        val key = "fetch-${action.id}"
+                        val count = attemptCounts.getOrPut(key) { 0 } + 1
+                        attemptCounts[key] = count
+                        if (action.id == "fail" && count < 3) {
+                            throw RuntimeException("Simulated failure $count")
+                        }
+                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                    }
+                    on<TestAction.Search> { _, action ->
+                        val key = "search-${action.query}"
+                        val count = attemptCounts.getOrPut(key) { 0 } + 1
+                        attemptCounts[key] = count
+                        if (action.query == "fail" && count < 2) {
+                            throw RuntimeException("Simulated failure $count")
+                        }
+                        emit(TestAction.SearchResult(action.query, listOf(action.query)))
+                    }
+                }
+            }
+        }
+
+        val store = createStore(
+            initialState = TestState(),
+            reducer = testReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = testErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        store.state.test {
+            assertEquals(emptyList<String>(), awaitItem().values)
+
+            // Fetch "fail" - should retry 3 times and succeed
+            store.dispatch(TestAction.Fetch("fail"))
+            advanceTimeBy(100)
+            awaitItem()
+
+            // Search "fail" - should retry 2 times and succeed
+            store.dispatch(TestAction.Search("fail"))
+            advanceTimeBy(100)
+            awaitItem()
+
+            // Fetch "ok" - should succeed first time
+            store.dispatch(TestAction.Fetch("ok"))
+            advanceTimeBy(100)
+            awaitItem()
+
+            // Verify retry counts
+            assertEquals(3, attemptCounts["fetch-fail"]) // Fetch "fail" retried 3 times
+            assertEquals(2, attemptCounts["search-fail"]) // Search "fail" retried 2 times
+            assertEquals(1, attemptCounts["fetch-ok"])   // Fetch "ok" succeeded first time
+
+            cancelAndIgnoreRemainingEvents()
         }
     }
 }

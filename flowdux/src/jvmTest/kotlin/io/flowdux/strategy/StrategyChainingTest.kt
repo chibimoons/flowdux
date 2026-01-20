@@ -8,6 +8,7 @@ import io.flowdux.createStore
 import io.flowdux.debounce
 import io.flowdux.retry
 import io.flowdux.retryWithBackoff
+import io.flowdux.sequential
 import io.flowdux.strategy.ExecutionStrategyTestBase.TestAction
 import io.flowdux.strategy.ExecutionStrategyTestBase.TestState
 import io.flowdux.strategy.ExecutionStrategyTestBase.testErrorProcessor
@@ -37,6 +38,7 @@ class StrategyChainingTest {
         fun `strategies have correct categories`() {
             assertEquals(StrategyCategory.CONCURRENCY, takeLatest().category)
             assertEquals(StrategyCategory.CONCURRENCY, takeLeading().category)
+            assertEquals(StrategyCategory.CONCURRENCY, sequential().category)
             assertEquals(StrategyCategory.TIMING, debounce(100.milliseconds).category)
             assertEquals(StrategyCategory.TIMING, throttle(100.milliseconds).category)
             assertEquals(StrategyCategory.RESILIENCE, retry(3).category)

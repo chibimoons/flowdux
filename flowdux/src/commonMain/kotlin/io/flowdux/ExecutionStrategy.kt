@@ -116,6 +116,27 @@ class TakeLeading : ExecutionStrategy {
 }
 
 /**
+ * Queues actions and processes them one at a time, preserving order.
+ * Unlike [TakeLeading] which ignores new actions, this strategy waits
+ * for the current action to complete before processing the next one.
+ *
+ * Use [group] in middleware to coordinate sequential processing across different action types.
+ */
+class Sequential : ExecutionStrategy {
+    override val category = StrategyCategory.CONCURRENCY
+
+    private val mutex = Mutex()
+
+    override fun <S, A, T : A> wrap(
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+    ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
+        mutex.withLock {
+            processor(state, action)
+        }
+    }
+}
+
+/**
  * Delays execution. If another action arrives before the delay completes,
  * the previous action is canceled and the timer restarts.
  *
@@ -322,6 +343,16 @@ fun takeLatest(): ExecutionStrategy = TakeLatest()
  * Use [group] in middleware to share a strategy instance across different action types.
  */
 fun takeLeading(): ExecutionStrategy = TakeLeading()
+
+/**
+ * Creates a [Sequential] strategy that queues actions and processes them one at a time.
+ *
+ * Unlike [takeLeading] which ignores new actions, this strategy waits for
+ * the current action to complete before processing the next one in order.
+ *
+ * Use [group] in middleware to share a strategy instance across different action types.
+ */
+fun sequential(): ExecutionStrategy = Sequential()
 
 /**
  * Creates a [Debounce] strategy that delays execution until no new actions arrive.
