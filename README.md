@@ -295,62 +295,66 @@ By default, FlowHolderAction uses `TakeLatest` strategy—when a new FlowHolderA
 
 ```kotlin
 // Default: TakeLatest (cancels previous when new one dispatched)
-data class SearchStream(val query: String) : FlowHolderAction {
-    override fun toFlowAction() = flow {
-        emit(SearchStarted)
-        val results = api.search(query)
-        emit(SearchResults(results))
-    }
+// Wraps a search results flow from repository
+data class ObserveSearchResults(
+    private val resultsFlow: Flow<List<SearchResult>>
+) : FlowHolderAction {
+    override fun toFlowAction(): Flow<Action> =
+        resultsFlow.map { SearchResultsLoaded(it) }
 }
 
-store.dispatch(SearchStream("a"))    // Started
-store.dispatch(SearchStream("ab"))   // Cancels "a", starts "ab"
-store.dispatch(SearchStream("abc"))  // Cancels "ab", starts "abc"
-// Only "abc" search completes
+// Each new search cancels the previous observation
+store.dispatch(ObserveSearchResults(repository.search("a")))
+store.dispatch(ObserveSearchResults(repository.search("ab")))   // Cancels "a"
+store.dispatch(ObserveSearchResults(repository.search("abc")))  // Cancels "ab"
+// Only "abc" results are observed
 ```
 
 Use `concurrent()` for parallel execution without cancellation:
 
 ```kotlin
 // Concurrent: Multiple streams run in parallel
-data class DownloadFile(val url: String) : FlowHolderAction {
+// Wraps download progress flows
+data class ObserveDownloadProgress(
+    private val progressFlow: Flow<DownloadProgress>
+) : FlowHolderAction {
     override val strategy = concurrent()
 
-    override fun toFlowAction() = flow {
-        emit(DownloadStarted(url))
-        val file = downloadService.download(url)
-        emit(DownloadComplete(url, file))
-    }
+    override fun toFlowAction(): Flow<Action> =
+        progressFlow.map { DownloadProgressUpdated(it) }
 }
 
-store.dispatch(DownloadFile("file1.zip"))  // Starts download 1
-store.dispatch(DownloadFile("file2.zip"))  // Starts download 2 (parallel)
-// Both downloads run concurrently
+// Multiple downloads can be observed simultaneously
+store.dispatch(ObserveDownloadProgress(downloadService.download("file1.zip")))
+store.dispatch(ObserveDownloadProgress(downloadService.download("file2.zip")))
+// Both progress streams are active concurrently
 ```
 
 FlowHolderAction supports all execution strategies:
 
 ```kotlin
-// Debounced FlowHolderAction
-data class AutoSaveStream(val content: String) : FlowHolderAction {
+// Debounced: Observes input changes with debounce
+data class ObserveInputChanges(
+    private val inputFlow: Flow<String>
+) : FlowHolderAction {
     override val strategy = debounce(500.milliseconds)
 
-    override fun toFlowAction() = flow {
-        api.save(content)
-        emit(SaveComplete)
-    }
+    override fun toFlowAction(): Flow<Action> =
+        inputFlow.map { InputChanged(it) }
 }
 
-// Throttled FlowHolderAction
-data class AnalyticsStream(val event: String) : FlowHolderAction {
+// Throttled: Observes sensor data with throttle
+data class ObserveSensorData(
+    private val sensorFlow: Flow<SensorReading>
+) : FlowHolderAction {
     override val strategy = throttle(1000.milliseconds)
 
-    override fun toFlowAction() = flow {
-        analytics.track(event)
-        emit(EventTracked(event))
-    }
+    override fun toFlowAction(): Flow<Action> =
+        sensorFlow.map { SensorDataReceived(it) }
 }
 ```
+
+> **Note:** FlowHolderAction is designed to wrap and transform existing Flows, not to perform side effects. Side effects (API calls, database writes, etc.) should be handled in Middleware.
 
 ## Execution Strategies
 
