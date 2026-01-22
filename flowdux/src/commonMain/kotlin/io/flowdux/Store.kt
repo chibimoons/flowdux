@@ -19,7 +19,14 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
+import kotlin.reflect.KClass
+
+/** Cancellation flag for FlowHolderAction streams. */
+private class CancelFlag {
+    var cancelled = false
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class Store<S : State, A : Action>(
@@ -32,6 +39,9 @@ class Store<S : State, A : Action>(
 ) {
     private val actionFlow = Channel<A>()
     private var _isClosed = false
+
+    /** Active cancel flags for cancelable FlowHolderActions, keyed by KClass. */
+    private val activeFlags = mutableMapOf<KClass<*>, CancelFlag>()
 
     val isClosed: Boolean get() = _isClosed
 
@@ -52,14 +62,7 @@ class Store<S : State, A : Action>(
             }
         }
         .onEach { logger.onMiddlewaresCompleted(it) }
-        .flatMapMerge {
-            if (it is FlowHolderAction) {
-                (it.toFlowAction() as Flow<A>)
-                    .onEach { logger.onFlowHolderActionEmitted(it) }
-            } else {
-                flowOf(it)
-            }
-        }
+        .flatMapMerge { processFlowHolderAction(it) }
         .catch { error ->
             logger.onErrorOccurred(error)
             emitAll(
@@ -67,6 +70,33 @@ class Store<S : State, A : Action>(
                     .onEach { logger.onErrorHandled(it) }
             )
         }
+
+    /**
+     * Processes FlowHolderAction, expanding it into its stream of actions.
+     * For cancelable FlowHolderActions, cancels any previously running
+     * flow of the same type before starting the new one.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun processFlowHolderAction(action: A): Flow<A> {
+        if (action is FlowHolderAction) {
+            val type = action::class
+            var myFlag: CancelFlag? = null
+
+            if (action.cancelable) {
+                // Cancel previous flow of the same type
+                activeFlags[type]?.cancelled = true
+                // Create new flag for this flow
+                myFlag = CancelFlag()
+                activeFlags[type] = myFlag
+            }
+
+            return (action.toFlowAction() as Flow<A>)
+                .onEach { logger.onFlowHolderActionEmitted(it) }
+                .flatMapMerge { processFlowHolderAction(it) }
+                .takeWhile { myFlag?.cancelled != true }
+        }
+        return flowOf(action)
+    }
 
     val state: StateFlow<S> = stateFlow
 
@@ -91,6 +121,13 @@ class Store<S : State, A : Action>(
     fun close() {
         if (_isClosed) return
         _isClosed = true
+
+        // Cancel all active FlowHolderAction flows
+        for (flag in activeFlags.values) {
+            flag.cancelled = true
+        }
+        activeFlags.clear()
+
         actionFlow.close()
         scope.cancel()
     }

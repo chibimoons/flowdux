@@ -1,7 +1,9 @@
 package io.flowdux
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 
@@ -36,6 +38,41 @@ sealed interface CounterAction : Action {
             flow2.map { Add(it) }
         ).merge()
     }
+
+    /**
+     * Cancelable infinite stream action (default cancelable = true).
+     * When a new instance is dispatched, the previous stream is cancelled.
+     */
+    data class InfiniteStreamAction(
+        val id: String,
+        val emitInterval: Long = 100L,
+    ) : CounterAction, FlowHolderAction {
+        override fun toFlowAction(): Flow<Action> = flow {
+            while (true) {
+                delay(emitInterval)
+                emit(Add(1))
+            }
+        }
+    }
+
+    /**
+     * Non-cancelable FlowHolderAction.
+     * Multiple streams can run concurrently.
+     */
+    data class NonCancelableStreamAction(
+        val id: String,
+        val values: List<Int>,
+        val delayBetween: Long = 50L,
+    ) : CounterAction, FlowHolderAction {
+        override val cancelable: Boolean get() = false
+
+        override fun toFlowAction(): Flow<Action> = flow {
+            for (value in values) {
+                delay(delayBetween)
+                emit(Add(value))
+            }
+        }
+    }
 }
 
 val counterReducer =
@@ -51,6 +88,8 @@ val counterReducer =
             is CounterAction.Reset -> state.copy(count = 0)
             is CounterAction.StreamConnected -> state
             is CounterAction.MultiStreamConnected -> state
+            is CounterAction.InfiniteStreamAction -> state
+            is CounterAction.NonCancelableStreamAction -> state
         }
     }
 
