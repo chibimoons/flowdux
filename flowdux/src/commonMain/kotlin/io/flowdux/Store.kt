@@ -144,7 +144,7 @@ class Store<S : State, A : Action>(
 
         // Cancel all active FlowHolderAction flows
         // Use runBlocking to synchronize with processFlowHolderAction
-        kotlinx.coroutines.runBlocking {
+        runBlocking {
             activeFlagsMutex.withLock {
                 for (flag in activeFlags.values) {
                     flag.cancelled = true
