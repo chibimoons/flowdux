@@ -19,20 +19,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
-import kotlin.reflect.KClass
-
-/** Cancellation flag for FlowHolderAction streams. */
-private class CancelFlag {
-    var cancelled = false
-}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class Store<S : State, A : Action>(
     initialState: S,
     private val reducer: Reducer<S, A>,
-    private val middlewares: List<Middleware<S, A>>,
+    middlewares: List<Middleware<S, A>>,
     private val errorProcessor: ErrorProcessor<A>,
     private val logger: StoreLogger<S, A>,
     private val scope: CoroutineScope,
@@ -40,8 +33,9 @@ class Store<S : State, A : Action>(
     private val actionFlow = Channel<A>()
     private var _isClosed = false
 
-    /** Active cancel flags for cancelable FlowHolderActions, keyed by KClass. */
-    private val activeFlags = mutableMapOf<KClass<*>, CancelFlag>()
+    /** All middlewares including the internal FlowHolderMiddleware at the end. */
+    private val allMiddlewares: List<Middleware<S, A>> =
+        middlewares + FlowHolderMiddleware(logger)
 
     val isClosed: Boolean get() = _isClosed
 
@@ -51,7 +45,7 @@ class Store<S : State, A : Action>(
         .map { reduceAction(state.value, it) }
         .stateIn(scope, SharingStarted.Eagerly, initialState)
 
-    private fun processAction(a: A): Flow<A> = middlewares
+    private fun processAction(a: A): Flow<A> = allMiddlewares
         .fold(flowOf(a)) { flow, middleware ->
             flow.flatMapConcat { currentAction ->
                 logger.onMiddlewareProcessing(middleware.name, currentAction)
@@ -62,7 +56,6 @@ class Store<S : State, A : Action>(
             }
         }
         .onEach { logger.onMiddlewaresCompleted(it) }
-        .flatMapMerge { processFlowHolderAction(it) }
         .catch { error ->
             logger.onErrorOccurred(error)
             emitAll(
@@ -70,36 +63,6 @@ class Store<S : State, A : Action>(
                     .onEach { logger.onErrorHandled(it) }
             )
         }
-
-    /**
-     * Processes FlowHolderAction, expanding it into its stream of actions.
-     * For cancelable FlowHolderActions, cancels any previously running
-     * flow of the same type before starting the new one.
-     */
-    @Suppress("UNCHECKED_CAST")
-    private fun processFlowHolderAction(action: A): Flow<A> {
-        if (action is FlowHolderAction) {
-            val type = action::class
-
-            if (action.cancelable) {
-                // Cancel any previously running flow of the same type
-                activeFlags[type]?.cancelled = true
-                val myFlag = CancelFlag()
-                activeFlags[type] = myFlag
-
-                return (action.toFlowAction() as Flow<A>)
-                    .onEach { logger.onFlowHolderActionEmitted(it) }
-                    .flatMapMerge { processFlowHolderAction(it) }
-                    .takeWhile { !myFlag.cancelled }
-            }
-
-            // Non-cancelable: just process the flow without cancellation logic
-            return (action.toFlowAction() as Flow<A>)
-                .onEach { logger.onFlowHolderActionEmitted(it) }
-                .flatMapMerge { processFlowHolderAction(it) }
-        }
-        return flowOf(action)
-    }
 
     val state: StateFlow<S> = stateFlow
 
@@ -124,13 +87,6 @@ class Store<S : State, A : Action>(
     fun close() {
         if (_isClosed) return
         _isClosed = true
-
-        // Cancel all active FlowHolderAction flows
-        for (flag in activeFlags.values) {
-            flag.cancelled = true
-        }
-        activeFlags.clear()
-
         actionFlow.close()
         scope.cancel()
     }

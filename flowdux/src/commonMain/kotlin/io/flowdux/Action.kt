@@ -10,10 +10,10 @@ interface Action
  * When dispatched, the Store automatically subscribes to the Flow
  * and dispatches each emitted action individually.
  *
- * By default, FlowHolderAction is cancelable, meaning that when a new
- * FlowHolderAction of the same type is dispatched, the previous one's
- * flow will be cancelled. Override [cancelable] to return false
- * if you want multiple flows of the same type to run concurrently.
+ * By default, FlowHolderAction uses [TakeLatest] strategy, meaning that
+ * when a new FlowHolderAction of the same type is dispatched, the previous
+ * one's flow will be cancelled. Override [strategy] to use a different
+ * execution strategy.
  *
  * Example:
  * ```kotlin
@@ -29,9 +29,15 @@ interface Action
  *     }
  * }
  *
- * // Non-cancelable FlowHolderAction (multiple can run concurrently)
+ * // Concurrent FlowHolderAction (multiple can run in parallel)
  * class ConcurrentStreamAction : FlowHolderAction {
- *     override val cancelable: Boolean get() = false
+ *     override val strategy: ExecutionStrategy get() = concurrent()
+ *     override fun toFlowAction() = flow { ... }
+ * }
+ *
+ * // Debounced FlowHolderAction
+ * class DebouncedSearchAction : FlowHolderAction {
+ *     override val strategy: ExecutionStrategy get() = debounce(300.milliseconds)
  *     override fun toFlowAction() = flow { ... }
  * }
  * ```
@@ -43,10 +49,12 @@ interface FlowHolderAction : Action {
     fun toFlowAction(): Flow<Action>
 
     /**
-     * Whether this action's flow should be cancelled when a new
-     * FlowHolderAction of the same type is dispatched.
+     * Execution strategy for this FlowHolderAction.
      *
-     * Default is true. Override to return false for concurrent execution.
+     * Default is [TakeLatest], which cancels previous executions
+     * when a new action of the same type is dispatched.
+     *
+     * Use [concurrent] for parallel execution without cancellation.
      */
-    val cancelable: Boolean get() = true
+    val strategy: ExecutionStrategy get() = TakeLatest()
 }

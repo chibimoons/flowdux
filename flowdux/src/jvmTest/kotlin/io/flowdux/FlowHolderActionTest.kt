@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class FlowHolderActionTest {
 
+    // ============= Basic FlowHolderAction Tests =============
+
     @Test
     fun `FlowHolderAction flattens inner flows and updates state`() =
         runTest {
@@ -285,15 +287,15 @@ class FlowHolderActionTest {
                 // We should see increments of both 1 and 10
                 var sawIncrementByOne = false
                 var sawIncrementByTen = false
-                
+
                 var previousCount = firstCount
                 repeat(10) {
                     val currentCount = awaitItem().count
                     val increment = currentCount - previousCount
-                    
+
                     if (increment == 1) sawIncrementByOne = true
                     if (increment == 10) sawIncrementByTen = true
-                    
+
                     previousCount = currentCount
                 }
 
@@ -301,6 +303,187 @@ class FlowHolderActionTest {
                     "Expected both streams to run concurrently. " +
                         "sawIncrementByOne=$sawIncrementByOne, sawIncrementByTen=$sawIncrementByTen"
                 }
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    // ============= Strategy-based Tests =============
+
+    @Test
+    fun `FlowHolderAction with TakeLeading strategy ignores subsequent dispatches`() =
+        runTest {
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // Start first TakeLeading stream (values: 1, 1, 1)
+                store.dispatch(CounterAction.TakeLeadingStreamAction("stream1", listOf(1, 1, 1), delayBetween = 50L))
+
+                // Immediately dispatch second stream (values: 10, 10, 10) - should be ignored
+                store.dispatch(CounterAction.TakeLeadingStreamAction("stream2", listOf(10, 10, 10), delayBetween = 50L))
+
+                // Only first stream should run
+                // stream1: 1 + 1 + 1 = 3
+                assertEquals(1, awaitItem().count)
+                assertEquals(2, awaitItem().count)
+                assertEquals(3, awaitItem().count)
+
+                // Verify second stream was ignored - no more emissions
+                expectNoEvents()
+
+                assertEquals(3, store.currentState.count)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `FlowHolderAction with Debounce strategy delays execution`() =
+        runTest {
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // Dispatch multiple debounced actions rapidly
+                store.dispatch(CounterAction.DebouncedStreamAction("a1", value = 1, debounceMs = 100L))
+                delay(30)
+                store.dispatch(CounterAction.DebouncedStreamAction("a2", value = 2, debounceMs = 100L))
+                delay(30)
+                store.dispatch(CounterAction.DebouncedStreamAction("a3", value = 3, debounceMs = 100L))
+
+                // Only the last one should execute after debounce
+                // Wait for debounce to complete
+                delay(150)
+
+                val finalCount = awaitItem().count
+                assertEquals(3, finalCount) {
+                    "Expected only last debounced action (3) to execute, but got $finalCount"
+                }
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `FlowHolderAction with Throttle strategy limits execution rate`() =
+        runTest {
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // Dispatch first throttled action - should execute immediately
+                store.dispatch(CounterAction.ThrottledStreamAction("a1", value = 1, throttleMs = 200L))
+                assertEquals(1, awaitItem().count)
+
+                // Dispatch more actions within throttle window - should be ignored
+                store.dispatch(CounterAction.ThrottledStreamAction("a2", value = 10, throttleMs = 200L))
+                store.dispatch(CounterAction.ThrottledStreamAction("a3", value = 100, throttleMs = 200L))
+
+                // Verify no new emissions from throttled actions
+                expectNoEvents()
+
+                assertEquals(1, store.currentState.count) {
+                    "Expected actions within throttle window to be ignored"
+                }
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    // ============= Nested FlowHolderAction Tests =============
+
+    @Test
+    fun `nested FlowHolderAction processes recursively`() =
+        runTest {
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // Create an inner FlowHolderAction that adds 1, 2, 3
+                val innerAction = CounterAction.NonCancelableStreamAction(
+                    id = "inner",
+                    values = listOf(1, 2, 3),
+                    delayBetween = 10L
+                )
+
+                // Dispatch nested FlowHolderAction
+                // It will emit Add(100) first, then emit the innerAction
+                store.dispatch(CounterAction.NestedFlowHolderAction(innerAction))
+
+                // First: Add(100) from outer action
+                assertEquals(100, awaitItem().count)
+
+                // Then: 1, 2, 3 from inner action
+                assertEquals(101, awaitItem().count)
+                assertEquals(103, awaitItem().count)
+                assertEquals(106, awaitItem().count)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `deeply nested FlowHolderActions process correctly`() =
+        runTest {
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // Level 3: innermost action emits 1
+                val level3 = CounterAction.NonCancelableStreamAction(
+                    id = "level3",
+                    values = listOf(1),
+                    delayBetween = 10L
+                )
+
+                // Level 2: wraps level3, also emits Add(100)
+                val level2 = CounterAction.NestedFlowHolderAction(level3)
+
+                // Level 1: wraps level2, also emits Add(100)
+                val level1 = CounterAction.NestedFlowHolderAction(level2)
+
+                // Dispatch the outermost nested action
+                store.dispatch(level1)
+
+                // level1 emits Add(100), then level2
+                // level2 emits Add(100), then level3
+                // level3 emits Add(1)
+                // Total: 100 + 100 + 1 = 201
+
+                assertEquals(100, awaitItem().count)  // From level1
+                assertEquals(200, awaitItem().count)  // From level2
+                assertEquals(201, awaitItem().count)  // From level3
 
                 cancelAndIgnoreRemainingEvents()
             }

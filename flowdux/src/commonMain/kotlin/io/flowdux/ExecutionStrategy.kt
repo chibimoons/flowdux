@@ -309,7 +309,26 @@ class RetryWithBackoff(
     }
 }
 
+/**
+ * Allows all executions to run concurrently without any coordination.
+ * Each action will execute independently regardless of other actions.
+ *
+ * Use this when you want multiple instances of the same action to run in parallel.
+ */
+class Concurrent : ExecutionStrategy {
+    override val category = StrategyCategory.CONCURRENCY
+
+    override fun <S, A, T : A> wrap(
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+    ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = processor
+}
+
 // Convenience factory functions
+
+/**
+ * Creates a [Concurrent] strategy that allows all executions to run in parallel.
+ */
+fun concurrent(): ExecutionStrategy = Concurrent()
 
 /**
  * Creates a [TakeLatest] strategy that cancels previous executions when a new action arrives.
