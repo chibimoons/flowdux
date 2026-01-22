@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.flatMapConcat
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -94,6 +95,13 @@ class Store<S : State, A : Action>(
                 .onEach { logger.onFlowHolderActionEmitted(it) }
                 .flatMapMerge { processFlowHolderAction(it) }
                 .takeWhile { myFlag?.cancelled != true }
+                .onCompletion {
+                    // Clean up the flag when the flow completes
+                    // Only remove if it's still our flag (not replaced by a newer flow)
+                    if (action.cancelable && activeFlags[type] === myFlag) {
+                        activeFlags.remove(type)
+                    }
+                }
         }
         return flowOf(action)
     }
