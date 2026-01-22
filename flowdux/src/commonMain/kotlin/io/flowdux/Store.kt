@@ -25,13 +25,17 @@ import kotlinx.coroutines.launch
 class Store<S : State, A : Action>(
     initialState: S,
     private val reducer: Reducer<S, A>,
-    private val middlewares: List<Middleware<S, A>>,
+    middlewares: List<Middleware<S, A>>,
     private val errorProcessor: ErrorProcessor<A>,
     private val logger: StoreLogger<S, A>,
     private val scope: CoroutineScope,
 ) {
     private val actionFlow = Channel<A>()
     private var _isClosed = false
+
+    /** All middlewares including the internal FlowHolderMiddleware at the end. */
+    private val allMiddlewares: List<Middleware<S, A>> =
+        middlewares + FlowHolderMiddleware(logger)
 
     val isClosed: Boolean get() = _isClosed
 
@@ -41,7 +45,7 @@ class Store<S : State, A : Action>(
         .map { reduceAction(state.value, it) }
         .stateIn(scope, SharingStarted.Eagerly, initialState)
 
-    private fun processAction(a: A): Flow<A> = middlewares
+    private fun processAction(a: A): Flow<A> = allMiddlewares
         .fold(flowOf(a)) { flow, middleware ->
             flow.flatMapConcat { currentAction ->
                 logger.onMiddlewareProcessing(middleware.name, currentAction)
@@ -52,14 +56,6 @@ class Store<S : State, A : Action>(
             }
         }
         .onEach { logger.onMiddlewaresCompleted(it) }
-        .flatMapMerge {
-            if (it is FlowHolderAction) {
-                (it.toFlowAction() as Flow<A>)
-                    .onEach { logger.onFlowHolderActionEmitted(it) }
-            } else {
-                flowOf(it)
-            }
-        }
         .catch { error ->
             logger.onErrorOccurred(error)
             emitAll(
