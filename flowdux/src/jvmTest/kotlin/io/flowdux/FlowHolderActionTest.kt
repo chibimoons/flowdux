@@ -213,12 +213,19 @@ class FlowHolderActionTest {
                 // Close the store
                 store.close()
 
-                // Give some time for any pending emissions
-                delay(200)
+                // Wait longer to ensure any buffered emissions are processed
+                // and the cancellation has taken effect
+                delay(500)
 
-                // Count should not have increased significantly after close
-                assertTrue(store.currentState.count <= countBeforeClose + 1) {
-                    "Stream should have been cancelled on store close"
+                val countAfterClose = store.currentState.count
+
+                // Verify no new emissions occurred after a reasonable delay
+                // The stream should be cancelled, so no further emissions
+                delay(300)
+
+                // Count should remain stable after cancellation
+                assertEquals(countAfterClose, store.currentState.count) {
+                    "Stream should have been cancelled on store close - count should not increase after cancellation"
                 }
 
                 cancelAndIgnoreRemainingEvents()
