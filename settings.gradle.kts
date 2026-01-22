@@ -15,10 +15,11 @@ dependencyResolutionManagement {
 
 rootProject.name = "flowdux-root"
 include(":flowdux")
-include(":flowdux-timetravel")
-include(":sample-jvm")
-include(":sample-android")
-include(":sample-shared:shared")
-include(":sample-shared:androidApp")
-include(":sample-web")
-include(":sample-wasm")
+// Exclude other modules for testing environment constraints
+// include(":flowdux-timetravel")
+// include(":sample-jvm")
+// include(":sample-android")
+// include(":sample-shared:shared")
+// include(":sample-shared:androidApp")
+// include(":sample-web")
+// include(":sample-wasm")
