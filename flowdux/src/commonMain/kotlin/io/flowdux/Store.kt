@@ -25,6 +25,7 @@ import kotlin.reflect.KClass
 
 /** Cancellation flag for FlowHolderAction streams. */
 private class CancelFlag {
+    @Volatile
     var cancelled = false
 }
 
@@ -76,18 +77,19 @@ class Store<S : State, A : Action>(
      * For cancelable FlowHolderActions, cancels any previously running
      * flow of the same type before starting the new one.
      * 
-     * @param isNested Whether this is a nested FlowHolderAction. Nested actions
-     *                 inherit cancellation from their parent and do not create
-     *                 their own cancellation flags.
+     * @param action The action to process
+     * @param parentFlag The cancellation flag from the parent flow. Nested actions
+     *                   inherit this flag and are cancelled when the parent is cancelled.
      */
     @Suppress("UNCHECKED_CAST")
-    private fun processFlowHolderAction(action: A, isNested: Boolean = false): Flow<A> {
+    private fun processFlowHolderAction(action: A, parentFlag: CancelFlag? = null): Flow<A> {
         if (action is FlowHolderAction) {
             val type = action::class
-            var myFlag: CancelFlag? = null
+            var myFlag: CancelFlag? = parentFlag
 
             // Only manage cancellation flags for top-level actions
-            if (action.cancelable && !isNested) {
+            // Nested actions inherit the parent's flag
+            if (action.cancelable && parentFlag == null) {
                 // Cancel previous flow of the same type
                 activeFlags[type]?.cancelled = true
                 // Create new flag for this flow
@@ -97,7 +99,7 @@ class Store<S : State, A : Action>(
 
             return (action.toFlowAction() as Flow<A>)
                 .onEach { logger.onFlowHolderActionEmitted(it) }
-                .flatMapMerge { processFlowHolderAction(it, isNested = true) }
+                .flatMapMerge { processFlowHolderAction(it, parentFlag = myFlag) }
                 .takeWhile { myFlag?.cancelled != true }
         }
         return flowOf(action)

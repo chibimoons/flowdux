@@ -290,4 +290,61 @@ class FlowHolderActionTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `nested FlowHolderActions are cancelled when parent is cancelled`() =
+        runTest {
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // Create an action with an infinite nested stream
+                data class ParentWithInfiniteNested(val id: String) : CounterAction, FlowHolderAction {
+                    override fun toFlowAction(): Flow<Action> = flow {
+                        emit(Add(1))
+                        // Emit a nested infinite stream
+                        emit(InfiniteStreamAction("nested", emitInterval = 50L))
+                    }
+                }
+
+                // Dispatch first parent
+                store.dispatch(ParentWithInfiniteNested("parent1"))
+
+                // Should get the initial Add(1)
+                assertEquals(1, awaitItem().count)
+
+                // And then starts getting from infinite nested stream
+                assertEquals(2, awaitItem().count)
+                assertEquals(3, awaitItem().count)
+
+                val countBeforeCancel = store.currentState.count
+
+                // Dispatch another parent of same type - should cancel the first including its nested stream
+                store.dispatch(ParentWithInfiniteNested("parent2"))
+
+                // Should get the new parent's Add(1)
+                awaitItem()
+
+                // And then the new nested stream
+                awaitItem()
+                awaitItem()
+
+                // Verify we're not getting double emissions (both streams running)
+                // If nested wasn't cancelled, we'd get ~double the rate
+                val countAfter = store.currentState.count
+                
+                assertTrue(countAfter <= countBeforeCancel + 6) {
+                    "Nested stream should have been cancelled with parent. " +
+                        "Count was $countAfter, expected around ${countBeforeCancel + 4}"
+                }
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }
