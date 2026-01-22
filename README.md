@@ -28,10 +28,10 @@ flowchart TB
         channel["Channel〈Action〉"]
 
         subgraph processAction["processAction()"]
-            middleware["Middleware Chain"]
-            flowHolder{"FlowHolderAction?"}
-            toFlow["toFlowAction()"]
-            pass["Pass Through"]
+            subgraph middlewareChain["Middleware Chain"]
+                userMiddleware["User Middlewares"]
+                flowHolderMW["FlowHolderMiddleware"]
+            end
             catchBlock[".catch { }"]
             errorProc["ErrorProcessor"]
         end
@@ -40,16 +40,23 @@ flowchart TB
         stateFlow["StateFlow〈State〉"]
     end
 
+    subgraph flowHolderMWDetail["FlowHolderMiddleware"]
+        fhCheck{"FlowHolderAction?"}
+        toFlow["toFlowAction()"]
+        strategy["Apply Strategy"]
+        passThrough["Pass Through"]
+    end
+
     dispatch --> channel
-    channel --> middleware
-    middleware --> flowHolder
-    flowHolder -->|Yes| toFlow
-    flowHolder -->|No| pass
-    toFlow --> reducer
-    pass --> reducer
-    middleware -.->|Error| catchBlock
-    toFlow -.->|Error| catchBlock
-    pass -.->|Error| catchBlock
+    channel --> userMiddleware
+    userMiddleware --> flowHolderMW
+    flowHolderMW --> fhCheck
+    fhCheck -->|Yes| strategy
+    strategy --> toFlow
+    toFlow -->|"emit(Action)"| fhCheck
+    fhCheck -->|No| passThrough
+    passThrough --> reducer
+    middlewareChain -.->|Error| catchBlock
     catchBlock --> errorProc
     errorProc -.-> reducer
     reducer --> stateFlow
@@ -59,6 +66,7 @@ flowchart TB
 | Component | Role |
 |-----------|------|
 | **Middleware** | Side effects (API calls, logging), action transformation |
+| **FlowHolderMiddleware** | Processes FlowHolderAction with ExecutionStrategy (auto-added) |
 | **ExecutionStrategy** | Control concurrent action processing (takeLatest, sequential, debounce, retry, etc.) |
 | **FlowHolderAction** | Convert existing Flow to Action stream |
 | **ErrorProcessor** | Catch errors and convert to Actions |
