@@ -1,0 +1,17 @@
+# Dart/Flutter specific
+.dart_tool/
+.packages
+build/
+pubspec.lock
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Coverage
+coverage/
+
+# Flutter
+.flutter-plugins
+.flutter-plugins-dependencies
