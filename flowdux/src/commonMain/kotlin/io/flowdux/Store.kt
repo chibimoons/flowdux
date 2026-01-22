@@ -22,12 +22,14 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.reflect.KClass
 
 /** Cancellation flag for FlowHolderAction streams. */
 private class CancelFlag {
+    @Volatile
     var cancelled = false
 }
 
@@ -141,10 +143,15 @@ class Store<S : State, A : Action>(
         _isClosed = true
 
         // Cancel all active FlowHolderAction flows
-        for (flag in activeFlags.values) {
-            flag.cancelled = true
+        // Use runBlocking to synchronize with processFlowHolderAction
+        kotlinx.coroutines.runBlocking {
+            activeFlagsMutex.withLock {
+                for (flag in activeFlags.values) {
+                    flag.cancelled = true
+                }
+                activeFlags.clear()
+            }
         }
-        activeFlags.clear()
 
         actionFlow.close()
         scope.cancel()
