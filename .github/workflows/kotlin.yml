@@ -17,6 +17,9 @@ on:
       - 'settings.gradle.kts'
       - 'gradle.properties'
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest

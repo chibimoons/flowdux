@@ -9,6 +9,9 @@ on:
     paths:
       - 'dart/**'
 
+permissions:
+  contents: read
+
 jobs:
   test-flowdux:
     runs-on: ubuntu-latest
