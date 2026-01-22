@@ -44,7 +44,7 @@ jobs:
 
       - name: Update flowdux_flutter dependency to published version
         run: |
-          sed -i 's|path: ../flowdux|^${{ steps.version.outputs.VERSION }}|' pubspec.yaml
+          sed -i '/flowdux:/{N;s|  flowdux:\n    path: ../flowdux|  flowdux: ^${{ steps.version.outputs.VERSION }}|}' pubspec.yaml
         working-directory: dart/flowdux_flutter
 
       - name: Publish flowdux_flutter
