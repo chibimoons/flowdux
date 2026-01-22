@@ -73,6 +73,23 @@ sealed interface CounterAction : Action {
             }
         }
     }
+
+    /**
+     * Another cancelable infinite stream action (default cancelable = true).
+     * This is a different type from InfiniteStreamAction, used to test that
+     * different cancelable types don't cancel each other.
+     */
+    data class SecondaryStreamAction(
+        val id: String,
+        val emitInterval: Long = 100L,
+    ) : CounterAction, FlowHolderAction {
+        override fun toFlowAction(): Flow<Action> = flow {
+            while (true) {
+                delay(emitInterval)
+                emit(Add(10))
+            }
+        }
+    }
 }
 
 val counterReducer =
@@ -90,6 +107,7 @@ val counterReducer =
             is CounterAction.MultiStreamConnected -> state
             is CounterAction.InfiniteStreamAction -> state
             is CounterAction.NonCancelableStreamAction -> state
+            is CounterAction.SecondaryStreamAction -> state
         }
     }
 

@@ -264,4 +264,51 @@ class FlowHolderActionTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `different cancelable FlowHolderAction types run concurrently without canceling each other`() =
+        runTest {
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // Start first cancelable stream (adds 1 per emission)
+                store.dispatch(CounterAction.InfiniteStreamAction("stream1", emitInterval = 50L))
+
+                // Wait for first emission from InfiniteStreamAction
+                assertEquals(1, awaitItem().count)
+
+                // Start second cancelable stream of a DIFFERENT type (adds 10 per emission)
+                store.dispatch(CounterAction.SecondaryStreamAction("stream2", emitInterval = 50L))
+
+                // Both streams should continue running concurrently
+                // We should see increments of both 1 and 10
+                var sawIncrementByOne = false
+                var sawIncrementByTen = false
+                
+                var previousCount = store.currentState.count
+                repeat(10) {
+                    val currentCount = awaitItem().count
+                    val increment = currentCount - previousCount
+                    
+                    if (increment == 1) sawIncrementByOne = true
+                    if (increment == 10) sawIncrementByTen = true
+                    
+                    previousCount = currentCount
+                }
+
+                assertTrue(sawIncrementByOne && sawIncrementByTen) {
+                    "Expected both streams to run concurrently. " +
+                        "sawIncrementByOne=$sawIncrementByOne, sawIncrementByTen=$sawIncrementByTen"
+                }
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }
