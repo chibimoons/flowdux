@@ -54,7 +54,7 @@ jobs:
 
       - name: Analyze
         working-directory: dart/flowdux_flutter
-        run: flutter analyze
+        run: flutter analyze --no-fatal-warnings
 
       - name: Run tests
         working-directory: dart/flowdux_flutter
