@@ -1,0 +1,61 @@
+name: Dart CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dart/**'
+  pull_request:
+    paths:
+      - 'dart/**'
+
+permissions:
+  contents: read
+
+jobs:
+  test-flowdux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        working-directory: dart/flowdux
+        run: dart pub get
+
+      - name: Analyze
+        working-directory: dart/flowdux
+        run: dart analyze
+
+      - name: Run tests
+        working-directory: dart/flowdux
+        run: dart test
+
+  test-flowdux-flutter:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+
+      - name: Install dependencies
+        working-directory: dart/flowdux_flutter
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: dart/flowdux_flutter
+        run: flutter analyze
+
+      - name: Run tests
+        working-directory: dart/flowdux_flutter
+        run: flutter test

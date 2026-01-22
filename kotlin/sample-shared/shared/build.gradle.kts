@@ -23,7 +23,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            api(project(":flowdux"))
+            api(project(":kotlin:flowdux"))
             implementation(libs.kotlinx.coroutines.core)
         }
     }

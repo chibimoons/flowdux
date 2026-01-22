@@ -14,11 +14,11 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "flowdux-root"
-include(":flowdux")
-include(":flowdux-timetravel")
-include(":sample-jvm")
-include(":sample-android")
-include(":sample-shared:shared")
-include(":sample-shared:androidApp")
-include(":sample-web")
-include(":sample-wasm")
+include(":kotlin:flowdux")
+include(":kotlin:flowdux-timetravel")
+include(":kotlin:sample-jvm")
+include(":kotlin:sample-android")
+include(":kotlin:sample-shared:shared")
+include(":kotlin:sample-shared:androidApp")
+include(":kotlin:sample-web")
+include(":kotlin:sample-wasm")

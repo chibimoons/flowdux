@@ -1,8 +1,10 @@
 # Flowdux
 
-A lightweight Redux-style state management library for Kotlin Multiplatform with Middleware support.
+A lightweight Redux-style state management library for **Kotlin Multiplatform** and **Dart/Flutter** with Middleware support.
 
-[![](https://jitpack.io/v/chibimoons/flowdux.svg)](https://jitpack.io/#chibimoons/flowdux)
+[![Kotlin](https://jitpack.io/v/chibimoons/flowdux.svg)](https://jitpack.io/#chibimoons/flowdux)
+[![Dart](https://img.shields.io/pub/v/flowdux.svg)](https://pub.dev/packages/flowdux)
+[![Flutter](https://img.shields.io/pub/v/flowdux_flutter.svg)](https://pub.dev/packages/flowdux_flutter)
 
 ## Features
 
@@ -12,8 +14,9 @@ A lightweight Redux-style state management library for Kotlin Multiplatform with
 - Strategy chaining and groups for flexible action coordination
 - Error handling with ErrorProcessor
 - Time travel debugging (undo/redo, state history)
-- Built on Kotlin Coroutines and Flow
+- Built on Kotlin Coroutines and Flow / Dart Streams
 - Kotlin Multiplatform support (JVM, iOS, JS, WASM)
+- Dart/Flutter support with Flutter bindings
 
 ## Architecture
 
@@ -153,6 +156,8 @@ store.dispatch(Increment)  // → Middleware (no processor) → Reducer
 
 ## Installation
 
+### Kotlin (JitPack)
+
 Add JitPack repository to your `settings.gradle.kts`:
 
 ```kotlin
@@ -171,7 +176,26 @@ dependencies {
 }
 ```
 
-## Usage
+### Dart
+
+Add to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  flowdux: ^1.0.0
+```
+
+### Flutter
+
+Add to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  flowdux: ^1.0.0
+  flowdux_flutter: ^1.0.0
+```
+
+## Usage (Kotlin)
 
 ### Define State and Actions
 
@@ -552,12 +576,127 @@ store.dispatch(NewAction) // History becomes: [0] -> [1] -> [new]
                           // States [2] and [3] are discarded
 ```
 
+## Usage (Dart/Flutter)
+
+### Define State and Actions
+
+```dart
+// State
+class CounterState {
+  final int count;
+  CounterState(this.count);
+
+  CounterState copyWith({int? count}) => CounterState(count ?? this.count);
+}
+
+// Actions
+class IncrementAction implements Action {}
+class DecrementAction implements Action {}
+class AddAction implements Action {
+  final int value;
+  AddAction(this.value);
+}
+```
+
+### Create a Reducer
+
+```dart
+final counterReducer = ReducerBuilder<CounterState, Action>()
+  ..on<IncrementAction>((state, _) => state.copyWith(count: state.count + 1))
+  ..on<DecrementAction>((state, _) => state.copyWith(count: state.count - 1))
+  ..on<AddAction>((state, action) => state.copyWith(count: state.count + action.value));
+```
+
+### Create a Store
+
+```dart
+final store = createStore<CounterState, Action>(
+  initialState: CounterState(0),
+  reducer: counterReducer.build(),
+);
+
+// Dispatch actions
+store.dispatch(IncrementAction());
+
+// Listen to state changes
+store.state.listen((state) => print('Count: ${state.count}'));
+```
+
+### Middleware with Execution Strategies
+
+```dart
+class SearchMiddleware extends Middleware<AppState, Action> {
+  SearchMiddleware() {
+    // takeLatest cancels previous search when new one arrives
+    apply(takeLatest()).on<SearchAction>((state, action) async* {
+      final results = await api.search(action.query);
+      yield SearchResultsAction(results);
+    });
+  }
+}
+```
+
+### FlowHolderAction
+
+```dart
+class FetchDataAction with FlowHolderAction {
+  @override
+  Stream<Action> toStreamAction() async* {
+    yield LoadingAction();
+    final data = await api.fetchData();
+    yield DataLoadedAction(data);
+  }
+
+  // Default: TakeLatest strategy (auto-cancels previous)
+  // Override for concurrent execution:
+  // @override
+  // ExecutionStrategy get strategy => concurrent();
+}
+```
+
+### Flutter Integration
+
+```dart
+// Provide store to widget tree
+StoreProvider<AppState, Action>(
+  store: store,
+  child: MyApp(),
+)
+
+// Consume state in widgets
+StoreConsumer<AppState, Action>(
+  builder: (context, store, state) {
+    return Text('Count: ${state.count}');
+  },
+)
+
+// Or use selector for specific state
+StoreSelector<AppState, Action, int>(
+  selector: (state) => state.count,
+  builder: (context, store, count) {
+    return Text('Count: $count');
+  },
+)
+```
+
+### Run Dart Tests
+
+```bash
+cd dart/flowdux && dart test
+```
+
+### Run Flutter Example
+
+```bash
+cd dart/flowdux_flutter/example && flutter run
+```
+
 ## Sample Apps
 
 ### Run JVM Console Sample
 
 ```bash
-./gradlew :sample-jvm:run
+./gradlew :kotlin:sample-jvm:run
 ```
 
 Output:
@@ -608,18 +747,18 @@ State: count = 42 [api]
 ### Build Android Sample
 
 ```bash
-./gradlew :sample-android:assembleDebug
+./gradlew :kotlin:sample-android:assembleDebug
 ```
 
-APK location: `sample-android/build/outputs/apk/debug/sample-android-debug.apk`
+APK location: `kotlin/sample-android/build/outputs/apk/debug/sample-android-debug.apk`
 
 ### Build KMM Sample (Android)
 
 ```bash
-./gradlew :sample-shared:androidApp:assembleDebug
+./gradlew :kotlin:sample-shared:androidApp:assembleDebug
 ```
 
-APK location: `sample-shared/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
+APK location: `kotlin/sample-shared/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
 
 ### Build KMM Sample (iOS)
 
@@ -627,19 +766,19 @@ APK location: `sample-shared/androidApp/build/outputs/apk/debug/androidApp-debug
 
 ```bash
 # Build shared framework
-./gradlew :sample-shared:shared:linkDebugFrameworkIosSimulatorArm64
+./gradlew :kotlin:sample-shared:shared:linkDebugFrameworkIosSimulatorArm64
 
 # Build iOS app
-xcodebuild -project sample-shared/iosApp/iosApp.xcodeproj \
+xcodebuild -project kotlin/sample-shared/iosApp/iosApp.xcodeproj \
   -target iosApp -sdk iphonesimulator -arch arm64 build
 ```
 
-App location: `sample-shared/iosApp/build/Debug-iphonesimulator/iosApp.app`
+App location: `kotlin/sample-shared/iosApp/build/Debug-iphonesimulator/iosApp.app`
 
 ### KMM Sample Structure
 
 ```
-sample-shared/
+kotlin/sample-shared/
 ├── shared/           # Shared Kotlin code (commonMain)
 │   └── CounterStore  # Shared business logic
 ├── androidApp/       # Android UI (Compose)
@@ -649,7 +788,7 @@ sample-shared/
 ### Run Web (JavaScript) Sample
 
 ```bash
-./gradlew :sample-web:jsBrowserDevelopmentRun
+./gradlew :kotlin:sample-web:jsBrowserDevelopmentRun
 ```
 
 Opens browser at `http://localhost:8080` with an interactive Counter app.
@@ -657,7 +796,7 @@ Opens browser at `http://localhost:8080` with an interactive Counter app.
 ### Run WebAssembly (WASM) Sample
 
 ```bash
-./gradlew :sample-wasm:wasmJsBrowserDevelopmentRun
+./gradlew :kotlin:sample-wasm:wasmJsBrowserDevelopmentRun
 ```
 
 Opens browser at `http://localhost:8080` with an interactive Counter app (WASM version).
@@ -666,11 +805,11 @@ Opens browser at `http://localhost:8080` with an interactive Counter app (WASM v
 
 | Platform | Status | Sample |
 |----------|--------|--------|
-| JVM | ✅ | `sample-jvm` |
-| Android | ✅ | `sample-android`, `sample-shared/androidApp` |
-| iOS | ✅ | `sample-shared/iosApp` |
-| JavaScript | ✅ | `sample-web` |
-| WebAssembly | ✅ | `sample-wasm` |
+| JVM | ✅ | `kotlin/sample-jvm` |
+| Android | ✅ | `kotlin/sample-android`, `kotlin/sample-shared/androidApp` |
+| iOS | ✅ | `kotlin/sample-shared/iosApp` |
+| JavaScript | ✅ | `kotlin/sample-web` |
+| WebAssembly | ✅ | `kotlin/sample-wasm` |
 
 ## License
 

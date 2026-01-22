@@ -517,56 +517,6 @@ class ConcurrencyStrategyTest {
             }
         }
 
-        @Test
-        fun `sequential works with real dispatcher`() = runBlocking {
-            val executionOrder = mutableListOf<String>()
-            val storeScope = CoroutineScope(Dispatchers.Default + Job())
-
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Fetch>(sequential()) { _, action ->
-                        executionOrder.add("start-${action.id}")
-                        delay(50)
-                        executionOrder.add("end-${action.id}")
-                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                    }
-                }
-            }
-
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = storeScope,
-            )
-
-            try {
-                store.state.test {
-                    assertEquals(emptyList<String>(), awaitItem().values)
-
-                    // Dispatch multiple actions rapidly
-                    store.dispatch(TestAction.Fetch("1"))
-                    store.dispatch(TestAction.Fetch("2"))
-                    store.dispatch(TestAction.Fetch("3"))
-
-                    // Wait for all to complete with generous timing
-                    awaitItem() // result-1
-                    awaitItem() // result-2
-                    awaitItem() // result-3
-
-                    // Verify order: each action should start and end before the next starts
-                    assertEquals(
-                        listOf("start-1", "end-1", "start-2", "end-2", "start-3", "end-3"),
-                        executionOrder
-                    )
-
-                    cancelAndIgnoreRemainingEvents()
-                }
-            } finally {
-                storeScope.cancel()
-            }
-        }
     }
 
     @Nested

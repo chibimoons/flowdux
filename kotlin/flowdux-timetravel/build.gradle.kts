@@ -28,7 +28,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(project(":flowdux"))
+            implementation(project(":kotlin:flowdux"))
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)
         }
