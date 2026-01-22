@@ -73,6 +73,24 @@ sealed interface CounterAction : Action {
             }
         }
     }
+
+    /**
+     * Cancelable FlowHolderAction that emits nested FlowHolderActions of the same type.
+     * Used to test that nested actions inherit cancellation from parent.
+     */
+    data class NestedSameTypeAction(
+        val id: String,
+        val depth: Int,
+        val valueToEmit: Int,
+    ) : CounterAction, FlowHolderAction {
+        override fun toFlowAction(): Flow<Action> = flow {
+            emit(Add(valueToEmit))
+            if (depth > 0) {
+                // Emit a nested FlowHolderAction of the same type
+                emit(NestedSameTypeAction(id = "$id-nested", depth = depth - 1, valueToEmit = valueToEmit * 10))
+            }
+        }
+    }
 }
 
 val counterReducer =
@@ -90,6 +108,7 @@ val counterReducer =
             is CounterAction.MultiStreamConnected -> state
             is CounterAction.InfiniteStreamAction -> state
             is CounterAction.NonCancelableStreamAction -> state
+            is CounterAction.NestedSameTypeAction -> state
         }
     }
 

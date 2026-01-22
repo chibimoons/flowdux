@@ -75,14 +75,19 @@ class Store<S : State, A : Action>(
      * Processes FlowHolderAction, expanding it into its stream of actions.
      * For cancelable FlowHolderActions, cancels any previously running
      * flow of the same type before starting the new one.
+     * 
+     * @param isNested Whether this is a nested FlowHolderAction. Nested actions
+     *                 inherit cancellation from their parent and do not create
+     *                 their own cancellation flags.
      */
     @Suppress("UNCHECKED_CAST")
-    private fun processFlowHolderAction(action: A): Flow<A> {
+    private fun processFlowHolderAction(action: A, isNested: Boolean = false): Flow<A> {
         if (action is FlowHolderAction) {
             val type = action::class
             var myFlag: CancelFlag? = null
 
-            if (action.cancelable) {
+            // Only manage cancellation flags for top-level actions
+            if (action.cancelable && !isNested) {
                 // Cancel previous flow of the same type
                 activeFlags[type]?.cancelled = true
                 // Create new flag for this flow
@@ -92,7 +97,7 @@ class Store<S : State, A : Action>(
 
             return (action.toFlowAction() as Flow<A>)
                 .onEach { logger.onFlowHolderActionEmitted(it) }
-                .flatMapMerge { processFlowHolderAction(it) }
+                .flatMapMerge { processFlowHolderAction(it, isNested = true) }
                 .takeWhile { myFlag?.cancelled != true }
         }
         return flowOf(action)

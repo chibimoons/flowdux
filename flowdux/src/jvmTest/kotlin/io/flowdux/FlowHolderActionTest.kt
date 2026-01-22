@@ -264,4 +264,30 @@ class FlowHolderActionTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `nested FlowHolderAction of same type does not cancel parent stream`() =
+        runTest {
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // Dispatch an action that emits nested FlowHolderActions of the same type
+                // Expected emissions: 1, 10, 100 (parent -> nested depth 1 -> nested depth 0)
+                store.dispatch(CounterAction.NestedSameTypeAction(id = "parent", depth = 2, valueToEmit = 1))
+
+                // All nested actions should complete without cancelling the parent
+                assertEquals(1, awaitItem().count)      // First Add(1)
+                assertEquals(11, awaitItem().count)     // Second Add(10) from nested depth 1
+                assertEquals(111, awaitItem().count)    // Third Add(100) from nested depth 0
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }
