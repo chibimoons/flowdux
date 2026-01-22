@@ -687,6 +687,15 @@ StoreSelector<AppState, Action, int>(
     return Text('Count: $count');
   },
 )
+
+// Listen to state changes for side effects (navigation, snackbar, etc.)
+StoreListener<AppState, Action>(
+  listenWhen: (previous, current) => current.navigateTo != null,
+  listener: (context, store, state) {
+    Navigator.of(context).pushNamed(state.navigateTo!);
+  },
+  child: MyWidget(),
+)
 ```
 
 ### Run Dart Tests
