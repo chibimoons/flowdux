@@ -254,7 +254,7 @@ class ResilienceStrategyTest {
     }
 
     @Test
-    fun `retry does not retry on CancellationException`() = runTest {
+    fun `retry propagates CancellationException without retrying`() = runTest {
         val attemptCount = mutableListOf<Int>()
         var attempt = 0
 
