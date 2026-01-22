@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.reflect.KClass
@@ -131,7 +132,8 @@ class Store<S : State, A : Action>(
         if (_isClosed) return
         _isClosed = true
 
-        scope.launch {
+        // Use runBlocking to ensure cleanup completes before proceeding
+        runBlocking {
             activeFlagsMutex.withLock {
                 // Cancel all active FlowHolderAction flows
                 for (flag in activeFlags.values) {
