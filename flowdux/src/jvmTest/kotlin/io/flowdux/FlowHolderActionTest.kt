@@ -282,7 +282,8 @@ class FlowHolderActionTest {
                 store.dispatch(CounterAction.InfiniteStreamAction("stream1", emitInterval = 50L))
 
                 // Wait for first emission from InfiniteStreamAction
-                assertEquals(1, awaitItem().count)
+                val firstCount = awaitItem().count
+                assertEquals(1, firstCount)
 
                 // Start second cancelable stream of a DIFFERENT type (adds 10 per emission)
                 store.dispatch(CounterAction.SecondaryStreamAction("stream2", emitInterval = 50L))
@@ -292,7 +293,7 @@ class FlowHolderActionTest {
                 var sawIncrementByOne = false
                 var sawIncrementByTen = false
                 
-                var previousCount = store.currentState.count
+                var previousCount = firstCount
                 repeat(10) {
                     val currentCount = awaitItem().count
                     val increment = currentCount - previousCount

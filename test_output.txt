@@ -1,0 +1,17 @@
+> Task :flowdux:checkKotlinGradlePluginConfigurationErrors
+> Task :flowdux:compileKotlinJvm UP-TO-DATE
+> Task :flowdux:jvmProcessResources NO-SOURCE
+> Task :flowdux:jvmMainClasses UP-TO-DATE
+> Task :flowdux:compileTestKotlinJvm UP-TO-DATE
+> Task :flowdux:jvmTestProcessResources NO-SOURCE
+> Task :flowdux:jvmTestClasses UP-TO-DATE
+> Task :flowdux:jvmTest
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.9/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1s
+4 actionable tasks: 2 executed, 2 up-to-date
