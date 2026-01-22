@@ -557,7 +557,7 @@ store.dispatch(NewAction) // History becomes: [0] -> [1] -> [new]
 ### Run JVM Console Sample
 
 ```bash
-./gradlew :sample-jvm:run
+./gradlew :kotlin:sample-jvm:run
 ```
 
 Output:
@@ -608,18 +608,18 @@ State: count = 42 [api]
 ### Build Android Sample
 
 ```bash
-./gradlew :sample-android:assembleDebug
+./gradlew :kotlin:sample-android:assembleDebug
 ```
 
-APK location: `sample-android/build/outputs/apk/debug/sample-android-debug.apk`
+APK location: `kotlin/sample-android/build/outputs/apk/debug/sample-android-debug.apk`
 
 ### Build KMM Sample (Android)
 
 ```bash
-./gradlew :sample-shared:androidApp:assembleDebug
+./gradlew :kotlin:sample-shared:androidApp:assembleDebug
 ```
 
-APK location: `sample-shared/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
+APK location: `kotlin/sample-shared/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
 
 ### Build KMM Sample (iOS)
 
@@ -627,19 +627,19 @@ APK location: `sample-shared/androidApp/build/outputs/apk/debug/androidApp-debug
 
 ```bash
 # Build shared framework
-./gradlew :sample-shared:shared:linkDebugFrameworkIosSimulatorArm64
+./gradlew :kotlin:sample-shared:shared:linkDebugFrameworkIosSimulatorArm64
 
 # Build iOS app
-xcodebuild -project sample-shared/iosApp/iosApp.xcodeproj \
+xcodebuild -project kotlin/sample-shared/iosApp/iosApp.xcodeproj \
   -target iosApp -sdk iphonesimulator -arch arm64 build
 ```
 
-App location: `sample-shared/iosApp/build/Debug-iphonesimulator/iosApp.app`
+App location: `kotlin/sample-shared/iosApp/build/Debug-iphonesimulator/iosApp.app`
 
 ### KMM Sample Structure
 
 ```
-sample-shared/
+kotlin/sample-shared/
 ├── shared/           # Shared Kotlin code (commonMain)
 │   └── CounterStore  # Shared business logic
 ├── androidApp/       # Android UI (Compose)
@@ -649,7 +649,7 @@ sample-shared/
 ### Run Web (JavaScript) Sample
 
 ```bash
-./gradlew :sample-web:jsBrowserDevelopmentRun
+./gradlew :kotlin:sample-web:jsBrowserDevelopmentRun
 ```
 
 Opens browser at `http://localhost:8080` with an interactive Counter app.
@@ -657,7 +657,7 @@ Opens browser at `http://localhost:8080` with an interactive Counter app.
 ### Run WebAssembly (WASM) Sample
 
 ```bash
-./gradlew :sample-wasm:wasmJsBrowserDevelopmentRun
+./gradlew :kotlin:sample-wasm:wasmJsBrowserDevelopmentRun
 ```
 
 Opens browser at `http://localhost:8080` with an interactive Counter app (WASM version).
@@ -666,11 +666,11 @@ Opens browser at `http://localhost:8080` with an interactive Counter app (WASM v
 
 | Platform | Status | Sample |
 |----------|--------|--------|
-| JVM | ✅ | `sample-jvm` |
-| Android | ✅ | `sample-android`, `sample-shared/androidApp` |
-| iOS | ✅ | `sample-shared/iosApp` |
-| JavaScript | ✅ | `sample-web` |
-| WebAssembly | ✅ | `sample-wasm` |
+| JVM | ✅ | `kotlin/sample-jvm` |
+| Android | ✅ | `kotlin/sample-android`, `kotlin/sample-shared/androidApp` |
+| iOS | ✅ | `kotlin/sample-shared/iosApp` |
+| JavaScript | ✅ | `kotlin/sample-web` |
+| WebAssembly | ✅ | `kotlin/sample-wasm` |
 
 ## License
 
