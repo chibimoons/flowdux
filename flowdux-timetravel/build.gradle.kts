@@ -9,10 +9,10 @@ version = "1.6.1"
 kotlin {
     jvm()
 
-    // iOS - Temporarily disabled for testing
-    // iosX64()
-    // iosArm64()
-    // iosSimulatorArm64()
+    // iOS
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
 
     // JavaScript
     js(IR) {
