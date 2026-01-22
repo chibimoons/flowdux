@@ -638,13 +638,19 @@ class SearchMiddleware extends Middleware<AppState, Action> {
 
 ### FlowHolderAction
 
+Use `FlowHolderAction` to wrap existing Streams (Repository, Socket) and convert them to Actions.
+No side effects in the Action—just holds and transforms the Stream:
+
 ```dart
-class FetchDataAction with FlowHolderAction {
+// FlowHolderAction wraps an existing Stream and converts to Stream<Action>
+class ObserveUserAction with FlowHolderAction {
+  final Stream<User> userStream;
+
+  ObserveUserAction(this.userStream);
+
   @override
-  Stream<Action> toStreamAction() async* {
-    yield LoadingAction();
-    final data = await api.fetchData();
-    yield DataLoadedAction(data);
+  Stream<Action> toStreamAction() {
+    return userStream.map((user) => SetUserAction(user));
   }
 
   // Default: TakeLatest strategy (auto-cancels previous)
@@ -652,6 +658,10 @@ class FetchDataAction with FlowHolderAction {
   // @override
   // ExecutionStrategy get strategy => concurrent();
 }
+
+// Usage: pass the Stream from Repository/Socket
+final repositoryStream = userRepository.getUser(123);  // Stream creation (cold)
+store.dispatch(ObserveUserAction(repositoryStream));   // Store collects it
 ```
 
 ### Flutter Integration
@@ -803,6 +813,8 @@ Opens browser at `http://localhost:8080` with an interactive Counter app (WASM v
 
 ## Platform Support
 
+### Kotlin Multiplatform
+
 | Platform | Status | Sample |
 |----------|--------|--------|
 | JVM | ✅ | `kotlin/sample-jvm` |
@@ -810,6 +822,13 @@ Opens browser at `http://localhost:8080` with an interactive Counter app (WASM v
 | iOS | ✅ | `kotlin/sample-shared/iosApp` |
 | JavaScript | ✅ | `kotlin/sample-web` |
 | WebAssembly | ✅ | `kotlin/sample-wasm` |
+
+### Dart / Flutter
+
+| Platform | Status | Sample |
+|----------|--------|--------|
+| Dart | ✅ | `dart/flowdux` |
+| Flutter | ✅ | `dart/flowdux_flutter` |
 
 ## License
 
