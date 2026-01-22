@@ -121,31 +121,33 @@ class FlowHolderActionTest {
             store.state.test {
                 assertEquals(0, awaitItem().count)
 
-                // Start first infinite stream
-                store.dispatch(CounterAction.InfiniteStreamAction("stream1", emitInterval = 50L))
+                // Start first stream that emits 100 per emission
+                store.dispatch(CounterAction.InfiniteStreamAction("stream1", emitInterval = 50L, emitValue = 100))
 
-                // Wait for a few emissions
-                assertEquals(1, awaitItem().count)
-                assertEquals(2, awaitItem().count)
+                // Wait for a few emissions from stream1
+                assertEquals(100, awaitItem().count)
+                assertEquals(200, awaitItem().count)
 
-                val countBeforeNewStream = store.currentState.count
+                // Start second stream that emits 1 per emission - should cancel the first
+                store.dispatch(CounterAction.InfiniteStreamAction("stream2", emitInterval = 50L, emitValue = 1))
 
-                // Start second stream - should cancel the first
-                store.dispatch(CounterAction.InfiniteStreamAction("stream2", emitInterval = 50L))
+                // Collect several emissions and verify they're all from stream2 (adding 1 each time)
+                // If stream1 were still running, we'd see jumps of 100
+                val observedIncrements = mutableListOf<Int>()
+                var previousCount = 200
+                
+                repeat(6) {
+                    val currentCount = awaitItem().count
+                    val increment = currentCount - previousCount
+                    observedIncrements.add(increment)
+                    previousCount = currentCount
+                }
 
-                // Wait for emissions from the new stream
-                awaitItem()
-                awaitItem()
-                awaitItem()
-
-                // The count should only reflect emissions from one stream at a time
-                // If both streams were running, count would increase much faster
-                val countAfter = store.currentState.count
-
-                // Should have roughly countBeforeNewStream + 3 emissions (not double)
-                assertTrue(countAfter <= countBeforeNewStream + 5) {
-                    "Expected count to be around ${countBeforeNewStream + 3}, but was $countAfter. " +
-                        "Both streams might be running concurrently."
+                // All increments should be 1 (from stream2), not 100 (from stream1)
+                // If stream1 were still running, we'd see at least one increment of 100 or 101
+                assertTrue(observedIncrements.all { it in 1..2 }) {
+                    "All increments should be 1 from stream2, but got: $observedIncrements. " +
+                        "Stream1 (emitting 100) might still be running."
                 }
 
                 cancelAndIgnoreRemainingEvents()

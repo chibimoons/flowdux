@@ -46,11 +46,12 @@ sealed interface CounterAction : Action {
     data class InfiniteStreamAction(
         val id: String,
         val emitInterval: Long = 100L,
+        val emitValue: Int = 1,
     ) : CounterAction, FlowHolderAction {
         override fun toFlowAction(): Flow<Action> = flow {
             while (true) {
                 delay(emitInterval)
-                emit(Add(1))
+                emit(Add(emitValue))
             }
         }
     }
