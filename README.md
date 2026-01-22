@@ -289,56 +289,6 @@ store.dispatch(ObserveUser(repositoryFlow))       // Store collects it
 // State updates: cached user -> fresh user from API
 ```
 
-#### FlowHolderAction Execution Strategy
-
-By default, FlowHolderAction uses `TakeLatest` strategy—when a new FlowHolderAction of the same type is dispatched, the previous one is cancelled.
-
-Use `concurrent()` for parallel execution without cancellation:
-
-```kotlin
-// Concurrent: Multiple streams run in parallel
-// Wraps download progress flows
-data class ObserveDownloadProgress(
-    private val progressFlow: Flow<DownloadProgress>
-) : FlowHolderAction {
-    override val strategy = concurrent()
-
-    override fun toFlowAction(): Flow<Action> =
-        progressFlow.map { DownloadProgressUpdated(it) }
-}
-
-// Multiple downloads can be observed simultaneously
-store.dispatch(ObserveDownloadProgress(downloadService.download("file1.zip")))
-store.dispatch(ObserveDownloadProgress(downloadService.download("file2.zip")))
-// Both progress streams are active concurrently
-```
-
-FlowHolderAction supports all execution strategies:
-
-```kotlin
-// Debounced: Observes input changes with debounce
-data class ObserveInputChanges(
-    private val inputFlow: Flow<String>
-) : FlowHolderAction {
-    override val strategy = debounce(500.milliseconds)
-
-    override fun toFlowAction(): Flow<Action> =
-        inputFlow.map { InputChanged(it) }
-}
-
-// Throttled: Observes sensor data with throttle
-data class ObserveSensorData(
-    private val sensorFlow: Flow<SensorReading>
-) : FlowHolderAction {
-    override val strategy = throttle(1000.milliseconds)
-
-    override fun toFlowAction(): Flow<Action> =
-        sensorFlow.map { SensorDataReceived(it) }
-}
-```
-
-> **Note:** FlowHolderAction is designed to wrap and transform existing Flows, not to perform side effects. Side effects (API calls, database writes, etc.) should be handled in Middleware.
-
 ## Execution Strategies
 
 FlowDux provides execution strategies to control how concurrent actions are processed in middleware.
