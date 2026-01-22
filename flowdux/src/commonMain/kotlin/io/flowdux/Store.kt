@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapConcat
 import kotlinx.coroutines.flow.flatMapMerge
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
@@ -22,11 +23,15 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.reflect.KClass
 
 /** Cancellation flag for FlowHolderAction streams. */
 private class CancelFlag {
-    @Volatile var cancelled = false
+    @Volatile
+    var cancelled = false
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -43,6 +48,9 @@ class Store<S : State, A : Action>(
 
     /** Active cancel flags for cancelable FlowHolderActions, keyed by KClass. */
     private val activeFlags = mutableMapOf<KClass<*>, CancelFlag>()
+    
+    /** Mutex to protect concurrent access to activeFlags map. */
+    private val activeFlagsMutex = Mutex()
 
     val isClosed: Boolean get() = _isClosed
 
@@ -81,14 +89,26 @@ class Store<S : State, A : Action>(
     private fun processFlowHolderAction(action: A): Flow<A> {
         if (action is FlowHolderAction) {
             val type = action::class
-            var myFlag: CancelFlag? = null
 
             if (action.cancelable) {
-                // Cancel previous flow of the same type
-                activeFlags[type]?.cancelled = true
-                // Create new flag for this flow
-                myFlag = CancelFlag()
-                activeFlags[type] = myFlag
+                val myFlag = CancelFlag()
+                
+                // Use flow builder to allow suspending mutex operations
+                return flow {
+                    // Atomically cancel previous flow and register this one
+                    activeFlagsMutex.withLock {
+                        activeFlags[type]?.cancelled = true
+                        activeFlags[type] = myFlag
+                    }
+                    
+                    // Emit all actions from the flow holder
+                    emitAll(
+                        (action.toFlowAction() as Flow<A>)
+                            .onEach { logger.onFlowHolderActionEmitted(it) }
+                            .flatMapMerge { processFlowHolderAction(it) }
+                            .takeWhile { !myFlag.cancelled }
+                    )
+                }
             }
 
             return (action.toFlowAction() as Flow<A>)
@@ -131,10 +151,18 @@ class Store<S : State, A : Action>(
         _isClosed = true
 
         // Cancel all active FlowHolderAction flows
-        for (flag in activeFlags.values) {
-            flag.cancelled = true
+        // runBlocking is necessary here because:
+        // 1. close() must be synchronous to ensure all flags are cancelled before proceeding
+        // 2. We need the mutex to prevent race conditions with processFlowHolderAction
+        // 3. This happens during shutdown, so blocking the calling thread is acceptable
+        runBlocking {
+            activeFlagsMutex.withLock {
+                for (flag in activeFlags.values) {
+                    flag.cancelled = true
+                }
+                activeFlags.clear()
+            }
         }
-        activeFlags.clear()
 
         actionFlow.close()
         scope.cancel()
