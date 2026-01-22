@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapConcat
 import kotlinx.coroutines.flow.flatMapMerge
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -21,6 +22,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.reflect.KClass
 
 /** Cancellation flag for FlowHolderAction streams. */
@@ -42,6 +45,9 @@ class Store<S : State, A : Action>(
 
     /** Active cancel flags for cancelable FlowHolderActions, keyed by KClass. */
     private val activeFlags = mutableMapOf<KClass<*>, CancelFlag>()
+    
+    /** Mutex to protect concurrent access to activeFlags map. */
+    private val activeFlagsMutex = Mutex()
 
     val isClosed: Boolean get() = _isClosed
 
@@ -83,17 +89,29 @@ class Store<S : State, A : Action>(
             var myFlag: CancelFlag? = null
 
             if (action.cancelable) {
-                // Cancel previous flow of the same type
-                activeFlags[type]?.cancelled = true
-                // Create new flag for this flow
                 myFlag = CancelFlag()
-                activeFlags[type] = myFlag
+                
+                // Use flow builder to allow suspending mutex operations
+                return flow {
+                    // Atomically cancel previous flow and register this one
+                    activeFlagsMutex.withLock {
+                        activeFlags[type]?.cancelled = true
+                        activeFlags[type] = myFlag
+                    }
+                    
+                    // Emit all actions from the flow holder
+                    emitAll(
+                        (action.toFlowAction() as Flow<A>)
+                            .onEach { logger.onFlowHolderActionEmitted(it) }
+                            .flatMapMerge { processFlowHolderAction(it) }
+                            .takeWhile { myFlag.cancelled != true }
+                    )
+                }
             }
 
             return (action.toFlowAction() as Flow<A>)
                 .onEach { logger.onFlowHolderActionEmitted(it) }
                 .flatMapMerge { processFlowHolderAction(it) }
-                .takeWhile { myFlag?.cancelled != true }
         }
         return flowOf(action)
     }
