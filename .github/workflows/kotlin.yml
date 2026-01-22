@@ -1,0 +1,43 @@
+name: Kotlin CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'kotlin/**'
+      - 'gradle/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+  pull_request:
+    paths:
+      - 'kotlin/**'
+      - 'gradle/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle.properties'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run flowdux tests
+        run: ./gradlew :kotlin:flowdux:check -x jsTest -x wasmJsTest
+
+      - name: Run flowdux-timetravel tests
+        run: ./gradlew :kotlin:flowdux-timetravel:check -x jsTest -x wasmJsTest

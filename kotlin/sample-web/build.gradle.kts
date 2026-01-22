@@ -3,8 +3,7 @@ plugins {
 }
 
 kotlin {
-    @OptIn(org.jetbrains.kotlin.gradle.targets.js.dsl.ExperimentalWasmDsl::class)
-    wasmJs {
+    js(IR) {
         browser {
             commonWebpackConfig {
                 cssSupport {
@@ -16,9 +15,9 @@ kotlin {
     }
 
     sourceSets {
-        val wasmJsMain by getting {
+        val jsMain by getting {
             dependencies {
-                implementation(project(":flowdux"))
+                implementation(project(":kotlin:flowdux"))
                 implementation(libs.kotlinx.coroutines.core)
             }
         }

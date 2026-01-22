@@ -34,7 +34,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":flowdux"))
+    implementation(project(":kotlin:flowdux"))
     implementation(libs.kotlinx.coroutines.core)
 
     implementation(platform(libs.androidx.compose.bom))

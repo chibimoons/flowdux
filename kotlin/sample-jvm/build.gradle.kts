@@ -11,7 +11,7 @@ application {
 }
 
 dependencies {
-    implementation(project(":flowdux"))
-    implementation(project(":flowdux-timetravel"))
+    implementation(project(":kotlin:flowdux"))
+    implementation(project(":kotlin:flowdux-timetravel"))
     implementation(libs.kotlinx.coroutines.core)
 }
