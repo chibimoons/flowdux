@@ -25,6 +25,7 @@ import kotlin.reflect.KClass
 
 /** Cancellation flag for FlowHolderAction streams. */
 private class CancelFlag {
+    @Volatile
     var cancelled = false
 }
 

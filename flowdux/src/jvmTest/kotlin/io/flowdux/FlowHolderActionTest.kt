@@ -144,6 +144,7 @@ class FlowHolderActionTest {
                 }
 
                 // All increments should be 1 (from stream2), not 100 (from stream1)
+                // Allow 1-2 to handle potential race where two stream2 emissions occur between awaitItem() calls
                 // If stream1 were still running, we'd see at least one increment of 100 or 101
                 assertTrue(observedIncrements.all { it in 1..2 }) {
                     "All increments should be 1 from stream2, but got: $observedIncrements. " +
