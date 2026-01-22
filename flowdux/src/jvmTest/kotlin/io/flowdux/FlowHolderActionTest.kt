@@ -208,18 +208,11 @@ class FlowHolderActionTest {
                 assertEquals(1, awaitItem().count)
                 assertEquals(2, awaitItem().count)
 
-                val countBeforeClose = store.currentState.count
-
                 // Close the store
                 store.close()
 
-                // Give some time for any pending emissions
-                delay(200)
-
-                // Count should not have increased significantly after close
-                assertTrue(store.currentState.count <= countBeforeClose + 1) {
-                    "Stream should have been cancelled on store close"
-                }
+                // Verify no new emissions occur after closing
+                expectNoEvents()
 
                 cancelAndIgnoreRemainingEvents()
             }
