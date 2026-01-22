@@ -813,6 +813,8 @@ Opens browser at `http://localhost:8080` with an interactive Counter app (WASM v
 
 ## Platform Support
 
+### Kotlin Multiplatform
+
 | Platform | Status | Sample |
 |----------|--------|--------|
 | JVM | ✅ | `kotlin/sample-jvm` |
@@ -820,6 +822,13 @@ Opens browser at `http://localhost:8080` with an interactive Counter app (WASM v
 | iOS | ✅ | `kotlin/sample-shared/iosApp` |
 | JavaScript | ✅ | `kotlin/sample-web` |
 | WebAssembly | ✅ | `kotlin/sample-wasm` |
+
+### Dart / Flutter
+
+| Platform | Status | Sample |
+|----------|--------|--------|
+| Dart | ✅ | `dart/flowdux` |
+| Flutter | ✅ | `dart/flowdux_flutter` |
 
 ## License
 
