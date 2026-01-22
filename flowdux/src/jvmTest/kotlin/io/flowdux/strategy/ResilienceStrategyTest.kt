@@ -551,7 +551,8 @@ class ResilienceStrategyTest {
 
                 // Maximum delay = baseDelay + (baseDelay * jitter) = 100 + (100 * 1.0) = 200ms
                 val maxDelayMs = 200L
-                advanceTimeBy(maxDelayMs + 100) // Add buffer for processing
+                val processingBufferMs = 100L
+                advanceTimeBy(maxDelayMs + processingBufferMs)
 
                 val result = awaitItem()
                 assertEquals(listOf("result-$run"), result.values)
@@ -620,7 +621,8 @@ class ResilienceStrategyTest {
 
             // Total delay = 100ms + 200ms = 300ms (no jitter)
             val totalDelayMs = 300L
-            advanceTimeBy(totalDelayMs + 100) // Add buffer for processing
+            val processingBufferMs = 100L
+            advanceTimeBy(totalDelayMs + processingBufferMs)
 
             val result = awaitItem()
             assertEquals(listOf("result-1"), result.values)
