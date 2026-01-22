@@ -289,9 +289,8 @@ class RetryWithBackoff(
 
                 // Apply jitter
                 val jitterAmount = if (jitter > 0.0) {
-                    val jitterRange = cappedDelay * jitter
-                    // jitter is a factor (0.0–1.0); this yields a random offset in [-cappedDelay * jitter, +cappedDelay * jitter]
-                    jitterRange * (kotlin.random.Random.nextDouble() * 2 - 1)
+                    // jitter is a factor (0.0–1.0); this yields an extra delay in [0, cappedDelay * jitter]
+                    cappedDelay * jitter * kotlin.random.Random.nextDouble()
                 } else {
                     Duration.ZERO
                 }
