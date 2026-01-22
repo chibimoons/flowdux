@@ -23,7 +23,15 @@ import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlin.reflect.KClass
 
-/** Cancellation flag for FlowHolderAction streams. */
+/**
+ * Cancellation flag for FlowHolderAction streams.
+ * 
+ * Note: This flag is not marked with @Volatile (not supported in KMP).
+ * Thread-safety is ensured by the coroutine context: all flag operations
+ * (reads in takeWhile, writes in dispatch) happen within the Store's
+ * flow processing pipeline, which provides memory visibility guarantees
+ * through structured concurrency.
+ */
 private class CancelFlag {
     var cancelled = false
 }
