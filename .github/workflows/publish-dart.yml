@@ -15,6 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/dart-v}" >> $GITHUB_OUTPUT
+
       - name: Set up Dart
         uses: dart-lang/setup-dart@v1
         with:
@@ -34,6 +38,14 @@ jobs:
       - name: Publish flowdux
         run: dart pub publish --force
         working-directory: dart/flowdux
+
+      - name: Wait for pub.dev to index flowdux
+        run: sleep 30
+
+      - name: Update flowdux_flutter dependency to published version
+        run: |
+          sed -i 's|path: ../flowdux|^${{ steps.version.outputs.VERSION }}|' pubspec.yaml
+        working-directory: dart/flowdux_flutter
 
       - name: Publish flowdux_flutter
         run: flutter pub publish --force

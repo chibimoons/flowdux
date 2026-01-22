@@ -268,7 +268,7 @@ class _ChartPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     final fillPaint = Paint()
-      ..color = lineColor.withValues(alpha: 0.1)
+      ..color = lineColor.withOpacity(0.1)
       ..style = PaintingStyle.fill;
 
     final path = Path();
