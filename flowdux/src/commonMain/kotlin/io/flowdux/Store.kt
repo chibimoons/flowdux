@@ -25,7 +25,7 @@ import kotlin.reflect.KClass
 
 /** Cancellation flag for FlowHolderAction streams. */
 private class CancelFlag {
-    var cancelled = false
+    @Volatile var cancelled = false
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
