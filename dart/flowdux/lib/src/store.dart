@@ -4,14 +4,10 @@ import 'package:rxdart/rxdart.dart';
 
 import 'action.dart';
 import 'error_processor.dart';
+import 'flow_holder_middleware.dart';
 import 'middleware.dart';
 import 'reducer.dart';
 import 'store_logger.dart';
-
-/// Cancellation flag for FlowHolderAction streams.
-class _CancelFlag {
-  bool cancelled = false;
-}
 
 /// Central state container for FlowDux.
 ///
@@ -35,11 +31,12 @@ class Store<S, A extends Action> {
   final StreamController<A> _actionController;
   final Reducer<S, A> _reducer;
   final List<Middleware<S, A>> _middlewares;
+  final FlowHolderMiddleware<S, A> _flowHolderMiddleware;
   final ErrorProcessor<A> _errorProcessor;
   final StoreLogger<S, A> _logger;
 
-  /// Active cancel flags for cancelable FlowHolderActions, keyed by runtimeType.
-  final Map<Type, _CancelFlag> _activeFlags = {};
+  /// All middlewares including FlowHolderMiddleware at the end.
+  late final List<Middleware<S, A>> _allMiddlewares;
 
   late final ValueStream<S> _state;
   late final StreamSubscription<S> _subscription;
@@ -58,8 +55,10 @@ class Store<S, A extends Action> {
   })  : _actionController = StreamController<A>.broadcast(),
         _reducer = reducer,
         _middlewares = middlewares,
+        _flowHolderMiddleware = FlowHolderMiddleware<S, A>(logger),
         _errorProcessor = errorProcessor,
         _logger = logger {
+    _allMiddlewares = [..._middlewares, _flowHolderMiddleware];
     _currentState = initialState;
     _state = _buildStateStream(initialState);
     _subscription = _state.listen(null);
@@ -76,12 +75,11 @@ class Store<S, A extends Action> {
         .shareValueSeeded(initialState);
   }
 
-  /// Processes an action through middlewares and FlowHolderAction handling.
+  /// Processes an action through middlewares.
   /// Equivalent to Kotlin's processAction function.
   Stream<A> _processAction(A action) {
     return _processMiddlewares(action)
         .doOnData(_logger.onMiddlewaresCompleted)
-        .flatMap(_processFlowHolderAction)
         .onErrorResume((error, stackTrace) {
           _handleError(error, stackTrace);
           return _errorProcessor
@@ -91,14 +89,11 @@ class Store<S, A extends Action> {
   }
 
   /// Processes an action through all middlewares sequentially.
+  /// FlowHolderMiddleware is included at the end of the chain.
   Stream<A> _processMiddlewares(A action) {
-    if (_middlewares.isEmpty) {
-      return Stream.value(action);
-    }
-
     Stream<A> currentStream = Stream.value(action);
 
-    for (final middleware in _middlewares) {
+    for (final middleware in _allMiddlewares) {
       currentStream = currentStream.asyncExpand((currentAction) {
         _logger.onMiddlewareProcessing(middleware.name, currentAction);
         return middleware.process(() => currentState, currentAction);
@@ -106,35 +101,6 @@ class Store<S, A extends Action> {
     }
 
     return currentStream;
-  }
-
-  /// Expands FlowHolderAction into its stream of actions.
-  /// Normal actions pass through unchanged.
-  /// Recursively expands nested FlowHolderActions.
-  ///
-  /// For cancelable FlowHolderActions, cancels any previously running
-  /// stream of the same type before starting the new one.
-  Stream<A> _processFlowHolderAction(A action) {
-    if (action is FlowHolderAction) {
-      _CancelFlag? myFlag;
-
-      if (action.cancelable) {
-        final type = action.runtimeType;
-        // Cancel previous stream of the same type
-        _activeFlags[type]?.cancelled = true;
-        // Create new flag for this stream
-        myFlag = _CancelFlag();
-        _activeFlags[type] = myFlag;
-      }
-
-      return action
-          .toStreamAction()
-          .cast<A>()
-          .doOnData(_logger.onFlowHolderActionEmitted)
-          .flatMap(_processFlowHolderAction)
-          .takeWhile((_) => myFlag?.cancelled != true);
-    }
-    return Stream.value(action);
   }
 
   /// Reduces an action to produce a new state.
@@ -182,12 +148,6 @@ class Store<S, A extends Action> {
   Future<void> close() async {
     if (_isClosed) return;
     _isClosed = true;
-
-    // Cancel all active FlowHolderAction streams
-    for (final flag in _activeFlags.values) {
-      flag.cancelled = true;
-    }
-    _activeFlags.clear();
 
     await _subscription.cancel();
     await _actionController.close();

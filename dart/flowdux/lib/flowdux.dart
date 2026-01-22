@@ -20,6 +20,7 @@ export 'src/strategy/throttle.dart';
 export 'src/strategy/retry.dart';
 export 'src/strategy/retry_with_backoff.dart';
 export 'src/strategy/chained_strategy.dart';
+export 'src/strategy/concurrent.dart';
 
 // Utilities
 export 'src/util/async_lock.dart';

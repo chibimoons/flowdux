@@ -10,7 +10,7 @@ class BatchIncrementAction with FlowHolderAction {
   BatchIncrementAction(this.count);
 
   @override
-  bool get cancelable => false; // Batch actions should complete fully
+  ExecutionStrategy get strategy => concurrent(); // Batch actions should complete fully
 
   @override
   Stream<Action> toStreamAction() async* {
@@ -29,7 +29,7 @@ class AsyncBatchIncrementAction with FlowHolderAction {
   AsyncBatchIncrementAction(this.count, {this.delay = const Duration(milliseconds: 200)});
 
   @override
-  bool get cancelable => false; // Batch actions should complete fully
+  ExecutionStrategy get strategy => concurrent(); // Batch actions should complete fully
 
   @override
   Stream<Action> toStreamAction() async* {
@@ -47,7 +47,7 @@ class ResetAndSetAction with FlowHolderAction {
   ResetAndSetAction(this.value);
 
   @override
-  bool get cancelable => false; // Should complete both actions
+  ExecutionStrategy get strategy => concurrent(); // Should complete both actions
 
   @override
   Stream<Action> toStreamAction() async* {

@@ -254,8 +254,8 @@ void main() {
     });
   });
 
-  group('FlowHolderAction Cancelable Tests', () {
-    test('cancelable FlowHolderAction cancels previous stream when new one is dispatched', () async {
+  group('FlowHolderAction Strategy Tests', () {
+    test('TakeLatest FlowHolderAction cancels previous stream when new one is dispatched', () async {
       final store = createStore<AppState, Action>(
         initialState: AppState(),
         reducer: ExtendedAppReducer().reducer,
@@ -291,18 +291,18 @@ void main() {
       await store.close();
     });
 
-    test('non-cancelable FlowHolderAction allows multiple streams to run concurrently', () async {
+    test('Concurrent FlowHolderAction allows multiple streams to run concurrently', () async {
       final store = createStore<AppState, Action>(
         initialState: AppState(),
         reducer: ExtendedAppReducer().reducer,
       );
 
-      // Start two non-cancelable streams
+      // Start two concurrent streams
       // stream1: adds 1 three times = 3
       // stream2: adds 10 three times = 30
       // Total: 33
-      store.dispatch(NonCancelableAdditiveFlowAction('stream1', addValue: 1, count: 3, delayBetween: Duration(milliseconds: 30)));
-      store.dispatch(NonCancelableAdditiveFlowAction('stream2', addValue: 10, count: 3, delayBetween: Duration(milliseconds: 30)));
+      store.dispatch(ConcurrentAdditiveFlowAction('stream1', addValue: 1, count: 3, delayBetween: Duration(milliseconds: 30)));
+      store.dispatch(ConcurrentAdditiveFlowAction('stream2', addValue: 10, count: 3, delayBetween: Duration(milliseconds: 30)));
 
       // Wait for both streams to complete
       await Future.delayed(Duration(milliseconds: 200));
@@ -316,7 +316,7 @@ void main() {
       await store.close();
     });
 
-    test('cancelable FlowHolderAction is cancelled when store is closed', () async {
+    test('TakeLatest FlowHolderAction is cancelled when store is closed', () async {
       final store = createStore<AppState, Action>(
         initialState: AppState(),
         reducer: ExtendedAppReducer().reducer,
@@ -345,7 +345,7 @@ void main() {
       );
     });
 
-    test('other actions are processed while cancelable infinite stream is running', () async {
+    test('other actions are processed while TakeLatest infinite stream is running', () async {
       final store = createStore<AppState, Action>(
         initialState: AppState(),
         reducer: ExtendedAppReducer().reducer,
@@ -451,7 +451,7 @@ class _CountingStreamMiddleware extends Middleware<AppState, Action> {
 
 // FlowHolderAction Tests
 
-/// Cancelable infinite stream FlowHolderAction (default cancelable = true).
+/// TakeLatest infinite stream FlowHolderAction (default strategy = TakeLatest).
 /// When a new instance is dispatched, the previous stream is cancelled.
 class InfiniteStreamFlowAction with FlowHolderAction {
   final String id;
@@ -466,23 +466,24 @@ class InfiniteStreamFlowAction with FlowHolderAction {
       yield IncrementAction();
     }
   }
+  // Uses default TakeLatestStrategy
 }
 
-/// Non-cancelable FlowHolderAction.
+/// Concurrent FlowHolderAction.
 /// Multiple streams can run concurrently.
-class NonCancelableStreamFlowAction with FlowHolderAction {
+class ConcurrentStreamFlowAction with FlowHolderAction {
   final String id;
   final List<int> values;
   final Duration delayBetween;
 
-  NonCancelableStreamFlowAction(
+  ConcurrentStreamFlowAction(
     this.id,
     this.values, {
     this.delayBetween = const Duration(milliseconds: 30),
   });
 
   @override
-  bool get cancelable => false;
+  ExecutionStrategy get strategy => concurrent();
 
   @override
   Stream<Action> toStreamAction() async* {
@@ -493,14 +494,14 @@ class NonCancelableStreamFlowAction with FlowHolderAction {
   }
 }
 
-/// Non-cancelable additive FlowHolderAction for concurrent test.
-class NonCancelableAdditiveFlowAction with FlowHolderAction {
+/// Concurrent additive FlowHolderAction for concurrent test.
+class ConcurrentAdditiveFlowAction with FlowHolderAction {
   final String id;
   final int addValue;
   final int count;
   final Duration delayBetween;
 
-  NonCancelableAdditiveFlowAction(
+  ConcurrentAdditiveFlowAction(
     this.id, {
     required this.addValue,
     required this.count,
@@ -508,7 +509,7 @@ class NonCancelableAdditiveFlowAction with FlowHolderAction {
   });
 
   @override
-  bool get cancelable => false;
+  ExecutionStrategy get strategy => concurrent();
 
   @override
   Stream<Action> toStreamAction() async* {

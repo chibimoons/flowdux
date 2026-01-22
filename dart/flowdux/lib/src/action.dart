@@ -1,3 +1,6 @@
+import 'strategy/execution_strategy.dart';
+import 'strategy/take_latest.dart';
+
 /// Base interface for all actions.
 ///
 /// All action classes should implement this interface.
@@ -9,14 +12,14 @@ abstract class Action {}
 /// When dispatched, the Store automatically subscribes to the Stream
 /// and dispatches each emitted action individually.
 ///
-/// By default, FlowHolderAction is cancelable, meaning that when a new
+/// By default, FlowHolderAction uses [TakeLatestStrategy], meaning that when a new
 /// FlowHolderAction of the same type is dispatched, the previous one's
-/// stream will be cancelled. Override [cancelable] to return false
-/// if you want multiple streams of the same type to run concurrently.
+/// stream will be cancelled. Override [strategy] to use a different
+/// execution strategy.
 ///
 /// Example:
 /// ```dart
-/// class BatchAction implements FlowHolderAction {
+/// class BatchAction with FlowHolderAction {
 ///   final List<Action> actions;
 ///   BatchAction(this.actions);
 ///
@@ -24,7 +27,7 @@ abstract class Action {}
 ///   Stream<Action> toStreamAction() => Stream.fromIterable(actions);
 /// }
 ///
-/// class FetchAndProcessAction implements FlowHolderAction {
+/// class FetchAndProcessAction with FlowHolderAction {
 ///   @override
 ///   Stream<Action> toStreamAction() async* {
 ///     yield LoadingAction();
@@ -33,24 +36,24 @@ abstract class Action {}
 ///   }
 /// }
 ///
-/// // Non-cancelable FlowHolderAction (multiple can run concurrently)
-/// class ConcurrentStreamAction implements FlowHolderAction {
+/// // Concurrent FlowHolderAction (multiple can run concurrently)
+/// class ConcurrentStreamAction with FlowHolderAction {
 ///   @override
-///   bool get cancelable => false;
+///   ExecutionStrategy get strategy => concurrent();
 ///
 ///   @override
 ///   Stream<Action> toStreamAction() async* { ... }
 /// }
 /// ```
-/// Use `with FlowHolderAction` to inherit the default [cancelable] value,
+/// Use `with FlowHolderAction` to inherit the default [strategy] value,
 /// or `implements FlowHolderAction` and provide your own implementation.
 abstract mixin class FlowHolderAction implements Action {
   /// Returns a Stream of actions to be dispatched.
   Stream<Action> toStreamAction();
 
-  /// Whether this action's stream should be cancelled when a new
-  /// FlowHolderAction of the same type is dispatched.
+  /// The execution strategy for this action.
   ///
-  /// Default is true. Override to return false for concurrent execution.
-  bool get cancelable => true;
+  /// Default is [TakeLatestStrategy]. Override to use a different strategy.
+  /// Use [concurrent()] to allow multiple streams to run simultaneously.
+  ExecutionStrategy get strategy => TakeLatestStrategy();
 }

@@ -355,7 +355,8 @@ void main() {
 
       final middlewareProcessingLogs =
           logger.logs.where((log) => log.startsWith('middleware:')).toList();
-      expect(middlewareProcessingLogs.length, 2);
+      // 2 user middlewares + 1 FlowHolderMiddleware
+      expect(middlewareProcessingLogs.length, 3);
 
       await store.close();
     });

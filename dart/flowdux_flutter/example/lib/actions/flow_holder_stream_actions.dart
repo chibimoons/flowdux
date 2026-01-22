@@ -36,7 +36,7 @@ class FlowHolderStreamManager {
 
 /// FlowHolderAction that starts an infinite price stream.
 ///
-/// With cancelable = true (default), dispatching a new FlowHolderPriceStreamAction
+/// With TakeLatest strategy (default), dispatching a new FlowHolderPriceStreamAction
 /// will automatically cancel the previous stream. The CancellationToken is kept
 /// for explicit manual cancellation via Stop button.
 class FlowHolderPriceStreamAction with FlowHolderAction {
@@ -45,7 +45,7 @@ class FlowHolderPriceStreamAction with FlowHolderAction {
 
   FlowHolderPriceStreamAction(this.symbol, this.token);
 
-  // cancelable = true (default) means Store will auto-cancel previous stream
+  // Uses TakeLatest strategy (default) - Store will auto-cancel previous stream
 
   @override
   Stream<Action> toStreamAction() async* {

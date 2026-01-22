@@ -18,7 +18,7 @@ class SetValueAction implements Action {
 class UnhandledAction implements Action {}
 
 // FlowHolderAction implementations
-// Using 'with' to inherit default cancelable value
+// Using 'with' to inherit default strategy value
 class BatchAction with FlowHolderAction {
   final List<Action> actions;
   BatchAction(this.actions);
@@ -27,7 +27,7 @@ class BatchAction with FlowHolderAction {
   Stream<Action> toStreamAction() => Stream.fromIterable(actions);
 
   @override
-  bool get cancelable => false; // Batch actions should not cancel each other
+  ExecutionStrategy get strategy => concurrent(); // Batch actions should not cancel each other
 }
 
 class AsyncBatchAction with FlowHolderAction {
@@ -44,7 +44,7 @@ class AsyncBatchAction with FlowHolderAction {
   }
 
   @override
-  bool get cancelable => false; // Batch actions should not cancel each other
+  ExecutionStrategy get strategy => concurrent(); // Batch actions should not cancel each other
 }
 
 class NestedFlowHolderAction with FlowHolderAction {
@@ -56,7 +56,7 @@ class NestedFlowHolderAction with FlowHolderAction {
   }
 
   @override
-  bool get cancelable => false; // Should complete all nested actions
+  ExecutionStrategy get strategy => concurrent(); // Should complete all nested actions
 }
 
 // Test State

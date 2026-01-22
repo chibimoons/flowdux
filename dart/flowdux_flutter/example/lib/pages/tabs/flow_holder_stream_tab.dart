@@ -36,9 +36,9 @@ class FlowHolderStreamTab extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  '• CancellationToken으로 명시적 취소 관리 필요\n'
-                  '• 심볼 전환 시 수동으로 이전 스트림 취소\n'
-                  '• Middleware 없이 Action만으로 스트림 처리',
+                  '• TakeLatest 전략으로 심볼 전환 시 자동 취소\n'
+                  '• Stop 버튼용 CancellationToken (선택적)\n'
+                  '• 별도 Middleware 작성 없이 Action만으로 스트림 처리',
                   style: TextStyle(fontSize: 12),
                 ),
               ],
