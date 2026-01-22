@@ -224,28 +224,18 @@ class Retry(
     override fun <S, A, T : A> wrap(
         processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
     ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
-        var lastException: Throwable? = null
-        var succeeded = false
-
         for (attempt in 0 until maxAttempts) {
             try {
                 processor(state, action)
-                succeeded = true
                 break // Success, exit loop
             } catch (e: CancellationException) {
                 throw e // Don't retry on cancellation
             } catch (e: Throwable) {
-                lastException = e
                 if (attempt == maxAttempts - 1 || !retryIf(e)) {
                     throw e // Last attempt or non-retryable exception
                 }
                 // Continue to next attempt
             }
-        }
-
-        // Should not reach here if succeeded, but just in case
-        if (!succeeded) {
-            lastException?.let { throw it }
         }
     }
 }
