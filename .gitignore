@@ -26,3 +26,5 @@ local.properties
 xcuserdata/
 *.xcuserstate
 DerivedData/
+test_output*.log
+test_output.txt
