@@ -17,10 +17,13 @@ import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.reflect.KClass
 
 /** Cancellation flag for FlowHolderAction streams. */
@@ -42,6 +45,8 @@ class Store<S : State, A : Action>(
 
     /** Active cancel flags for cancelable FlowHolderActions, keyed by KClass. */
     private val activeFlags = mutableMapOf<KClass<*>, CancelFlag>()
+    /** Mutex to protect concurrent access to activeFlags map. */
+    private val activeFlagsMutex = Mutex()
 
     val isClosed: Boolean get() = _isClosed
 
@@ -82,15 +87,19 @@ class Store<S : State, A : Action>(
             val type = action::class
             var myFlag: CancelFlag? = null
 
-            if (action.cancelable) {
-                // Cancel previous flow of the same type
-                activeFlags[type]?.cancelled = true
-                // Create new flag for this flow
-                myFlag = CancelFlag()
-                activeFlags[type] = myFlag
-            }
-
             return (action.toFlowAction() as Flow<A>)
+                .onStart {
+                    if (action.cancelable) {
+                        activeFlagsMutex.withLock {
+                            // Cancel previous flow of the same type
+                            activeFlags[type]?.cancelled = true
+                            // Create new flag for this flow
+                            val newFlag = CancelFlag()
+                            myFlag = newFlag
+                            activeFlags[type] = newFlag
+                        }
+                    }
+                }
                 .onEach { logger.onFlowHolderActionEmitted(it) }
                 .flatMapMerge { processFlowHolderAction(it) }
                 .takeWhile { myFlag?.cancelled != true }
@@ -122,11 +131,15 @@ class Store<S : State, A : Action>(
         if (_isClosed) return
         _isClosed = true
 
-        // Cancel all active FlowHolderAction flows
-        for (flag in activeFlags.values) {
-            flag.cancelled = true
+        scope.launch {
+            activeFlagsMutex.withLock {
+                // Cancel all active FlowHolderAction flows
+                for (flag in activeFlags.values) {
+                    flag.cancelled = true
+                }
+                activeFlags.clear()
+            }
         }
-        activeFlags.clear()
 
         actionFlow.close()
         scope.cancel()
