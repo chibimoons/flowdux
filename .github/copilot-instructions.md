@@ -30,25 +30,35 @@ Action → Middleware Chain → FlowHolderAction Expansion → Reducer → State
 - [ ] Actions are **immutable** (use `data class` in Kotlin, immutable fields in Dart)
 - [ ] Actions have **descriptive names** indicating intent (e.g., `FetchUserAction`, not `DoAction`)
 - [ ] FlowHolderAction correctly implements `toFlowAction()` / `toStreamAction()`
-- [ ] FlowHolderAction.cancelable is set appropriately:
-  - `true` (default): For actions where only the latest matters (e.g., search, fetch)
-  - `false`: For actions that must complete (e.g., batch operations, transactions)
+- [ ] FlowHolderAction.strategy is set appropriately:
+  - `takeLatest()` (default): For actions where only the latest matters (e.g., search, fetch)
+  - `concurrent()`: For actions that can run in parallel (e.g., independent fetches)
+  - `sequential()`: For actions that must run in order (e.g., message queue)
+  - `takeLeading()`: For actions where first wins (e.g., prevent double-submit)
 
 ```kotlin
-// Good: Cancelable search (only latest results matter)
+// Good: TakeLatest search (only latest results matter)
 class SearchAction(val query: String) : FlowHolderAction {
     override fun toFlowAction() = flow {
         emit(SearchLoadingAction)
         emit(SearchResultAction(api.search(query)))
     }
-    // cancelable = true (default)
+    // strategy = takeLatest() (default)
 }
 
-// Good: Non-cancelable batch (all operations must complete)
+// Good: Concurrent batch (all operations run in parallel)
 class BatchSaveAction(val items: List<Item>) : FlowHolderAction {
-    override val cancelable = false
+    override val strategy = concurrent()
     override fun toFlowAction() = flow {
         items.forEach { emit(SaveItemAction(it)) }
+    }
+}
+
+// Good: Sequential processing (maintain order)
+class MessageQueueAction(val messages: List<Message>) : FlowHolderAction {
+    override val strategy = sequential()
+    override fun toFlowAction() = flow {
+        messages.forEach { emit(SendMessageAction(it)) }
     }
 }
 ```
@@ -61,6 +71,7 @@ class BatchSaveAction(val items: List<Item>) : FlowHolderAction {
   - `takeLatest()`: Cancel previous, keep latest (search, autocomplete)
   - `takeLeading()`: Ignore new while processing (prevent double-submit)
   - `sequential()`: Process in order (message queue)
+  - `concurrent()`: Run all in parallel (independent operations)
   - `throttle()`: Rate limit (scroll events)
   - `debounce()`: Wait for pause (input validation)
   - `retryWithBackoff()`: Retry with exponential backoff (network calls)
@@ -188,6 +199,7 @@ sealed interface CounterAction : Action {
 - [ ] Use RxDart operators when appropriate (`flatMap`, `switchMap`, etc.)
 - [ ] Implement `copyWith()` for state classes
 - [ ] Use `ReducerBase` for type-safe reducer building
+- [ ] Import with `hide Action` to avoid Flutter conflict
 
 ```dart
 // Good: Proper FlowHolderAction in Dart
@@ -205,6 +217,10 @@ class FetchDataAction with FlowHolderAction {
       yield ErrorAction(e.toString());
     }
   }
+
+  // Override strategy if needed (default is takeLatest)
+  // @override
+  // ExecutionStrategy get strategy => concurrent();
 }
 ```
 
@@ -217,7 +233,7 @@ class FetchDataAction with FlowHolderAction {
 1. **Side effects in Reducer**: Reducers must be pure functions
 2. **Memory leaks**: Uncancelled subscriptions, streams not closed
 3. **Race conditions**: Multiple concurrent operations modifying shared state
-4. **Missing cancelable override**: FlowHolderAction that should complete but uses default `cancelable = true`
+4. **Wrong strategy**: FlowHolderAction using wrong execution strategy for its use case
 
 ### Performance Issues
 
@@ -277,8 +293,8 @@ fun `middleware emits correct actions`() = runTest {
 ## PR Review Focus Areas
 
 1. **Architecture Compliance**: Does the code follow unidirectional data flow?
-2. **Cancelable Correctness**: Is `cancelable` set correctly for FlowHolderAction?
-3. **Strategy Appropriateness**: Is the right execution strategy used?
+2. **Strategy Correctness**: Is the right `ExecutionStrategy` used for FlowHolderAction?
+3. **Strategy Appropriateness**: Is the right execution strategy used in Middleware?
 4. **Resource Management**: Are streams/subscriptions properly cleaned up?
 5. **Test Coverage**: Are new features adequately tested?
 6. **Cross-Platform Consistency**: Do Kotlin and Dart implementations match in behavior?
@@ -287,7 +303,6 @@ fun `middleware emits correct actions`() = runTest {
 
 ## References
 
-- [FlowDux Specification](docs/spec-flowdux.md)
 - [Execution Strategies Blog](docs/blog/)
-- Kotlin: `flowdux/src/commonMain/kotlin/io/flowdux/`
+- Kotlin: `kotlin/flowdux/src/commonMain/kotlin/io/flowdux/`
 - Dart: `dart/flowdux/lib/src/`
