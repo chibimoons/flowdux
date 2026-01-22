@@ -472,7 +472,7 @@ class ResilienceStrategyTest {
 
             // With jitter, delays are: baseDelay + (baseDelay * jitter * random[0,1])
             // Base delays: 100ms, 200ms, 400ms
-            // With 50% jitter, actual delays: [100-150ms], [200-300ms], [400-600ms]
+            // With 50% jitter, actual delays: [100, 150]ms, [200, 300]ms, [400, 600]ms
             advanceTimeBy(800) // Enough time for all retries with jitter
 
             val result = awaitItem()
@@ -559,9 +559,6 @@ class ResilienceStrategyTest {
 
                 cancelAndIgnoreRemainingEvents()
             }
-
-            // Reset attempt counter for next run
-            attempt = 0
         }
 
         // Verify we got 10 delay measurements
