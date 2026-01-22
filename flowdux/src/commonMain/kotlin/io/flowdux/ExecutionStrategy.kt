@@ -243,7 +243,8 @@ class Retry(
 /**
  * Retries the processor execution on failure with exponential backoff.
  *
- * The delay between retries follows the formula: `initialDelay * (factor ^ attempt)`
+ * The delay between retries for the k-th retry (k starting at 1 for the first retry after the
+ * initial attempt) follows the formula: `initialDelay * (factor ^ (k - 1))`
  * with optional jitter to prevent thundering herd problems.
  *
  * @param maxAttempts Maximum number of attempts (including the initial attempt)
