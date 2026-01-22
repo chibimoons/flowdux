@@ -26,3 +26,4 @@ local.properties
 xcuserdata/
 *.xcuserstate
 DerivedData/
+build.gradle.kts.bak
