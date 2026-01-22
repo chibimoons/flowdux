@@ -88,10 +88,9 @@ class Store<S : State, A : Action>(
     private fun processFlowHolderAction(action: A): Flow<A> {
         if (action is FlowHolderAction) {
             val type = action::class
-            var myFlag: CancelFlag? = null
 
             if (action.cancelable) {
-                myFlag = CancelFlag()
+                val myFlag = CancelFlag()
                 
                 // Use flow builder to allow suspending mutex operations
                 return flow {
@@ -106,7 +105,7 @@ class Store<S : State, A : Action>(
                         (action.toFlowAction() as Flow<A>)
                             .onEach { logger.onFlowHolderActionEmitted(it) }
                             .flatMapMerge { processFlowHolderAction(it) }
-                            .takeWhile { myFlag.cancelled != true }
+                            .takeWhile { !myFlag.cancelled }
                     )
                 }
             }
@@ -143,7 +142,10 @@ class Store<S : State, A : Action>(
         _isClosed = true
 
         // Cancel all active FlowHolderAction flows
-        // Use runBlocking to synchronize with processFlowHolderAction
+        // runBlocking is necessary here because:
+        // 1. close() must be synchronous to ensure all flags are cancelled before proceeding
+        // 2. We need the mutex to prevent race conditions with processFlowHolderAction
+        // 3. This happens during shutdown, so blocking the calling thread is acceptable
         runBlocking {
             activeFlagsMutex.withLock {
                 for (flag in activeFlags.values) {
