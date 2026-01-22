@@ -291,24 +291,7 @@ store.dispatch(ObserveUser(repositoryFlow))       // Store collects it
 
 #### FlowHolderAction Execution Strategy
 
-By default, FlowHolderAction uses `TakeLatest` strategy—when a new FlowHolderAction of the same type is dispatched, the previous one is cancelled:
-
-```kotlin
-// Default: TakeLatest (cancels previous when new one dispatched)
-// Wraps a search results flow from repository
-data class ObserveSearchResults(
-    private val resultsFlow: Flow<List<SearchResult>>
-) : FlowHolderAction {
-    override fun toFlowAction(): Flow<Action> =
-        resultsFlow.map { SearchResultsLoaded(it) }
-}
-
-// Each new search cancels the previous observation
-store.dispatch(ObserveSearchResults(repository.search("a")))
-store.dispatch(ObserveSearchResults(repository.search("ab")))   // Cancels "a"
-store.dispatch(ObserveSearchResults(repository.search("abc")))  // Cancels "ab"
-// Only "abc" results are observed
-```
+By default, FlowHolderAction uses `TakeLatest` strategy—when a new FlowHolderAction of the same type is dispatched, the previous one is cancelled.
 
 Use `concurrent()` for parallel execution without cancellation:
 
