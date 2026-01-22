@@ -432,4 +432,203 @@ class ResilienceStrategyTest {
             storeScope.cancel()
         }
     }
+
+    @Test
+    fun `retryWithBackoff applies jitter when enabled`() = runTest {
+        val attemptTimes = mutableListOf<Long>()
+        var attempt = 0
+        val startTime = testScheduler.currentTime
+
+        val middleware = object : Middleware<TestState, TestAction> {
+            override val processors = buildProcessors {
+                on<TestAction.Fetch>(retryWithBackoff(
+                    maxAttempts = 4,
+                    initialDelay = 100.milliseconds,
+                    factor = 2.0,
+                    jitter = 0.5 // 50% jitter
+                )) { _, action ->
+                    attemptTimes.add(testScheduler.currentTime - startTime)
+                    attempt++
+                    if (attempt < 4) {
+                        throw RuntimeException("Simulated failure $attempt")
+                    }
+                    emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                }
+            }
+        }
+
+        val store = createStore(
+            initialState = TestState(),
+            reducer = testReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = testErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        store.state.test {
+            assertEquals(emptyList<String>(), awaitItem().values)
+
+            store.dispatch(TestAction.Fetch("1"))
+
+            // With jitter, delays are: baseDelay + (baseDelay * jitter * random[0,1])
+            // Base delays: 100ms, 200ms, 400ms
+            // With 50% jitter, actual delays: [100-150ms], [200-300ms], [400-600ms]
+            advanceTimeBy(800) // Enough time for all retries with jitter
+
+            val result = awaitItem()
+            assertEquals(listOf("result-1"), result.values)
+
+            // Verify 4 attempts were made
+            assertEquals(4, attemptTimes.size)
+
+            // Verify that delays fall within expected ranges with jitter
+            // First attempt: immediate (0ms)
+            assertEquals(0L, attemptTimes[0])
+
+            // Calculate inter-attempt delays
+            val delay1to2 = attemptTimes[1] - attemptTimes[0]
+            val delay2to3 = attemptTimes[2] - attemptTimes[1]
+            val delay3to4 = attemptTimes[3] - attemptTimes[2]
+
+            // First retry: baseDelay = 100ms, with 50% jitter -> [100, 150]ms
+            assertTrue(delay1to2 >= 100, "First delay should be >= 100ms but was $delay1to2")
+            assertTrue(delay1to2 <= 150, "First delay should be <= 150ms but was $delay1to2")
+
+            // Second retry: baseDelay = 200ms, with 50% jitter -> [200, 300]ms
+            assertTrue(delay2to3 >= 200, "Second delay should be >= 200ms but was $delay2to3")
+            assertTrue(delay2to3 <= 300, "Second delay should be <= 300ms but was $delay2to3")
+
+            // Third retry: baseDelay = 400ms, with 50% jitter -> [400, 600]ms
+            assertTrue(delay3to4 >= 400, "Third delay should be >= 400ms but was $delay3to4")
+            assertTrue(delay3to4 <= 600, "Third delay should be <= 600ms but was $delay3to4")
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `retryWithBackoff jitter causes variation in delays across multiple runs`() = runTest {
+        // Run multiple times to check that jitter produces different delays
+        val allDelays = mutableListOf<Long>()
+
+        repeat(10) { run ->
+            val attemptTimes = mutableListOf<Long>()
+            var attempt = 0
+            val startTime = testScheduler.currentTime
+
+            val middleware = object : Middleware<TestState, TestAction> {
+                override val processors = buildProcessors {
+                    on<TestAction.Fetch>(retryWithBackoff(
+                        maxAttempts = 2,
+                        initialDelay = 100.milliseconds,
+                        factor = 2.0,
+                        jitter = 1.0 // 100% jitter for maximum variation
+                    )) { _, action ->
+                        attemptTimes.add(testScheduler.currentTime - startTime)
+                        attempt++
+                        if (attempt < 2) {
+                            throw RuntimeException("Simulated failure $attempt")
+                        }
+                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                    }
+                }
+            }
+
+            val store = createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(emptyList<String>(), awaitItem().values)
+
+                store.dispatch(TestAction.Fetch("$run"))
+
+                advanceTimeBy(300) // Enough time for retry with jitter
+
+                val result = awaitItem()
+                assertEquals(listOf("result-$run"), result.values)
+
+                // Record the delay between attempts
+                if (attemptTimes.size >= 2) {
+                    allDelays.add(attemptTimes[1] - attemptTimes[0])
+                }
+
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            // Reset attempt counter for next run
+            attempt = 0
+        }
+
+        // Verify we got 10 delay measurements
+        assertEquals(10, allDelays.size)
+
+        // With 100% jitter, delays should be in range [100ms, 200ms]
+        allDelays.forEach { delay ->
+            assertTrue(delay >= 100, "Delay should be >= 100ms but was $delay")
+            assertTrue(delay <= 200, "Delay should be <= 200ms but was $delay")
+        }
+
+        // Check that we got some variation (not all delays are identical)
+        // With 100% jitter over 10 runs, we should see at least 3 unique values
+        val uniqueDelays = allDelays.distinct()
+        assertTrue(uniqueDelays.size >= 3,
+            "Expected at least 3 unique delays with jitter, but got ${uniqueDelays.size}: $uniqueDelays")
+    }
+
+    @Test
+    fun `retryWithBackoff with zero jitter produces consistent delays`() = runTest {
+        val attemptTimes = mutableListOf<Long>()
+        var attempt = 0
+        val startTime = testScheduler.currentTime
+
+        val middleware = object : Middleware<TestState, TestAction> {
+            override val processors = buildProcessors {
+                on<TestAction.Fetch>(retryWithBackoff(
+                    maxAttempts = 3,
+                    initialDelay = 100.milliseconds,
+                    factor = 2.0,
+                    jitter = 0.0 // No jitter
+                )) { _, action ->
+                    attemptTimes.add(testScheduler.currentTime - startTime)
+                    attempt++
+                    if (attempt < 3) {
+                        throw RuntimeException("Simulated failure $attempt")
+                    }
+                    emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                }
+            }
+        }
+
+        val store = createStore(
+            initialState = TestState(),
+            reducer = testReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = testErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        store.state.test {
+            assertEquals(emptyList<String>(), awaitItem().values)
+
+            store.dispatch(TestAction.Fetch("1"))
+
+            advanceTimeBy(400) // 100ms + 200ms delays
+
+            val result = awaitItem()
+            assertEquals(listOf("result-1"), result.values)
+
+            // Verify exact delays without jitter
+            assertEquals(3, attemptTimes.size)
+            assertEquals(0L, attemptTimes[0]) // First attempt immediate
+            assertEquals(100L, attemptTimes[1] - attemptTimes[0]) // 100ms delay
+            assertEquals(200L, attemptTimes[2] - attemptTimes[1]) // 200ms delay (100 * 2)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
