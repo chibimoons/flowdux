@@ -66,13 +66,20 @@ class Store<S, A extends Action> {
 
   /// Builds the complete action → state stream pipeline.
   /// Similar to Kotlin's stateFlow construction.
+  ///
+  /// Uses distinct() to prevent emitting consecutive identical states,
+  /// matching Kotlin StateFlow's built-in distinctUntilChanged behavior.
+  /// The initial state is injected via startWith() before distinct() to ensure
+  /// the first action resulting in the same state is filtered correctly.
   ValueStream<S> _buildStateStream(S initialState) {
     return _actionController.stream
         .doOnData(_logger.onActionDispatched)
         .flatMap(_processAction)
         .map(_reduceAction)
         .doOnError(_handleError)
-        .shareValueSeeded(initialState);
+        .startWith(initialState)
+        .distinct()
+        .shareValue();
   }
 
   /// Processes an action through middlewares.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3
+
+- Add distinct() to state stream to filter consecutive identical states
+- Match Kotlin StateFlow's built-in distinctUntilChanged behavior
+
 ## 0.2.2
 
 - Fix middleware blocking when emitting FlowHolderAction with infinite streams

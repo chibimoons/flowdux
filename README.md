@@ -182,7 +182,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flowdux: ^0.2.2
+  flowdux: ^0.2.3
 ```
 
 ### Flutter
@@ -191,8 +191,8 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flowdux: ^0.2.2
-  flowdux_flutter: ^0.2.2
+  flowdux: ^0.2.3
+  flowdux_flutter: ^0.2.3
 ```
 
 ## Usage (Kotlin)
