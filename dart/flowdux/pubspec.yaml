@@ -2,7 +2,7 @@ name: flowdux
 description: >
   A predictable state management library with execution strategies.
   Supports takeLatest, takeLeading, debounce, throttle, retry, and strategy chaining.
-version: 0.2.1
+version: 0.2.2
 homepage: https://github.com/chibimoons/flowdux
 repository: https://github.com/chibimoons/flowdux
 issue_tracker: https://github.com/chibimoons/flowdux/issues

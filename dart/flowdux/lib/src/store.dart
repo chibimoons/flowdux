@@ -88,13 +88,17 @@ class Store<S, A extends Action> {
         });
   }
 
-  /// Processes an action through all middlewares sequentially.
+  /// Processes an action through all middlewares concurrently.
   /// FlowHolderMiddleware is included at the end of the chain.
+  ///
+  /// Uses flatMap instead of asyncExpand to allow concurrent processing
+  /// of emitted actions. This prevents blocking when a middleware emits
+  /// FlowHolderActions with infinite streams.
   Stream<A> _processMiddlewares(A action) {
     Stream<A> currentStream = Stream.value(action);
 
     for (final middleware in _allMiddlewares) {
-      currentStream = currentStream.asyncExpand((currentAction) {
+      currentStream = currentStream.flatMap((currentAction) {
         _logger.onMiddlewareProcessing(middleware.name, currentAction);
         return middleware.process(() => currentState, currentAction);
       });

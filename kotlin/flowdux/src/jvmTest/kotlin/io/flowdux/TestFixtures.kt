@@ -157,6 +157,18 @@ sealed interface CounterAction : Action {
             emit(innerAction) // Then emit another FlowHolderAction
         }
     }
+
+    /**
+     * Action that triggers the middleware to emit multiple FlowHolderActions.
+     * Used to test concurrent emission of FlowHolderActions from middleware.
+     */
+    object StartMultipleObservers : CounterAction
+
+    /**
+     * Marker action emitted after all FlowHolderActions are emitted.
+     * Used to verify that middleware code after emit() is executed.
+     */
+    data class SetupComplete(val timestamp: Long) : CounterAction
 }
 
 val counterReducer =
@@ -179,6 +191,8 @@ val counterReducer =
             is CounterAction.DebouncedStreamAction -> state
             is CounterAction.ThrottledStreamAction -> state
             is CounterAction.NestedFlowHolderAction -> state
+            is CounterAction.StartMultipleObservers -> state
+            is CounterAction.SetupComplete -> state
         }
     }
 

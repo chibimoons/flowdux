@@ -172,7 +172,7 @@ Add the dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.chibimoons:flowdux:1.8.0")
+    implementation("com.github.chibimoons:flowdux:1.8.2")
 }
 ```
 
@@ -182,7 +182,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flowdux: ^1.0.0
+  flowdux: ^0.2.2
 ```
 
 ### Flutter
@@ -191,8 +191,8 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flowdux: ^1.0.0
-  flowdux_flutter: ^1.0.0
+  flowdux: ^0.2.2
+  flowdux_flutter: ^0.2.2
 ```
 
 ## Usage (Kotlin)
@@ -503,7 +503,7 @@ Time travel debugging is available as a separate module:
 
 ```kotlin
 // build.gradle.kts
-implementation("com.github.chibimoons.flowdux:flowdux-timetravel:1.8.0")
+implementation("com.github.chibimoons.flowdux:flowdux-timetravel:1.8.2")
 ```
 
 ```kotlin
