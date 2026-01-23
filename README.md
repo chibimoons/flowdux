@@ -13,7 +13,7 @@ A lightweight Redux-style state management library for **Kotlin Multiplatform** 
 - Execution strategies (takeLatest, takeLeading, sequential, debounce, throttle, retry)
 - Strategy chaining and groups for flexible action coordination
 - Error handling with ErrorProcessor
-- Time travel debugging (undo/redo, state history)
+- Time travel debugging (undo/redo, state history) - Kotlin only
 - Built on Kotlin Coroutines and Flow / Dart Streams
 - Kotlin Multiplatform support (JVM, iOS, JS, WASM)
 - Dart/Flutter support with Flutter bindings
@@ -75,7 +75,7 @@ flowchart TB
 | **ErrorProcessor** | Catch errors and convert to Actions |
 | **Reducer** | Pure function: (State, Action) → NewState |
 
-### Action Flow
+## Action Flow
 
 Actions can enter the pipeline in two ways:
 
@@ -87,24 +87,12 @@ Called from UI or ViewModel to send actions into the Store:
 dispatch(action) → Channel → Middleware Chain → Reducer → StateFlow
 ```
 
-```kotlin
-// From ViewModel or UI
-store.dispatch(SearchAction("query"))
-```
-
 **2. emit() - Middleware Internal Emission**
 
 Called within middleware processors to emit resulting actions:
 
 ```
 emit(action) → (Remaining Middlewares) → Reducer → StateFlow
-```
-
-```kotlin
-on<SearchAction> { state, action ->
-    val results = api.search(action.query)
-    emit(SearchResults(results))  // Goes to Reducer
-}
 ```
 
 **Key Differences:**
@@ -115,48 +103,113 @@ on<SearchAction> { state, action ->
 | Entry point | Channel (full pipeline) | Current position in Flow |
 | Middleware | All middlewares process | Only remaining middlewares |
 
-**Middleware Patterns:**
+## FlowHolderAction
 
-```kotlin
-// Transform: Convert action to different action
-on<FetchUser> { state, action ->
-    val user = api.getUser(action.id)
-    emit(UserLoaded(user))
-}
+`FlowHolderAction` is an Action that holds and transforms an existing Flow/Stream into a stream of Actions.
 
-// Pass through: Let action continue to Reducer
-on<LogAction> { state, action ->
-    logger.log(action)
-    emit(action)
-}
+**Why use FlowHolderAction?**
 
-// Block: Don't emit to prevent Reducer processing
-on<InvalidAction> { state, action ->
-    // No emit - action stops here
-}
+- Wrap existing reactive streams (Repository, WebSocket, Database) without side effects in the Action
+- The Action itself is pure - it just holds a reference to the stream
+- Stream collection happens in FlowHolderMiddleware, not in the Action
 
-// Multiple emissions
-on<BatchAction> { state, action ->
-    emit(StartLoading)
-    val result = api.fetch()
-    emit(DataLoaded(result))
-    emit(StopLoading)
-}
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  FlowHolderAction                                               │
+│  ┌──────────────┐      ┌──────────────┐      ┌──────────────┐  │
+│  │ Repository   │ ───► │ toFlowAction │ ───► │ Action       │  │
+│  │ Flow/Stream  │      │ (transform)  │      │ Stream       │  │
+│  └──────────────┘      └──────────────┘      └──────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+                    FlowHolderMiddleware collects
+                    and emits each Action to Reducer
 ```
 
-**Note:** Actions without a registered processor in middleware automatically pass through to the Reducer:
+**Use cases:**
+- Observing real-time data (user profile, chat messages)
+- WebSocket connections
+- Database change listeners
+- Any existing Flow/Stream that needs to update state
 
-```kotlin
-// Middleware only handles FetchUser
-on<FetchUser> { state, action -> ... }
+## Execution Strategies
 
-// Other actions (Increment, Reset, etc.) pass through directly to Reducer
-store.dispatch(Increment)  // → Middleware (no processor) → Reducer
+Execution strategies control how concurrent actions of the same type are processed.
+
+### Strategy Categories
+
+| Category | Strategies | Purpose |
+|----------|------------|---------|
+| **Concurrency** | `takeLatest()`, `takeLeading()`, `sequential()`, `concurrent()` | How to handle concurrent executions |
+| **Timing** | `debounce(duration)`, `throttle(duration)` | When to execute |
+| **Resilience** | `retry(n)`, `retryWithBackoff(...)` | How to handle failures |
+
+### Concurrency Strategies
+
+```
+takeLatest()     - Cancel previous, keep latest (search, refresh)
+                   [A1]──X  [A2]──X  [A3]────►
+
+takeLeading()    - Ignore new while processing (form submit, payment)
+                   [A1]────────────►  [A2]X  [A3]X
+
+sequential()     - Queue and process in order (message queue)
+                   [A1]────►[A2]────►[A3]────►
+
+concurrent()     - Run all in parallel (independent fetches)
+                   [A1]────────►
+                   [A2]────────►
+                   [A3]────────►
 ```
 
-## Installation
+### Timing Strategies
 
-### Kotlin (JitPack)
+```
+debounce(300ms)  - Wait for quiet period (autocomplete, autosave)
+                   [A1]·[A2]·[A3]·······[execute A3]
+
+throttle(1000ms) - Rate limit (scroll, analytics)
+                   [A1]────►  [A2]X  [A3]X  [A4]────►
+```
+
+### Resilience Strategies
+
+```
+retry(3)                    - Retry on failure (network errors)
+retryWithBackoff(3, 100ms)  - Retry with exponential delay
+```
+
+### Strategy Chaining
+
+Combine strategies from different categories using `then`:
+
+```
+debounce(300ms) then takeLatest() then retry(3)
+```
+
+**Rules:**
+- Strategies from different categories can be chained
+- Strategies from the same category cannot be chained (throws exception)
+
+### Strategy Groups
+
+Share a strategy instance across multiple action types. Actions in the same group coordinate their execution:
+
+```
+group(takeLatest()) {
+    SearchAction    ─┐
+    RefreshAction   ─┴─► Same strategy instance
+}
+// Dispatching RefreshAction cancels in-progress SearchAction
+```
+
+---
+
+<details>
+<summary><h2>Kotlin</h2></summary>
+
+### Installation
 
 Add JitPack repository to your `settings.gradle.kts`:
 
@@ -172,30 +225,9 @@ Add the dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.chibimoons:flowdux:1.6.1")
+    implementation("com.github.chibimoons:flowdux:1.7.0")
 }
 ```
-
-### Dart
-
-Add to your `pubspec.yaml`:
-
-```yaml
-dependencies:
-  flowdux: ^1.0.0
-```
-
-### Flutter
-
-Add to your `pubspec.yaml`:
-
-```yaml
-dependencies:
-  flowdux: ^1.0.0
-  flowdux_flutter: ^1.0.0
-```
-
-## Usage (Kotlin)
 
 ### Define State and Actions
 
@@ -281,25 +313,11 @@ override fun onCleared() {
 }
 ```
 
-**isClosed Property:**
+### FlowHolderAction
 
-Check `isClosed` before dispatching if there's a possibility the store may be closed:
-
-```kotlin
-if (!store.isClosed) {
-    store.dispatch(action)
-}
-```
-
-**Note:** Dispatching after `close()` is logged via `StoreLogger.onDispatchAfterClose()` and may indicate a bug in your application.
-
-### FlowHolderAction (Wrap Existing Flow as Actions)
-
-Use `FlowHolderAction` to wrap existing Flows (Repository, Socket) and convert them to Actions.
-No side effects in the Action—just holds and transforms the Flow:
+Use `FlowHolderAction` to wrap existing Flows (Repository, Socket) and convert them to Actions:
 
 ```kotlin
-// FlowHolderAction wraps an existing Flow and converts to Flow<Action>
 data class ObserveUser(
     private val userFlow: Flow<User>
 ) : UserAction, FlowHolderAction {
@@ -307,15 +325,12 @@ data class ObserveUser(
         userFlow.map { user -> SetUser(user) }
 }
 
-// Usage: pass the Flow from Repository/Socket
-val repositoryFlow = userRepository.getUser(123)  // Flow creation (cold)
-store.dispatch(ObserveUser(repositoryFlow))       // Store collects it
-// State updates: cached user -> fresh user from API
+// Usage
+val repositoryFlow = userRepository.getUser(123)
+store.dispatch(ObserveUser(repositoryFlow))
 ```
 
-## Execution Strategies
-
-FlowDux provides execution strategies to control how concurrent actions are processed in middleware.
+### Execution Strategies
 
 | Category | Strategies | Purpose |
 |----------|------------|---------|
@@ -323,169 +338,39 @@ FlowDux provides execution strategies to control how concurrent actions are proc
 | **Timing** | `debounce(duration)`, `throttle(duration)` | When to execute |
 | **Resilience** | `retry(n)`, `retryWithBackoff(...)` | How to handle failures |
 
-<details>
-<summary><b>Concurrency Strategies</b></summary>
-
-#### takeLatest()
-
-Cancels previous processing when a new action arrives. Only the latest action's result is emitted.
-
 ```kotlin
-on<AppAction.Search>(takeLatest()) { state, action ->
+// takeLatest: Cancel previous when new arrives
+on<SearchAction>(takeLatest()) { state, action ->
     val results = searchApi.search(action.query)
-    emit(AppAction.SearchResults(results))
+    emit(SearchResults(results))
 }
-```
 
-Use cases: Search, API refresh, pagination with pull-to-refresh
-
-#### takeLeading()
-
-Ignores new actions while one is still processing. Only the first action in a series executes.
-
-```kotlin
-on<AppAction.Submit>(takeLeading()) { state, action ->
-    // Prevents duplicate submissions
-    val result = api.submit(action.data)
-    emit(AppAction.SubmitSuccess(result))
-}
-```
-
-Use cases: Form submission, payment processing, preventing double-clicks
-
-#### sequential()
-
-Queues actions and processes them one at a time, preserving order. Unlike `takeLeading()` which ignores new actions, `sequential()` waits for the current action to complete before processing the next one.
-
-```kotlin
-on<AppAction.Save>(sequential()) { state, action ->
-    // All save requests are processed in order
-    api.save(action.data)
-    emit(AppAction.SaveComplete(action.id))
-}
-```
-
-Use cases: Sequential API calls, ordered form saves, FIFO task processing
-
-</details>
-
-<details>
-<summary><b>Timing Strategies</b></summary>
-
-#### debounce(duration)
-
-Delays execution. If another action arrives before the delay completes, the previous action is canceled and the timer restarts.
-
-```kotlin
-on<AppAction.TextChanged>(debounce(500.milliseconds)) { state, action ->
-    // Only saves after user stops typing for 500ms
+// debounce: Wait for quiet period
+on<TextChanged>(debounce(500.milliseconds)) { state, action ->
     api.save(action.text)
-    emit(AppAction.SaveComplete)
+}
+
+// Strategy chaining
+on<Search>(debounce(300.milliseconds) then takeLatest() then retry(3)) { state, action ->
+    val results = searchApi.search(action.query)
+    emit(SearchResults(results))
 }
 ```
-
-Use cases: Search autocomplete, autosave, input validation
-
-#### throttle(duration)
-
-Limits execution rate. Executes the first action immediately, then ignores subsequent actions until the time window passes.
-
-```kotlin
-on<AppAction.Scroll>(throttle(1000.milliseconds)) { state, action ->
-    // Logs scroll position at most once per second
-    analytics.logScroll(action.position)
-    emit(action)
-}
-```
-
-Use cases: Analytics events, scroll handling, rate limiting
-
-</details>
-
-<details>
-<summary><b>Resilience Strategies</b></summary>
-
-#### retry(maxAttempts)
-
-Retries the processor execution on failure.
-
-```kotlin
-on<AppAction.FetchData>(retry(3)) { state, action ->
-    // Retries up to 3 times on failure
-    val data = api.fetchData(action.id)
-    emit(AppAction.FetchSuccess(data))
-}
-
-// With custom retry condition
-on<AppAction.FetchData>(retry(3) { e -> e is IOException }) { state, action ->
-    // Only retries on IOException
-}
-```
-
-#### retryWithBackoff(maxAttempts, initialDelay, ...)
-
-Retries with exponential backoff delay between attempts.
-
-```kotlin
-on<AppAction.FetchData>(retryWithBackoff(
-    maxAttempts = 5,
-    initialDelay = 100.milliseconds,
-    maxDelay = 10.seconds,
-    factor = 2.0,      // Exponential multiplier
-    jitter = 0.1       // Random jitter to prevent thundering herd
-)) { state, action ->
-    val data = api.fetchData(action.id)
-    emit(AppAction.FetchSuccess(data))
-}
-```
-
-Use cases: Network error recovery, transient server errors, rate limiting
-
-</details>
 
 ### Strategy Groups
 
-Use `group` to share a strategy instance across multiple action types. Actions within the same group will coordinate their execution (e.g., one action can cancel another):
+Share a strategy instance across multiple action types:
 
 ```kotlin
 override val processors = buildProcessors {
-    // SearchAction and RefreshAction share the same takeLatest instance
-    // Dispatching RefreshAction will cancel an in-progress SearchAction
     group(takeLatest()) {
-        on<SearchAction> { state, action ->
-            val results = searchApi.search(action.query)
-            emit(SearchResults(results))
-        }
-        on<RefreshAction> { state, action ->
-            val results = searchApi.refresh()
-            emit(SearchResults(results))
-        }
+        on<SearchAction> { state, action -> ... }
+        on<RefreshAction> { state, action -> ... }
     }
 }
 ```
 
-### Strategy Chaining
-
-Combine strategies from different categories using the `then` operator:
-
-```kotlin
-// Debounce input, then cancel previous search, then retry on failure
-on<AppAction.Search>(
-    debounce(300.milliseconds) then takeLatest() then retry(3)
-) { state, action ->
-    val results = searchApi.search(action.query)
-    emit(AppAction.SearchResults(results))
-}
-```
-
-**Rules:**
-- Strategies from different categories can be chained
-- Strategies from the same category cannot be chained (throws exception)
-- Chained strategies work with `group()` as well
-
-## Logging
-
-Use `DebugStoreLogger` for development debugging:
+### Logging
 
 ```kotlin
 val store = createStore(
@@ -495,88 +380,75 @@ val store = createStore(
 )
 ```
 
-> **Warning:** `DebugStoreLogger` prints the entire State and Action objects via `println()`. Do not use in production as it may expose sensitive information (tokens, passwords, personal data). Use `NoOpStoreLogger` (default) or implement a custom `StoreLogger` with proper filtering for production.
-
-## Time Travel Debugging
-
-Time travel debugging is available as a separate module:
+### Time Travel Debugging
 
 ```kotlin
 // build.gradle.kts
-implementation("com.github.chibimoons.flowdux:flowdux-timetravel:1.6.1")
+implementation("com.github.chibimoons.flowdux:flowdux-timetravel:1.7.0")
 ```
 
 ```kotlin
-import io.flowdux.timetravel.createTimeTravelStore
-
 val store = createTimeTravelStore(
     initialState = CounterState(),
     reducer = counterReducer,
-    middlewares = listOf(LoggingMiddleware()),
-    maxHistorySize = 100        // Optional: limit history size (default: 100)
+    maxHistorySize = 100
 )
 
-// Use like a regular store
-store.dispatch(CounterAction.Increment)
-store.dispatch(CounterAction.Add(10))
-
-// Access history
-store.history.forEach { snapshot ->
-    println("Index: ${snapshot.index}, State: ${snapshot.currentState}, Action: ${snapshot.action}")
-}
-
-// Navigate through time
-store.undo()           // Go to previous state
-store.redo()           // Go to next state
-store.jumpTo(0)        // Jump to initial state
-store.reset()          // Alias for jumpTo(0)
-
-// Check navigation availability
-if (store.canUndo) store.undo()
-if (store.canRedo) store.redo()
-
-// Clear history (keeps current state as new initial)
-store.clear()
+store.undo()
+store.redo()
+store.jumpTo(0)
+store.history.forEach { snapshot -> ... }
 ```
 
-**StateSnapshot Properties:**
+### Sample Apps
 
-| Property | Description |
-|----------|-------------|
-| `index` | Position in history (0 = initial) |
-| `action` | Action that caused this state (null for initial) |
-| `previousState` | State before the action (null for initial) |
-| `currentState` | State after the action |
-| `timestamp` | When the state change occurred |
+```bash
+# JVM Console
+./gradlew :kotlin:sample-jvm:run
 
-**Restoring History:**
+# Android
+./gradlew :kotlin:sample-android:assembleDebug
 
-You can restore a previous session's history using a separate overload:
+# Web (JavaScript)
+./gradlew :kotlin:sample-web:jsBrowserDevelopmentRun
 
-```kotlin
-// Save history (e.g., to JSON)
-val savedHistory = store.history
-
-// Later, restore from saved history
-val restoredStore = createTimeTravelStore(
-    initialHistory = savedHistory,  // Restores state and history
-    reducer = counterReducer
-)
-// restoredStore starts at the last state in savedHistory
+# WebAssembly
+./gradlew :kotlin:sample-wasm:wasmJsBrowserDevelopmentRun
 ```
 
-**Branching Behavior:**
+### Platform Support
 
-When dispatching from a past state (after `undo()` or `jumpTo()`), future history is discarded:
+| Platform | Status | Sample |
+|----------|--------|--------|
+| JVM | ✅ | `kotlin/sample-jvm` |
+| Android | ✅ | `kotlin/sample-android` |
+| iOS | ✅ | `kotlin/sample-shared/iosApp` |
+| JavaScript | ✅ | `kotlin/sample-web` |
+| WebAssembly | ✅ | `kotlin/sample-wasm` |
 
-```kotlin
-// History: [0] -> [1] -> [2] -> [3]
-store.jumpTo(1)           // Now at state [1]
-store.dispatch(NewAction) // History becomes: [0] -> [1] -> [new]
-                          // States [2] and [3] are discarded
+</details>
+
+---
+
+<details>
+<summary><h2>Dart / Flutter</h2></summary>
+
+### Installation
+
+**Dart only:**
+
+```yaml
+dependencies:
+  flowdux: ^0.2.1
 ```
 
-## Usage (Dart/Flutter)
+**Flutter:**
+
+```yaml
+dependencies:
+  flowdux: ^0.2.1
+  flowdux_flutter: ^0.2.1
+```
 
 ### Define State and Actions
 
@@ -627,7 +499,6 @@ store.state.listen((state) => print('Count: ${state.count}'));
 ```dart
 class SearchMiddleware extends Middleware<AppState, Action> {
   SearchMiddleware() {
-    // takeLatest cancels previous search when new one arrives
     apply(takeLatest()).on<SearchAction>((state, action) async* {
       final results = await api.search(action.query);
       yield SearchResultsAction(results);
@@ -638,11 +509,9 @@ class SearchMiddleware extends Middleware<AppState, Action> {
 
 ### FlowHolderAction
 
-Use `FlowHolderAction` to wrap existing Streams (Repository, Socket) and convert them to Actions.
-No side effects in the Action—just holds and transforms the Stream:
+Use `FlowHolderAction` to wrap existing Streams:
 
 ```dart
-// FlowHolderAction wraps an existing Stream and converts to Stream<Action>
 class ObserveUserAction with FlowHolderAction {
   final Stream<User> userStream;
 
@@ -653,20 +522,38 @@ class ObserveUserAction with FlowHolderAction {
     return userStream.map((user) => SetUserAction(user));
   }
 
-  // Default: TakeLatest strategy (auto-cancels previous)
-  // Override for concurrent execution:
-  // @override
-  // ExecutionStrategy get strategy => concurrent();
+  // Default: TakeLatest strategy
+  // Override for concurrent: ExecutionStrategy get strategy => concurrent();
 }
 
-// Usage: pass the Stream from Repository/Socket
-final repositoryStream = userRepository.getUser(123);  // Stream creation (cold)
-store.dispatch(ObserveUserAction(repositoryStream));   // Store collects it
+// Usage
+final repositoryStream = userRepository.getUser(123);
+store.dispatch(ObserveUserAction(repositoryStream));
+```
+
+### Execution Strategies
+
+| Category | Strategies | Purpose |
+|----------|------------|---------|
+| **Concurrency** | `takeLatest()`, `takeLeading()`, `sequential()`, `concurrent()` | How to handle concurrent executions |
+| **Timing** | `debounce(duration)`, `throttle(duration)` | When to execute |
+| **Resilience** | `retry(n)`, `retryWithBackoff(...)` | How to handle failures |
+
+```dart
+// Strategy chaining
+apply(debounce(Duration(milliseconds: 300)).then(takeLatest()))
+  .on<SearchAction>((state, action) async* {
+    final results = await api.search(action.query);
+    yield SearchResultsAction(results);
+  });
 ```
 
 ### Flutter Integration
 
 ```dart
+import 'package:flutter/material.dart' hide Action;
+import 'package:flowdux_flutter/flowdux_flutter.dart';
+
 // Provide store to widget tree
 StoreProvider<AppState, Action>(
   store: store,
@@ -680,7 +567,7 @@ StoreConsumer<AppState, Action>(
   },
 )
 
-// Or use selector for specific state
+// Use selector for specific state
 StoreSelector<AppState, Action, int>(
   selector: (state) => state.count,
   builder: (context, store, count) {
@@ -688,7 +575,7 @@ StoreSelector<AppState, Action, int>(
   },
 )
 
-// Listen to state changes for side effects (navigation, snackbar, etc.)
+// Listen to state changes for side effects
 StoreListener<AppState, Action>(
   listenWhen: (previous, current) => current.navigateTo != null,
   listener: (context, store, state) {
@@ -698,7 +585,7 @@ StoreListener<AppState, Action>(
 )
 ```
 
-### Run Dart Tests
+### Run Tests
 
 ```bash
 cd dart/flowdux && dart test
@@ -710,134 +597,16 @@ cd dart/flowdux && dart test
 cd dart/flowdux_flutter/example && flutter run
 ```
 
-## Sample Apps
+### Platform Support
 
-### Run JVM Console Sample
+| Platform | Status | Package |
+|----------|--------|---------|
+| Dart | ✅ | [flowdux](https://pub.dev/packages/flowdux) |
+| Flutter | ✅ | [flowdux_flutter](https://pub.dev/packages/flowdux_flutter) |
 
-```bash
-./gradlew :kotlin:sample-jvm:run
-```
+</details>
 
-Output:
-```
-=== Flowdux Sample: Counter ===
-
-State: count = 0
-> Dispatching Increment
-State: count = 1
-...
-> Dispatching ObserveCount - FlowHolderAction
-  (Repository Flow emits: cache -> api)
-State: count = 10 [cache]
-State: count = 42 [api]
-...
-
-==================================================
-=== Execution Strategy Examples ===
-==================================================
-
-> takeLatest: Rapid search (only latest completes)
-  Dispatching Search('a'), Search('ab'), Search('abc') rapidly...
-    [takeLatest] Searching for: a
-    [takeLatest] Searching for: ab
-    [takeLatest] Searching for: abc
-    [takeLatest] Search completed: abc
-  Result: Only 'abc' search completed!
-
-> debounce: Wait 200ms after last input
-  Dispatching FetchData rapidly...
-    [debounce] Fetching data: 3
-  Result: Only last FetchData executed after 200ms quiet period!
-
-> takeLeading: Prevent double form submission
-  Dispatching SubmitForm 3 times rapidly...
-    [takeLeading] Processing form submission...
-    [takeLeading] Form submitted!
-  Result: Only first submission processed, others ignored!
-
-> Strategy Group: LoadUser and RefreshUser share takeLatest
-  Dispatching LoadUser, then RefreshUser (cancels LoadUser)...
-    [group] Loading user: 123
-    [group] Refreshing user...
-    [group] User refreshed!
-  Result: LoadUser was canceled, only RefreshUser completed!
-```
-
-### Build Android Sample
-
-```bash
-./gradlew :kotlin:sample-android:assembleDebug
-```
-
-APK location: `kotlin/sample-android/build/outputs/apk/debug/sample-android-debug.apk`
-
-### Build KMM Sample (Android)
-
-```bash
-./gradlew :kotlin:sample-shared:androidApp:assembleDebug
-```
-
-APK location: `kotlin/sample-shared/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
-
-### Build KMM Sample (iOS)
-
-**Prerequisites:** Xcode 15+ with command line tools
-
-```bash
-# Build shared framework
-./gradlew :kotlin:sample-shared:shared:linkDebugFrameworkIosSimulatorArm64
-
-# Build iOS app
-xcodebuild -project kotlin/sample-shared/iosApp/iosApp.xcodeproj \
-  -target iosApp -sdk iphonesimulator -arch arm64 build
-```
-
-App location: `kotlin/sample-shared/iosApp/build/Debug-iphonesimulator/iosApp.app`
-
-### KMM Sample Structure
-
-```
-kotlin/sample-shared/
-├── shared/           # Shared Kotlin code (commonMain)
-│   └── CounterStore  # Shared business logic
-├── androidApp/       # Android UI (Compose)
-└── iosApp/           # iOS UI (SwiftUI) - see iosApp/README.md
-```
-
-### Run Web (JavaScript) Sample
-
-```bash
-./gradlew :kotlin:sample-web:jsBrowserDevelopmentRun
-```
-
-Opens browser at `http://localhost:8080` with an interactive Counter app.
-
-### Run WebAssembly (WASM) Sample
-
-```bash
-./gradlew :kotlin:sample-wasm:wasmJsBrowserDevelopmentRun
-```
-
-Opens browser at `http://localhost:8080` with an interactive Counter app (WASM version).
-
-## Platform Support
-
-### Kotlin Multiplatform
-
-| Platform | Status | Sample |
-|----------|--------|--------|
-| JVM | ✅ | `kotlin/sample-jvm` |
-| Android | ✅ | `kotlin/sample-android`, `kotlin/sample-shared/androidApp` |
-| iOS | ✅ | `kotlin/sample-shared/iosApp` |
-| JavaScript | ✅ | `kotlin/sample-web` |
-| WebAssembly | ✅ | `kotlin/sample-wasm` |
-
-### Dart / Flutter
-
-| Platform | Status | Sample |
-|----------|--------|--------|
-| Dart | ✅ | `dart/flowdux` |
-| Flutter | ✅ | `dart/flowdux_flutter` |
+---
 
 ## License
 
