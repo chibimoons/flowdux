@@ -52,8 +52,10 @@ abstract class ReducerBase<S, A extends Action> {
 
 /// Exception thrown when attempting to register a duplicate handler for the same action type.
 class DuplicateHandlerException implements Exception {
+  /// The action type that was duplicated.
   final Type actionType;
 
+  /// Creates a [DuplicateHandlerException] for the given [actionType].
   DuplicateHandlerException(this.actionType);
 
   @override

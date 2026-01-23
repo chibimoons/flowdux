@@ -24,6 +24,9 @@ class ThrottleStrategy implements ExecutionStrategy {
   bool _isThrottled = false;
   Timer? _throttleTimer;
 
+  /// Creates a [ThrottleStrategy] with the specified [duration].
+  ///
+  /// Actions within [duration] of the previous execution will be ignored.
   ThrottleStrategy(this._duration);
 
   @override

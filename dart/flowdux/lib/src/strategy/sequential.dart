@@ -25,6 +25,9 @@ import 'execution_strategy.dart';
 class SequentialStrategy implements ExecutionStrategy {
   final _lock = AsyncLock();
 
+  /// Creates a [SequentialStrategy] that queues and processes actions in order.
+  SequentialStrategy();
+
   @override
   StrategyCategory get category => StrategyCategory.concurrency;
 

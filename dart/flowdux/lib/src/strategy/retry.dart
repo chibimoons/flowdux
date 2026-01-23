@@ -20,7 +20,12 @@ import 'execution_strategy.dart';
 /// );
 /// ```
 class RetryStrategy implements ExecutionStrategy {
+  /// The maximum number of attempts including the initial one.
   final int maxAttempts;
+
+  /// Predicate to determine if an error should trigger a retry.
+  ///
+  /// [CancellationException] is never retried regardless of this predicate.
   final bool Function(Object error) retryIf;
 
   /// Creates a retry strategy.

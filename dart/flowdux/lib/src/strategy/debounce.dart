@@ -23,6 +23,9 @@ class DebounceStrategy implements ExecutionStrategy {
   Timer? _pendingTimer;
   StreamController<dynamic>? _pendingController;
 
+  /// Creates a [DebounceStrategy] with the specified [duration].
+  ///
+  /// Actions will be delayed until no new actions arrive for [duration].
   DebounceStrategy(this._duration);
 
   @override

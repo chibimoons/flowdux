@@ -35,12 +35,26 @@ import 'execution_strategy.dart';
 /// );
 /// ```
 class RetryWithBackoffStrategy implements ExecutionStrategy {
+  /// The maximum number of attempts including the initial one.
   final int maxAttempts;
+
+  /// The delay before the first retry attempt.
   final Duration initialDelay;
+
+  /// The maximum delay between retries (caps exponential growth).
   final Duration maxDelay;
+
+  /// The exponential multiplier applied to delays.
   final double factor;
+
+  /// Randomness factor (0.0 to 1.0) to prevent thundering herd.
   final double jitter;
+
+  /// Predicate to determine if an error should trigger a retry.
+  ///
+  /// [CancellationException] is never retried regardless of this predicate.
   final bool Function(Object error) retryIf;
+
   final Random _random;
 
   /// Creates a retry with backoff strategy.

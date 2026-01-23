@@ -23,6 +23,9 @@ import 'execution_strategy.dart';
 class TakeLeadingStrategy implements ExecutionStrategy {
   bool _isActive = false;
 
+  /// Creates a [TakeLeadingStrategy] that ignores actions while processing.
+  TakeLeadingStrategy();
+
   @override
   StrategyCategory get category => StrategyCategory.concurrency;
 

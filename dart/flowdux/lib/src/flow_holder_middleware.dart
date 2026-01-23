@@ -16,7 +16,8 @@ class FlowHolderMiddleware<S, A extends Action> extends Middleware<S, A> {
   /// Cached wrapped processors for FlowHolderActions, keyed by runtimeType.
   final Map<Type, Stream<A> Function(S, A)> _wrappedProcessors = {};
 
-  FlowHolderMiddleware(this._logger);
+  /// Creates a [FlowHolderMiddleware] with the specified [logger].
+  FlowHolderMiddleware(StoreLogger<S, A> logger) : _logger = logger;
 
   @override
   Stream<A> process(S Function() getState, A action) {

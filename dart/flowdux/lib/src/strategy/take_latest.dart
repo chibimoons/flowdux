@@ -23,6 +23,9 @@ class TakeLatestStrategy implements ExecutionStrategy {
   StreamSubscription<dynamic>? _currentSubscription;
   StreamController<dynamic>? _currentController;
 
+  /// Creates a [TakeLatestStrategy] that cancels previous executions.
+  TakeLatestStrategy();
+
   @override
   StrategyCategory get category => StrategyCategory.concurrency;
 
