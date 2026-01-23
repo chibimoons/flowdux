@@ -336,7 +336,7 @@ store.dispatch(ObserveUser(repositoryFlow))
 
 | Category | Strategies | Purpose |
 |----------|------------|---------|
-| **Concurrency** | `takeLatest()`, `takeLeading()`, `sequential()` | How to handle concurrent executions |
+| **Concurrency** | `takeLatest()`, `takeLeading()`, `sequential()`, `concurrent()` | How to handle concurrent executions |
 | **Timing** | `debounce(duration)`, `throttle(duration)` | When to execute |
 | **Resilience** | `retry(n)`, `retryWithBackoff(...)` | How to handle failures |
 
