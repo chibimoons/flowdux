@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- Fix LICENSE file format to standard Apache 2.0 template for pub.dev recognition
+
 ## 0.2.0
 
 - Fix LICENSE format for pub.dev OSI license recognition
