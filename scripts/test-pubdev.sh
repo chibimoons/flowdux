@@ -100,7 +100,7 @@ flutter pub publish --dry-run > /tmp/flutter-publish-check.log 2>&1 || true
 
 if grep -q "Package has 0 warnings" /tmp/flutter-publish-check.log; then
   echo "   ✅ publish 검증 통과"
-elif grep -q "path" /tmp/flutter-publish-check.log; then
+elif grep -qi "path dependency" /tmp/flutter-publish-check.log; then
   HAS_PATH_DEP_WARNING=1
   echo "   ⚠️  path dependency 경고 (배포 시 수정 필요)"
 else
