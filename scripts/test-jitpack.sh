@@ -74,12 +74,22 @@ SKIPPED_COUNT=$(grep -c "generateMetadataFileFor.*Publication SKIPPED" /tmp/jitp
 
 if [ "$SKIPPED_COUNT" -eq 0 ]; then
   echo "========================================"
-  echo "⚠️  경고: SKIPPED 태스크를 찾을 수 없습니다."
+  echo "❌ 실패: SKIPPED 태스크를 찾을 수 없습니다!"
   echo "========================================"
   echo ""
+  echo "메타데이터 생성이 실제로 SKIPPED 되었는지 검증할 수 없습니다."
   echo "빌드 로그를 확인하세요: /tmp/jitpack-test-output.log"
   echo ""
+  echo "build.gradle.kts 설정을 확인한 후 다시 실행하세요:"
+  echo ""
+  echo "  tasks.withType<GenerateModuleMetadata> {"
+  echo "      enabled = !System.getenv(\"JITPACK\").toBoolean()"
+  echo "  }"
+  echo ""
+  exit 1
 fi
+
+echo "      SKIPPED 태스크 수: $SKIPPED_COUNT"
 
 # 생성된 파일 목록
 echo "생성된 파일:"

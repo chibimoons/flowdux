@@ -118,9 +118,11 @@ tasks.withType<GenerateModuleMetadata> {
 
 | 항목 | 성공 | 실패 |
 |------|------|------|
-| `generateMetadataFileFor*` 태스크 | SKIPPED | 실행됨 |
+| `generateMetadataFileFor*` 태스크 | SKIPPED (1개 이상) | 실행됨 또는 찾을 수 없음 |
 | `.module` 파일 | 없음 | 있음 |
 | 배포 | ✅ 가능 | ❌ 금지 |
+
+**참고**: 스크립트는 SKIPPED 태스크를 찾을 수 없으면 실패로 처리합니다. 이는 메타데이터 생성이 실제로 비활성화되었는지 검증하기 위함입니다.
 
 ---
 
