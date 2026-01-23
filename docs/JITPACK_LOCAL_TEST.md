@@ -48,11 +48,11 @@ BUILD SUCCESSFUL
 ### 생성된 파일 확인
 
 ```bash
-$ ls ~/.m2/repository/io/flowdux/flowdux/1.8.0/
-flowdux-1.8.0-kotlin-tooling-metadata.json
-flowdux-1.8.0-sources.jar
-flowdux-1.8.0.jar
-flowdux-1.8.0.pom        # ✅ POM 파일만 있음
+$ ls ~/.m2/repository/io/flowdux/flowdux/X.Y.Z/
+flowdux-X.Y.Z-kotlin-tooling-metadata.json
+flowdux-X.Y.Z-sources.jar
+flowdux-X.Y.Z.jar
+flowdux-X.Y.Z.pom        # ✅ POM 파일만 있음
 ```
 
 **핵심**: `.module` 파일이 **없음**
@@ -75,12 +75,12 @@ BUILD SUCCESSFUL
 ### 생성된 파일 확인
 
 ```bash
-$ ls ~/.m2/repository/io/flowdux/flowdux/1.8.0/
-flowdux-1.8.0-kotlin-tooling-metadata.json
-flowdux-1.8.0-sources.jar
-flowdux-1.8.0.jar
-flowdux-1.8.0.module      # ❌ .module 파일이 있음 - 문제!
-flowdux-1.8.0.pom
+$ ls ~/.m2/repository/io/flowdux/flowdux/X.Y.Z/
+flowdux-X.Y.Z-kotlin-tooling-metadata.json
+flowdux-X.Y.Z-sources.jar
+flowdux-X.Y.Z.jar
+flowdux-X.Y.Z.module      # ❌ .module 파일이 있음 - 문제!
+flowdux-X.Y.Z.pom
 ```
 
 **문제**: `.module` 파일이 **존재함**
