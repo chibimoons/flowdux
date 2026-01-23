@@ -26,7 +26,7 @@ pub.dev 배포 전에 로컬에서 패키지를 검증합니다.
 1. flowdux_flutter/pubspec.yaml 수정:
    변경 전: flowdux:
              path: ../flowdux
-   변경 후: flowdux: ^0.2.1  # 현재 버전 확인
+   변경 후: flowdux: ^X.X.X  # dart/flowdux/pubspec.yaml에서 버전 확인
 
 2. 배포 (순서 중요!):
    cd dart/flowdux && dart pub publish
@@ -118,7 +118,7 @@ dependencies:
 **변경 후:**
 ```yaml
 dependencies:
-  flowdux: ^0.2.1  # 방금 배포한 버전
+  flowdux: ^X.X.X  # Step 1에서 배포한 버전
 ```
 
 ### 3. flowdux_flutter 배포

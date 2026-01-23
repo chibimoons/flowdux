@@ -131,7 +131,7 @@ if [ "$FAILED" -eq 0 ]; then
   echo "1. flowdux_flutter/pubspec.yaml 수정:"
   echo "   변경 전: flowdux:"
   echo "             path: ../flowdux"
-  echo "   변경 후: flowdux: ^0.2.1  # 현재 버전 확인"
+  echo "   변경 후: flowdux: ^X.X.X  # dart/flowdux/pubspec.yaml에서 버전 확인"
   echo ""
   echo "2. 배포 (순서 중요!):"
   echo "   cd dart/flowdux && dart pub publish"
