@@ -22,6 +22,9 @@ import 'execution_strategy.dart';
 /// }
 /// ```
 class ConcurrentStrategy implements ExecutionStrategy {
+  /// Creates a [ConcurrentStrategy] that allows concurrent executions.
+  ConcurrentStrategy();
+
   @override
   StrategyCategory get category => StrategyCategory.concurrency;
 

@@ -5,10 +5,16 @@ import 'execution_strategy.dart';
 
 /// Exception thrown when attempting to chain strategies of the same category.
 class DuplicateCategoryException implements Exception {
+  /// The conflicting strategy category.
   final StrategyCategory category;
+
+  /// The name of the first strategy with this category.
   final String firstName;
+
+  /// The name of the second strategy with this category.
   final String secondName;
 
+  /// Creates a [DuplicateCategoryException] with the conflicting details.
   DuplicateCategoryException({
     required this.category,
     required this.firstName,
@@ -38,7 +44,14 @@ class DuplicateCategoryException implements Exception {
 ///     .then(retry(3));
 /// ```
 class ChainedStrategy implements ExecutionStrategy {
+  /// The outer (first) strategy in the chain.
+  ///
+  /// This strategy wraps the [second] strategy and is executed first.
   final ExecutionStrategy first;
+
+  /// The inner (second) strategy in the chain.
+  ///
+  /// This strategy is wrapped by [first] and executed after it.
   final ExecutionStrategy second;
 
   /// Creates a chained strategy.

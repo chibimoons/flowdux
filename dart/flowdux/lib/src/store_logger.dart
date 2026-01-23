@@ -33,6 +33,9 @@ abstract class StoreLogger<S, A extends Action> {
 ///
 /// Used as the default logger when no logger is provided.
 class NoOpStoreLogger<S, A extends Action> implements StoreLogger<S, A> {
+  /// Creates a [NoOpStoreLogger] that does nothing.
+  NoOpStoreLogger();
+
   @override
   void onActionDispatched(A action) {}
 

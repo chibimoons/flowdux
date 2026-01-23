@@ -23,6 +23,8 @@ import 'dart:async';
 class AsyncLock {
   Completer<void>? _completer;
 
+  /// Creates a new [AsyncLock] instance.
+
   /// Acquires the lock, executes the function, then releases the lock.
   ///
   /// If another operation is holding the lock, this will wait until
