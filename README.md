@@ -380,6 +380,8 @@ val store = createStore(
 )
 ```
 
+> **Warning:** `DebugStoreLogger` prints full State and Action objects which may contain sensitive data (tokens, passwords, personal info). Use `NoOpStoreLogger` (default) in production.
+
 ### Time Travel Debugging
 
 ```kotlin
