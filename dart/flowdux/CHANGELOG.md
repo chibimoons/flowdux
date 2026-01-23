@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+- Fix LICENSE format for pub.dev OSI license recognition
+- Add dartdoc comments to all public API elements
+- Add example file demonstrating Store, Actions, FlowHolderAction, and strategies
+
 ## 0.1.0
 
 - Initial release
