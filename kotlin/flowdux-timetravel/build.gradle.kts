@@ -70,3 +70,11 @@ publishing {
         }
     }
 }
+
+// Disable Gradle Module Metadata for JitPack to avoid variant resolution issues
+// JitPack can't properly handle KMP's multi-platform variant metadata,
+// causing JVM consumers to fail when trying to resolve JS/WASM/iOS variants.
+// With module metadata disabled, consumers use POM files which don't have variant information.
+tasks.withType<GenerateModuleMetadata> {
+    enabled = !System.getenv("JITPACK").toBoolean()
+}
