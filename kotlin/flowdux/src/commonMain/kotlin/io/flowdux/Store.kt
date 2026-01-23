@@ -47,7 +47,7 @@ class Store<S : State, A : Action>(
 
     private fun processAction(a: A): Flow<A> = allMiddlewares
         .fold(flowOf(a)) { flow, middleware ->
-            flow.flatMapConcat { currentAction ->
+            flow.flatMapMerge { currentAction ->
                 logger.onMiddlewareProcessing(middleware.name, currentAction)
                 middleware.process(
                     getState = { currentState },

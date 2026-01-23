@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.2
+
+- Fix middleware blocking when emitting FlowHolderAction with infinite streams
+- Change middleware chain from asyncExpand to flatMap for concurrent processing
+
 ## 0.2.1
 
 - Fix LICENSE file format to standard Apache 2.0 template for pub.dev recognition

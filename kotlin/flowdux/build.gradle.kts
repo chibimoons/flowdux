@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.flowdux"
-version = "1.8.1"
+version = "1.8.2"
 
 // JitPack only publishes JVM artifacts to avoid variant resolution issues for JVM/Android consumers
 val isJitPack = System.getenv("JITPACK") == "true"
