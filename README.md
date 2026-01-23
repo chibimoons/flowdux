@@ -207,7 +207,9 @@ group(takeLatest()) {
 ---
 
 <details>
-<summary><h2>Kotlin</h2></summary>
+<summary><b>Kotlin</b></summary>
+
+## Kotlin
 
 ### Installation
 
@@ -433,7 +435,9 @@ store.history.forEach { snapshot -> ... }
 ---
 
 <details>
-<summary><h2>Dart / Flutter</h2></summary>
+<summary><b>Dart / Flutter</b></summary>
+
+## Dart / Flutter
 
 ### Installation
 
