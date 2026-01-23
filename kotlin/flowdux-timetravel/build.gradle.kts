@@ -4,26 +4,31 @@ plugins {
 }
 
 group = "io.flowdux"
-version = "1.7.0"
+version = "1.8.0"
+
+// JitPack only publishes JVM artifacts to avoid variant resolution issues for JVM/Android consumers
+val isJitPack = System.getenv("JITPACK") == "true"
 
 kotlin {
     jvm()
 
-    // iOS
-    iosX64()
-    iosArm64()
-    iosSimulatorArm64()
+    if (!isJitPack) {
+        // iOS
+        iosX64()
+        iosArm64()
+        iosSimulatorArm64()
 
-    // JavaScript
-    js(IR) {
-        browser()
-        nodejs()
-    }
+        // JavaScript
+        js(IR) {
+            browser()
+            nodejs()
+        }
 
-    // WebAssembly
-    @OptIn(org.jetbrains.kotlin.gradle.targets.js.dsl.ExperimentalWasmDsl::class)
-    wasmJs {
-        browser()
+        // WebAssembly
+        @OptIn(org.jetbrains.kotlin.gradle.targets.js.dsl.ExperimentalWasmDsl::class)
+        wasmJs {
+            browser()
+        }
     }
 
     sourceSets {
@@ -70,3 +75,4 @@ publishing {
         }
     }
 }
+
