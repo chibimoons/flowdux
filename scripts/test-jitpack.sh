@@ -30,6 +30,17 @@ JITPACK=true ./gradlew :kotlin:flowdux:publishToMavenLocal \
   -x jsTest -x wasmJsTest -x iosX64Test -x iosSimulatorArm64Test \
   --console=plain 2>&1 | tee /tmp/jitpack-test-output.log
 
+GRADLE_EXIT_CODE=${PIPESTATUS[0]}
+if [ "$GRADLE_EXIT_CODE" -ne 0 ]; then
+  echo ""
+  echo "========================================"
+  echo "❌ 실패: Gradle 빌드가 실패했습니다. (exit code: $GRADLE_EXIT_CODE)"
+  echo "========================================"
+  echo ""
+  echo "빌드 로그를 확인하세요: /tmp/jitpack-test-output.log"
+  exit "$GRADLE_EXIT_CODE"
+fi
+
 echo ""
 
 # 3. 결과 확인
