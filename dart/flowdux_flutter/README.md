@@ -1,9 +1,9 @@
 # FlowDux Flutter
 
-Flutter bindings for [FlowDux](../flowdux) state management library.
+Flutter bindings for [FlowDux](https://pub.dev/packages/flowdux) state management library.
 
 [![pub package](https://img.shields.io/pub/v/flowdux_flutter.svg)](https://pub.dev/packages/flowdux_flutter)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 ## Features
 
@@ -17,7 +17,8 @@ Flutter bindings for [FlowDux](../flowdux) state management library.
 
 ```yaml
 dependencies:
-  flowdux_flutter: ^0.1.0
+  flowdux: ^0.2.4
+  flowdux_flutter: ^0.2.4
 ```
 
 ## Quick Start
@@ -320,4 +321,4 @@ See the [API documentation](https://pub.dev/documentation/flowdux_flutter/latest
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+Apache License 2.0 - see [LICENSE](LICENSE) for details.
