@@ -60,12 +60,25 @@ class JsonMessageCodec : MessageCodec {
         }
 
         fun unescapeJson(value: String): String {
-            return value
-                .replace("\\\"", "\"")
-                .replace("\\\\", "\\")
-                .replace("\\n", "\n")
-                .replace("\\r", "\r")
-                .replace("\\t", "\t")
+            val sb = StringBuilder(value.length)
+            var i = 0
+            while (i < value.length) {
+                if (value[i] == '\\' && i + 1 < value.length) {
+                    when (value[i + 1]) {
+                        '"' -> sb.append('"')
+                        '\\' -> sb.append('\\')
+                        'n' -> sb.append('\n')
+                        'r' -> sb.append('\r')
+                        't' -> sb.append('\t')
+                        else -> { sb.append(value[i]); i++; continue }
+                    }
+                    i += 2
+                } else {
+                    sb.append(value[i])
+                    i++
+                }
+            }
+            return sb.toString()
         }
 
         fun extractJsonString(json: String, key: String): String {

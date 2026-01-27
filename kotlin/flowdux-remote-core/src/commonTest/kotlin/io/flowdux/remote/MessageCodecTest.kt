@@ -83,4 +83,28 @@ class MessageCodecTest {
         val decoded = codec.decodeActionFromClient(encoded)
         assertEquals(actionJson, decoded)
     }
+
+    @Test
+    fun `roundtrip preserves literal backslash followed by n`() {
+        val actionJson = """{"type":"SetMessage","message":"path\\name"}"""
+        val encoded = codec.encodeActionMessage(actionJson)
+        val decoded = codec.decodeActionFromClient(encoded)
+        assertEquals(actionJson, decoded)
+    }
+
+    @Test
+    fun `roundtrip preserves literal backslash followed by quote`() {
+        val actionJson = """{"type":"SetMessage","message":"say \\\"hi\\\""}"""
+        val encoded = codec.encodeActionMessage(actionJson)
+        val decoded = codec.decodeActionFromClient(encoded)
+        assertEquals(actionJson, decoded)
+    }
+
+    @Test
+    fun `roundtrip preserves newlines and tabs`() {
+        val actionJson = "{\"type\":\"SetMessage\",\"message\":\"line1\\nline2\\ttab\"}"
+        val encoded = codec.encodeActionMessage(actionJson)
+        val decoded = codec.decodeActionFromClient(encoded)
+        assertEquals(actionJson, decoded)
+    }
 }
