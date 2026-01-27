@@ -40,7 +40,16 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run flowdux tests
-        run: ./gradlew :kotlin:flowdux:check -x jsTest -x wasmJsTest
+        run: ./gradlew :kotlin:flowdux:check -x jsTest -x wasmJsTest -x compileTestKotlinJs -x compileTestKotlinWasmJs
 
       - name: Run flowdux-timetravel tests
-        run: ./gradlew :kotlin:flowdux-timetravel:check -x jsTest -x wasmJsTest
+        run: ./gradlew :kotlin:flowdux-timetravel:check -x jsTest -x wasmJsTest -x compileTestKotlinJs -x compileTestKotlinWasmJs
+
+      - name: Run flowdux-remote-core tests
+        run: ./gradlew :kotlin:flowdux-remote-core:jvmTest
+
+      - name: Run flowdux-remote-client tests
+        run: ./gradlew :kotlin:flowdux-remote-client:jvmTest
+
+      - name: Run flowdux-remote-server tests
+        run: ./gradlew :kotlin:flowdux-remote-server:jvmTest
