@@ -2,13 +2,11 @@ package io.flowdux.remote.server
 
 import io.flowdux.createStore
 import io.flowdux.remote.JsonMessageCodec
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.Test
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class ServerSessionHandlerTest {
 
     private val codec = JsonMessageCodec()
@@ -28,7 +26,6 @@ class ServerSessionHandlerTest {
                 Pair(store, collector)
             },
             actionCodec = actionCodec,
-            processingDelayMs = 50L,
         )
     }
 
@@ -96,7 +93,6 @@ class ServerSessionHandlerTest {
                 Pair(store, collector)
             },
             actionCodec = actionCodec,
-            processingDelayMs = 50L,
         )
         handler.initialize()
 

@@ -10,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -72,32 +71,35 @@ open class RemoteFlowMiddleware<S : State, A : Action>(
         scope.launch { connection.connect() }
     }
 
-    override fun process(getState: () -> S, action: A): Flow<A> {
+    override fun process(getState: () -> S, action: A): Flow<A> = flow {
         // Check if this action originated from the server (identity comparison)
         val isServerAction = removeServerOriginatedAction(action)
         if (isServerAction) {
-            return flowOf(action)
+            emit(action)
+            return@flow
         }
 
         // Non-SharedAction: pass through to local processing
         if (action !is SharedAction) {
-            return flowOf(action)
+            emit(action)
+            return@flow
         }
 
         // SharedAction: send to server, do NOT emit locally
-        return flow {
-            sendToServer(action)
-        }
+        sendToServer(action)
     }
 
-    private fun removeServerOriginatedAction(action: A): Boolean {
-        // Use identity comparison (===) to avoid data class value equality false positives
-        val idx = serverOriginatedActions.indexOfFirst { it === action }
-        if (idx >= 0) {
-            serverOriginatedActions.removeAt(idx)
-            return true
+    private suspend fun removeServerOriginatedAction(action: A): Boolean {
+        return serverActionsMutex.withLock {
+            // Use identity comparison (===) to avoid data class value equality false positives
+            val idx = serverOriginatedActions.indexOfFirst { it === action }
+            if (idx >= 0) {
+                serverOriginatedActions.removeAt(idx)
+                true
+            } else {
+                false
+            }
         }
-        return false
     }
 
     private suspend fun sendToServer(action: A) {

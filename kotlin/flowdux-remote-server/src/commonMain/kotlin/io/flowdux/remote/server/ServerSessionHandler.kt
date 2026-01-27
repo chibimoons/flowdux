@@ -6,7 +6,6 @@ import io.flowdux.Store
 import io.flowdux.remote.ActionCodec
 import io.flowdux.remote.JsonMessageCodec
 import io.flowdux.remote.MessageCodec
-import kotlinx.coroutines.delay
 
 /**
  * Handles a single client session on the server side.
@@ -39,13 +38,11 @@ import kotlinx.coroutines.delay
  * @param storeFactory Factory that creates a Store and its ResponseCollector pair.
  * @param actionCodec Codec for serializing/deserializing actions.
  * @param messageCodec Codec for wire-level message framing.
- * @param processingDelayMs Delay after dispatching to allow middleware processing.
  */
 class ServerSessionHandler<S : State, A : Action>(
     private val storeFactory: () -> Pair<Store<S, A>, ResponseCollector<S, A>>,
     private val actionCodec: ActionCodec<A>,
     private val messageCodec: MessageCodec = JsonMessageCodec(),
-    private val processingDelayMs: Long = 50L,
 ) {
     private lateinit var store: Store<S, A>
     private lateinit var collector: ResponseCollector<S, A>
@@ -72,8 +69,7 @@ class ServerSessionHandler<S : State, A : Action>(
 
         store.dispatch(action)
 
-        // Allow middleware and reducer processing to complete
-        delay(processingDelayMs)
+        collector.awaitNextReduction()
 
         val resultActions = collector.drain()
         val actionJsons = resultActions.map { actionCodec.encode(it) }
