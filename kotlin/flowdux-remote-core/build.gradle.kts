@@ -39,19 +39,13 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
-        }
-        jvmTest.dependencies {
             implementation(libs.turbine)
-            implementation(libs.junit.jupiter)
         }
     }
 
     jvm {
         compilations.all {
             kotlinOptions.jvmTarget = "17"
-        }
-        testRuns["test"].executionTask.configure {
-            useJUnitPlatform()
         }
     }
 }
