@@ -14,6 +14,4 @@ import io.flowdux.Action
  * data class IncrementAction(val amount: Int) : AppAction(), SharedAction
  * ```
  */
-interface SharedAction : Action {
-    val typeKey: String get() = this::class.simpleName ?: "Unknown"
-}
+interface SharedAction : Action
