@@ -159,6 +159,18 @@ sealed interface CounterAction : Action {
     }
 
     /**
+     * FlowHolderAction with explicit Dispatch delivery mode.
+     * Inner actions are re-dispatched through the full middleware pipeline.
+     */
+    data class DispatchDeliveryStreamAction(
+        private val valueFlow: Flow<Int>,
+    ) : CounterAction, FlowHolderAction {
+        override val delivery: FlowActionDelivery get() = FlowActionDelivery.Dispatch
+
+        override fun toFlowAction(): Flow<Action> = valueFlow.map { Add(it) }
+    }
+
+    /**
      * Action that triggers the middleware to emit multiple FlowHolderActions.
      * Used to test concurrent emission of FlowHolderActions from middleware.
      */
@@ -191,6 +203,7 @@ val counterReducer =
             is CounterAction.DebouncedStreamAction -> state
             is CounterAction.ThrottledStreamAction -> state
             is CounterAction.NestedFlowHolderAction -> state
+            is CounterAction.DispatchDeliveryStreamAction -> state
             is CounterAction.StartMultipleObservers -> state
             is CounterAction.SetupComplete -> state
         }
