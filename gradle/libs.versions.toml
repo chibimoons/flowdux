@@ -34,7 +34,6 @@ ktor-client-core-multiplatform = { module = "io.ktor:ktor-client-core", version.
 ktor-client-cio-multiplatform = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-websockets-multiplatform = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
-ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
