@@ -88,5 +88,5 @@ interface FlowHolderAction : Action {
      * Override with [FlowActionDelivery.Dispatch] to re-dispatch inner actions
      * through the full middleware pipeline.
      */
-    val delivery: FlowActionDelivery get() = FlowActionDelivery.Dispatch
+    val delivery: FlowActionDelivery get() = FlowActionDelivery.Emit
 }
