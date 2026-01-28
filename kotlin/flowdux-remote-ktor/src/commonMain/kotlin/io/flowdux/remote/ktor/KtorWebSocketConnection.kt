@@ -29,8 +29,21 @@ import kotlinx.coroutines.launch
 class KtorWebSocketConnection(
     private val url: String,
     private val scope: CoroutineScope,
-    private val httpClient: HttpClient = createDefaultHttpClient(),
+    httpClient: HttpClient? = null,
 ) : RemoteConnection {
+
+    private val httpClient: HttpClient
+    private val isClientOwned: Boolean
+
+    init {
+        if (httpClient != null) {
+            this.httpClient = httpClient
+            this.isClientOwned = false
+        } else {
+            this.httpClient = createDefaultHttpClient()
+            this.isClientOwned = true
+        }
+    }
 
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     override val connectionState: StateFlow<ConnectionState> = _connectionState
@@ -39,8 +52,6 @@ class KtorWebSocketConnection(
     override val incoming: Flow<String> = incomingChannel.receiveAsFlow()
 
     private val outgoingChannel = Channel<String>(Channel.UNLIMITED)
-
-    private var isClientOwned = false
 
     override suspend fun send(message: String) {
         if (_connectionState.value != ConnectionState.CONNECTED) {
