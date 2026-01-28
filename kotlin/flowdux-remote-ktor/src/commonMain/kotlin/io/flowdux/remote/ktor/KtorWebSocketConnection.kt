@@ -43,6 +43,9 @@ class KtorWebSocketConnection(
     private var isClientOwned = false
 
     override suspend fun send(message: String) {
+        if (_connectionState.value != ConnectionState.CONNECTED) {
+            throw IllegalStateException("Cannot send message: WebSocket is not connected")
+        }
         outgoingChannel.send(message)
     }
 
