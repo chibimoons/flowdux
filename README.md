@@ -313,6 +313,34 @@ store.dispatch(ObserveUser(repositoryFlow))       // Store collects it
 // State updates: cached user -> fresh user from API
 ```
 
+#### Delivery Mode
+
+By default, inner actions emitted by `FlowHolderAction` go directly to the reducer, bypassing user middlewares (`Emit` mode). Override `delivery` to re-dispatch inner actions through the full middleware pipeline:
+
+```kotlin
+// Default: Emit - inner actions bypass middlewares (efficient)
+data class ObserveUser(
+    private val userFlow: Flow<User>
+) : UserAction, FlowHolderAction {
+    override fun toFlowAction(): Flow<Action> =
+        userFlow.map { SetUser(it) }
+}
+
+// Dispatch - inner actions pass through full middleware pipeline
+data class ObserveUserWithLogging(
+    private val userFlow: Flow<User>
+) : UserAction, FlowHolderAction {
+    override val delivery get() = FlowActionDelivery.Dispatch
+    override fun toFlowAction(): Flow<Action> =
+        userFlow.map { SetUser(it) }
+}
+```
+
+| Mode | Behavior | Use Case |
+|------|----------|----------|
+| `Emit` (default) | Inner actions go directly to reducer | Most cases, best performance |
+| `Dispatch` | Inner actions pass through all middlewares | When middlewares need to observe/process inner actions |
+
 ## Execution Strategies
 
 FlowDux provides execution strategies to control how concurrent actions are processed in middleware.

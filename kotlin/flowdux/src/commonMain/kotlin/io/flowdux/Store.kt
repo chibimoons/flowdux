@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
-import kotlinx.coroutines.flow.flatMapConcat
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -22,20 +21,16 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class Store<S : State, A : Action>(
+class Store<S : State, A : Action> internal constructor(
     initialState: S,
     private val reducer: Reducer<S, A>,
-    middlewares: List<Middleware<S, A>>,
+    private val middlewares: List<Middleware<S, A>>,
     private val errorProcessor: ErrorProcessor<A>,
     private val logger: StoreLogger<S, A>,
     private val scope: CoroutineScope,
 ) {
     private val actionFlow = Channel<A>()
     private var _isClosed = false
-
-    /** All middlewares including the internal FlowHolderMiddleware at the end. */
-    private val allMiddlewares: List<Middleware<S, A>> =
-        middlewares + FlowHolderMiddleware(logger)
 
     val isClosed: Boolean get() = _isClosed
 
@@ -45,7 +40,7 @@ class Store<S : State, A : Action>(
         .map { reduceAction(state.value, it) }
         .stateIn(scope, SharingStarted.Eagerly, initialState)
 
-    private fun processAction(a: A): Flow<A> = allMiddlewares
+    private fun processAction(a: A): Flow<A> = middlewares
         .fold(flowOf(a)) { flow, middleware ->
             flow.flatMapMerge { currentAction ->
                 logger.onMiddlewareProcessing(middleware.name, currentAction)
@@ -77,7 +72,7 @@ class Store<S : State, A : Action>(
             try {
                 logger.onActionDispatched(action)
                 actionFlow.send(action)
-            } catch (e: ClosedSendChannelException) {
+            } catch (_: ClosedSendChannelException) {
                 // Race condition: close() called between isClosed check and send
                 logger.onDispatchAfterClose(action)
             }
@@ -105,12 +100,17 @@ fun <S : State, A : Action> createStore(
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
     logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-): Store<S, A> =
-    Store(
+): Store<S, A> {
+    lateinit var store: Store<S, A>
+    val allMiddlewares = middlewares +
+        FlowHolderMiddleware<S, A>(logger, dispatch = { store.dispatch(it) })
+    store = Store(
         initialState = initialState,
         reducer = reducer,
-        middlewares = middlewares,
+        middlewares = allMiddlewares,
         errorProcessor = errorProcessor,
         logger = logger,
         scope = scope,
     )
+    return store
+}
