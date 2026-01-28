@@ -61,6 +61,8 @@ internal class FlowHolderMiddleware<S : State, A : Action>(
             FlowActionDelivery.Dispatch -> flow<A> {
                 wrapped.invoke(this, getState(), action)
             }.onEach { innerAction ->
+                // Re-dispatch through full pipeline; nested FlowHolderActions
+                // will be processed when they reach this middleware again
                 dispatch(innerAction)
             }.transform {
                 // Don't emit anything; all inner actions are re-dispatched
