@@ -12,6 +12,7 @@ application {
 
 dependencies {
     implementation(project(":kotlin:flowdux"))
+    implementation(project(":kotlin:flowdux-remote-core"))
     implementation(libs.kotlinx.coroutines.core)
 }
 

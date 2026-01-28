@@ -12,7 +12,14 @@ fun main() = runBlocking {
         targetTickRate = 60,
     )
 
-    val benchmark = FlowDuxBenchmark(config)
-    val summary = benchmark.runAll()
-    summary.print()
+    // Store benchmarks
+    val storeBenchmark = FlowDuxBenchmark(config)
+    val storeSummary = storeBenchmark.runAll()
+    storeSummary.print()
+
+    // Serialization benchmarks
+    val serializationBenchmark = SerializationBenchmark(config)
+    serializationBenchmark.printPayloadSizes()
+    val serializationResults = serializationBenchmark.runAll()
+    BenchmarkSummary(serializationResults).print()
 }
