@@ -3,6 +3,9 @@
 build/
 kotlin-js-store/
 
+# Kotlin metadata cache
+.kotlin/
+
 # IDE
 .idea/
 *.iml

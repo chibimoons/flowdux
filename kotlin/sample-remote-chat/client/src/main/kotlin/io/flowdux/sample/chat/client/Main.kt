@@ -25,8 +25,6 @@ fun main() = runBlocking {
         middlewares = listOf(middleware),
         scope = scope,
     )
-    middleware.store = store
-
     // Observe state changes
     val collectorJob = launch {
         store.state.collect { state ->

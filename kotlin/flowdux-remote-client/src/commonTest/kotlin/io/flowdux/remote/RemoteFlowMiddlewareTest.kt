@@ -18,7 +18,7 @@ class RemoteFlowMiddlewareTest {
     @Test
     fun `SharedAction is intercepted and sent to server`() = runTest {
         val connection = MockRemoteConnection()
-        val middleware = RemoteFlowMiddleware<TestState, TestAction>(
+        val middleware = TestRemoteFlowMiddleware(
             connection = connection,
             actionCodec = actionCodec,
             scope = backgroundScope,
@@ -32,11 +32,11 @@ class RemoteFlowMiddlewareTest {
             scope = backgroundScope,
         )
 
-        middleware.connectTo(store)
-        delay(50) // allow connection to establish
-
         store.state.test {
             assertEquals(TestState(), awaitItem()) // initial state
+
+            store.dispatch(TestAction.Connect)
+            delay(100) // allow connection to establish and listener to start
 
             store.dispatch(TestAction.ServerAdd(5))
             delay(100) // wait for send
@@ -55,7 +55,7 @@ class RemoteFlowMiddlewareTest {
     @Test
     fun `non-SharedAction passes through to local reducer`() = runTest {
         val connection = MockRemoteConnection()
-        val middleware = RemoteFlowMiddleware<TestState, TestAction>(
+        val middleware = TestRemoteFlowMiddleware(
             connection = connection,
             actionCodec = actionCodec,
             scope = backgroundScope,
@@ -69,11 +69,11 @@ class RemoteFlowMiddlewareTest {
             scope = backgroundScope,
         )
 
-        middleware.connectTo(store)
-        delay(50)
-
         store.state.test {
             assertEquals(TestState(), awaitItem())
+
+            store.dispatch(TestAction.Connect)
+            delay(100)
 
             store.dispatch(TestAction.LocalIncrement)
             assertEquals(TestState(count = 1), awaitItem())
@@ -91,7 +91,7 @@ class RemoteFlowMiddlewareTest {
     @Test
     fun `server response actions are dispatched to local store`() = runTest {
         val connection = MockRemoteConnection()
-        val middleware = RemoteFlowMiddleware<TestState, TestAction>(
+        val middleware = TestRemoteFlowMiddleware(
             connection = connection,
             actionCodec = actionCodec,
             scope = backgroundScope,
@@ -105,13 +105,13 @@ class RemoteFlowMiddlewareTest {
             scope = backgroundScope,
         )
 
-        middleware.connectTo(store)
-        delay(50)
-
         store.state.test {
             assertEquals(TestState(), awaitItem())
 
-            // Simulate server sending a response with an Add action
+            store.dispatch(TestAction.Connect)
+            delay(100)
+
+            // Simulate server sending a response with an Add action (non-SharedAction)
             val serverResponse = messageCodec.encodeServerResponse(
                 actions = listOf("""{"type":"Add","value":42}"""),
             )
@@ -124,9 +124,9 @@ class RemoteFlowMiddlewareTest {
     }
 
     @Test
-    fun `server-originated actions are not re-sent to server`() = runTest {
+    fun `non-SharedAction server responses pass through without being sent to server`() = runTest {
         val connection = MockRemoteConnection()
-        val middleware = RemoteFlowMiddleware<TestState, TestAction>(
+        val middleware = TestRemoteFlowMiddleware(
             connection = connection,
             actionCodec = actionCodec,
             scope = backgroundScope,
@@ -140,21 +140,21 @@ class RemoteFlowMiddlewareTest {
             scope = backgroundScope,
         )
 
-        middleware.connectTo(store)
-        delay(50)
-
         store.state.test {
             assertEquals(TestState(), awaitItem())
 
-            // Simulate server sending a SharedAction type back
+            store.dispatch(TestAction.Connect)
+            delay(100)
+
+            // Simulate server sending a non-SharedAction response
             val serverResponse = messageCodec.encodeServerResponse(
-                actions = listOf("""{"type":"ServerAdd","value":10}"""),
+                actions = listOf("""{"type":"Add","value":10}"""),
             )
             connection.simulateServerMessage(serverResponse)
 
             assertEquals(TestState(count = 10), awaitItem())
 
-            // The server-originated ServerAdd should NOT have been sent back to server
+            // Non-SharedAction server responses should NOT be sent to server
             assertEquals(0, connection.sentMessages.size)
 
             cancelAndIgnoreRemainingEvents()
@@ -164,7 +164,7 @@ class RemoteFlowMiddlewareTest {
     @Test
     fun `multiple server response actions are all dispatched`() = runTest {
         val connection = MockRemoteConnection()
-        val middleware = RemoteFlowMiddleware<TestState, TestAction>(
+        val middleware = TestRemoteFlowMiddleware(
             connection = connection,
             actionCodec = actionCodec,
             scope = backgroundScope,
@@ -178,11 +178,11 @@ class RemoteFlowMiddlewareTest {
             scope = backgroundScope,
         )
 
-        middleware.connectTo(store)
-        delay(50)
-
         store.state.test {
             assertEquals(TestState(), awaitItem())
+
+            store.dispatch(TestAction.Connect)
+            delay(100)
 
             val serverResponse = messageCodec.encodeServerResponse(
                 actions = listOf(
@@ -200,94 +200,6 @@ class RemoteFlowMiddlewareTest {
             }
             assertEquals(30, lastState.count)
             assertEquals("done", lastState.message)
-
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `actions are buffered while disconnected`() = runTest {
-        val connection = MockRemoteConnection(autoConnect = false)
-
-        val middleware = RemoteFlowMiddleware<TestState, TestAction>(
-            connection = connection,
-            actionCodec = actionCodec,
-            config = RemoteFlowConfig(bufferWhileDisconnected = true),
-            scope = backgroundScope,
-        )
-
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
-
-        middleware.connectTo(store)
-        delay(50)
-
-        store.state.test {
-            assertEquals(TestState(), awaitItem())
-
-            // Dispatch while disconnected - should buffer
-            store.dispatch(TestAction.ServerAdd(5))
-            delay(100)
-
-            // No message sent since disconnected
-            assertEquals(0, connection.sentMessages.size)
-
-            // Simulate reconnection
-            connection.setConnectionState(ConnectionState.CONNECTED)
-            delay(100)
-
-            // Buffer should have been flushed
-            assertEquals(1, connection.sentMessages.size)
-            assertTrue(connection.sentMessages[0].contains("ServerAdd"))
-
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun `buffer respects max size`() = runTest {
-        val connection = MockRemoteConnection(autoConnect = false)
-
-        val middleware = RemoteFlowMiddleware<TestState, TestAction>(
-            connection = connection,
-            actionCodec = actionCodec,
-            config = RemoteFlowConfig(bufferWhileDisconnected = true, maxBufferSize = 2),
-            scope = backgroundScope,
-        )
-
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
-
-        middleware.connectTo(store)
-        delay(50)
-
-        store.state.test {
-            assertEquals(TestState(), awaitItem())
-
-            // Send 3 actions while disconnected, buffer max is 2
-            store.dispatch(TestAction.ServerAdd(1))
-            delay(50)
-            store.dispatch(TestAction.ServerAdd(2))
-            delay(50)
-            store.dispatch(TestAction.ServerAdd(3))
-            delay(50)
-
-            // Reconnect
-            connection.setConnectionState(ConnectionState.CONNECTED)
-            delay(100)
-
-            // Only 2 messages should be flushed (oldest dropped)
-            assertEquals(2, connection.sentMessages.size)
 
             cancelAndIgnoreRemainingEvents()
         }

@@ -2,43 +2,57 @@ package io.flowdux.remote
 
 import io.flowdux.Action
 import io.flowdux.ActionProcessorMap
+import io.flowdux.ExecutionStrategy
+import io.flowdux.FlowActionDelivery
+import io.flowdux.FlowHolderAction
 import io.flowdux.Middleware
 import io.flowdux.State
-import io.flowdux.Store
+import io.flowdux.concurrent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
  * Middleware that intercepts [SharedAction]s and sends them to a remote server,
- * then dispatches server responses back into the local store.
+ * and listens for server responses via a [FlowHolderAction]-based server listener.
  *
  * Data flow:
  * ```
  * dispatch(SharedAction) → middleware intercepts → serialize & send via connection
  *                        → NOT emitted locally
  *
- * Server response received → deserialize actions → dispatch to local store
+ * startConnection() → emits ServerListenerAction (FlowHolderAction)
+ *   → FlowHolderMiddleware resolves → listens for server messages
+ *   → server actions dispatched through full middleware pipeline
  * ```
  *
- * Non-[SharedAction] actions pass through unmodified.
+ * Non-[SharedAction] actions pass through unmodified, unless a processor is registered.
+ *
+ * Server response actions must NOT implement [SharedAction] to avoid
+ * being re-sent to the server when dispatched through the pipeline.
+ *
+ * Subclasses should override [processors] to handle specific actions:
+ * ```kotlin
+ * override val processors = buildProcessors {
+ *     on<ConnectAction> { _, _ -> startConnection() }
+ *     on<DisconnectAction> { _, _ -> stopConnection() }
+ * }
+ * ```
  *
  * @param connection The transport layer for communicating with the server.
  * @param actionCodec Codec for serializing/deserializing actions.
  * @param messageCodec Codec for wire-level message framing. Defaults to [JsonMessageCodec].
- * @param config Configuration options.
- * @param scope Coroutine scope for background tasks (connection listening, buffer flushing).
+ * @param scope Coroutine scope for background tasks.
  */
 open class RemoteFlowMiddleware<S : State, A : Action>(
     private val connection: RemoteConnection,
     private val actionCodec: ActionCodec<A>,
     private val messageCodec: MessageCodec = JsonMessageCodec(),
-    private val config: RemoteFlowConfig = RemoteFlowConfig(),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : Middleware<S, A> {
 
@@ -46,115 +60,61 @@ open class RemoteFlowMiddleware<S : State, A : Action>(
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     /**
-     * Tracks actions that originated from the server to prevent re-sending them.
-     * Uses identity (===) comparison to avoid false positives with data class value equality.
+     * Start the remote connection and emit a server listener [FlowHolderAction].
+     *
+     * Call this from within a processor to start listening for server messages.
+     * The emitted FlowHolderAction uses [FlowActionDelivery.Dispatch] delivery,
+     * so server actions are dispatched through the full middleware pipeline.
      */
-    private val serverOriginatedActions = mutableListOf<A>()
-    private val serverActionsMutex = Mutex()
-
-    private val buffer = mutableListOf<String>()
-    private val bufferMutex = Mutex()
-
-    private var dispatchToStore: ((A) -> Unit)? = null
+    @Suppress("UNCHECKED_CAST")
+    protected suspend fun FlowCollector<A>.startConnection() {
+        scope.launch { connection.connect() }
+        emit(ServerListenerAction() as A)
+    }
 
     /**
-     * Bind the middleware to a store and start the server connection.
+     * Stop the remote connection.
      *
-     * This must be called after the store is created. It starts listening
-     * for server messages and initiates the connection.
-     *
-     * @param store The store to dispatch server-originated actions to.
+     * Call this from within a processor to disconnect from the server.
      */
-    fun connectTo(store: Store<S, A>) {
-        dispatchToStore = store::dispatch
-        startServerListener()
-        scope.launch { connection.connect() }
+    protected suspend fun stopConnection() {
+        connection.disconnect()
     }
 
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
-        // Check if this action originated from the server (identity comparison)
-        val isServerAction = removeServerOriginatedAction(action)
-        if (isServerAction) {
-            emit(action)
+        // 1. SharedAction: send to server, do NOT emit locally
+        if (action is SharedAction) {
+            sendToServer(action)
             return@flow
         }
 
-        // Non-SharedAction: pass through to local processing
-        if (action !is SharedAction) {
-            emit(action)
+        // 2. Check processors for local action handling
+        val processor = processors[action::class]
+        if (processor != null) {
+            processor.invoke(this, getState(), action)
             return@flow
         }
 
-        // SharedAction: send to server, do NOT emit locally
-        sendToServer(action)
-    }
-
-    private suspend fun removeServerOriginatedAction(action: A): Boolean {
-        return serverActionsMutex.withLock {
-            // Use identity comparison (===) to avoid data class value equality false positives
-            val idx = serverOriginatedActions.indexOfFirst { it === action }
-            if (idx >= 0) {
-                serverOriginatedActions.removeAt(idx)
-                true
-            } else {
-                false
-            }
-        }
+        // 3. Pass through unhandled actions
+        emit(action)
     }
 
     private suspend fun sendToServer(action: A) {
         val actionJson = actionCodec.encode(action)
         val message = messageCodec.encodeActionMessage(actionJson)
-
-        if (connection.connectionState.value == ConnectionState.CONNECTED) {
-            connection.send(message)
-        } else if (config.bufferWhileDisconnected) {
-            bufferMutex.withLock {
-                if (buffer.size >= config.maxBufferSize) {
-                    buffer.removeAt(0)
-                }
-                buffer.add(message)
-            }
-        }
+        connection.send(message)
     }
 
-    private fun startServerListener() {
-        // Listen for incoming server messages
-        scope.launch {
-            connection.incoming.collect { raw ->
-                handleServerMessage(raw)
-            }
-        }
-        // Flush buffer on reconnection
-        scope.launch {
-            connection.connectionState.collect { state ->
-                if (state == ConnectionState.CONNECTED) {
-                    flushBuffer()
-                }
-            }
-        }
-    }
+    @Suppress("UNCHECKED_CAST")
+    private inner class ServerListenerAction : FlowHolderAction {
+        override val delivery: FlowActionDelivery get() = FlowActionDelivery.Dispatch
+        override val strategy: ExecutionStrategy get() = concurrent()
 
-    private suspend fun handleServerMessage(raw: String) {
-        val response = messageCodec.decodeServerMessage(raw)
-
-        for (actionJson in response.actions) {
-            val action = actionCodec.decode(actionJson)
-            serverActionsMutex.withLock {
-                serverOriginatedActions.add(action)
+        override fun toFlowAction(): Flow<Action> = connection.incoming.transform { raw ->
+            val response = messageCodec.decodeServerMessage(raw)
+            for (actionJson in response.actions) {
+                emit(actionCodec.decode(actionJson) as Action)
             }
-            dispatchToStore?.invoke(action)
-        }
-    }
-
-    private suspend fun flushBuffer() {
-        val messages = bufferMutex.withLock {
-            val copy = buffer.toList()
-            buffer.clear()
-            copy
-        }
-        for (message in messages) {
-            connection.send(message)
         }
     }
 }

@@ -1,9 +1,12 @@
 package io.flowdux.remote
 
 import io.flowdux.Action
+import io.flowdux.ActionProcessorMap
 import io.flowdux.ErrorProcessor
+import io.flowdux.Middleware
 import io.flowdux.Reducer
 import io.flowdux.State
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +25,7 @@ sealed interface TestAction : Action {
     data class ServerAdd(val value: Int) : TestAction, SharedAction
     data class ServerSetMessage(val message: String) : TestAction, SharedAction
     object LocalIncrement : TestAction
+    object Connect : TestAction
 }
 
 val testReducer = Reducer<TestState, TestAction> { state, action ->
@@ -31,6 +35,7 @@ val testReducer = Reducer<TestState, TestAction> { state, action ->
         is TestAction.ServerAdd -> state.copy(count = state.count + action.value)
         is TestAction.ServerSetMessage -> state.copy(message = action.message)
         is TestAction.LocalIncrement -> state.copy(count = state.count + 1)
+        is TestAction.Connect -> state
     }
 }
 
@@ -48,6 +53,7 @@ class TestActionCodec : ActionCodec<TestAction> {
             is TestAction.ServerAdd -> """{"type":"ServerAdd","value":${action.value}}"""
             is TestAction.ServerSetMessage -> """{"type":"ServerSetMessage","message":"${action.message}"}"""
             is TestAction.LocalIncrement -> """{"type":"LocalIncrement"}"""
+            is TestAction.Connect -> """{"type":"Connect"}"""
         }
     }
 
@@ -70,7 +76,28 @@ class TestActionCodec : ActionCodec<TestAction> {
                 TestAction.ServerSetMessage(message)
             }
             json.contains("\"type\":\"LocalIncrement\"") -> TestAction.LocalIncrement
+            json.contains("\"type\":\"Connect\"") -> TestAction.Connect
             else -> throw IllegalArgumentException("Unknown action JSON: $json")
+        }
+    }
+}
+
+// -- Test RemoteFlowMiddleware subclass --
+
+class TestRemoteFlowMiddleware(
+    connection: RemoteConnection,
+    actionCodec: ActionCodec<TestAction>,
+    messageCodec: MessageCodec = JsonMessageCodec(),
+    scope: CoroutineScope,
+) : RemoteFlowMiddleware<TestState, TestAction>(
+    connection = connection,
+    actionCodec = actionCodec,
+    messageCodec = messageCodec,
+    scope = scope,
+) {
+    override val processors: ActionProcessorMap<TestState, TestAction> = buildProcessors {
+        on<TestAction.Connect> { _, _ ->
+            startConnection()
         }
     }
 }
