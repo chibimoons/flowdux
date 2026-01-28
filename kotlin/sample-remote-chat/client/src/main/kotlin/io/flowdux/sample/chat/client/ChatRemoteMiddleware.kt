@@ -1,16 +1,17 @@
 package io.flowdux.sample.chat.client
 
 import io.flowdux.ActionProcessorMap
+import io.flowdux.remote.RemoteConnection
 import io.flowdux.remote.RemoteFlowMiddleware
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatState
 import kotlinx.coroutines.CoroutineScope
 
 class ChatRemoteMiddleware(
-    wsConnection: WebSocketConnection,
+    connection: RemoteConnection,
     scope: CoroutineScope,
 ) : RemoteFlowMiddleware<ChatState, ChatAction>(
-    connection = wsConnection,
+    connection = connection,
     actionCodec = io.flowdux.sample.chat.ChatActionCodec(),
     scope = scope,
 ) {

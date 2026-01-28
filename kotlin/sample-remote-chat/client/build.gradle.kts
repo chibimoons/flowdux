@@ -15,8 +15,6 @@ dependencies {
     implementation(project(":kotlin:flowdux"))
     implementation(project(":kotlin:flowdux-remote-core"))
     implementation(project(":kotlin:flowdux-remote-client"))
+    implementation(project(":kotlin:flowdux-remote-ktor"))
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.cio)
-    implementation(libs.ktor.client.websockets)
 }
