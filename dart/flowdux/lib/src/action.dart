@@ -7,6 +7,20 @@ import 'strategy/take_latest.dart';
 /// Actions should be immutable.
 abstract class Action {}
 
+/// Determines how inner actions emitted by a [FlowHolderAction] are delivered.
+///
+/// - [emit]: Inner actions bypass user middlewares and go directly to the reducer.
+///   This is the default and most efficient delivery mode.
+/// - [dispatch]: Inner actions are re-dispatched through the entire middleware pipeline,
+///   allowing user middlewares to observe and process them.
+enum FlowActionDelivery {
+  /// Inner actions go directly to the reducer, bypassing user middlewares.
+  emit,
+
+  /// Inner actions are re-dispatched through the full middleware pipeline.
+  dispatch,
+}
+
 /// Action that emits multiple actions via a Stream.
 ///
 /// When dispatched, the Store automatically subscribes to the Stream
@@ -47,6 +61,17 @@ abstract class Action {}
 /// ```
 /// Use `with FlowHolderAction` to inherit the default [strategy] value,
 /// or `implements FlowHolderAction` and provide your own implementation.
+///
+/// Example with Dispatch delivery (inner actions pass through middlewares):
+/// ```dart
+/// class DispatchedStreamAction with FlowHolderAction {
+///   @override
+///   FlowActionDelivery get delivery => FlowActionDelivery.dispatch;
+///
+///   @override
+///   Stream<Action> toStreamAction() async* { ... }
+/// }
+/// ```
 abstract mixin class FlowHolderAction implements Action {
   /// Returns a Stream of actions to be dispatched.
   Stream<Action> toStreamAction();
@@ -56,4 +81,13 @@ abstract mixin class FlowHolderAction implements Action {
   /// Default is [TakeLatestStrategy]. Override to use a different strategy.
   /// Use [concurrent()] to allow multiple streams to run simultaneously.
   ExecutionStrategy get strategy => TakeLatestStrategy();
+
+  /// Delivery mode for inner actions emitted by this FlowHolderAction.
+  ///
+  /// Default is [FlowActionDelivery.emit], which sends inner actions directly
+  /// to the reducer, bypassing user middlewares.
+  ///
+  /// Override with [FlowActionDelivery.dispatch] to re-dispatch inner actions
+  /// through the full middleware pipeline.
+  FlowActionDelivery get delivery => FlowActionDelivery.emit;
 }
