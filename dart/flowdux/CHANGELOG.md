@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Add `FlowActionDelivery` enum for `FlowHolderAction` delivery mode
+- `emit` (default): Inner actions bypass user middlewares, go directly to reducer
+- `dispatch`: Inner actions are re-dispatched through full middleware pipeline
+
 ## 0.2.3
 
 - Add distinct() to state stream to filter consecutive identical states

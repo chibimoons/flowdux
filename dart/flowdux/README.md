@@ -59,6 +59,38 @@ store.state.listen((state) {
 store.dispatch(Increment());
 ```
 
+## FlowHolderAction
+
+Wrap existing Streams and convert them to Actions:
+
+```dart
+// Default: emit - inner actions bypass middlewares (efficient)
+class ObserveUser with FlowHolderAction {
+  final Stream<User> userStream;
+  ObserveUser(this.userStream);
+
+  @override
+  Stream<Action> toStreamAction() => userStream.map(SetUser.new);
+}
+
+// Dispatch - inner actions pass through full middleware pipeline
+class ObserveUserWithLogging with FlowHolderAction {
+  final Stream<User> userStream;
+  ObserveUserWithLogging(this.userStream);
+
+  @override
+  FlowActionDelivery get delivery => FlowActionDelivery.dispatch;
+
+  @override
+  Stream<Action> toStreamAction() => userStream.map(SetUser.new);
+}
+```
+
+| Mode | Behavior | Use Case |
+|------|----------|----------|
+| `emit` (default) | Inner actions go directly to reducer | Most cases, best performance |
+| `dispatch` | Inner actions pass through all middlewares | When middlewares need to observe inner actions |
+
 ## Middleware with Execution Strategies
 
 ```dart
