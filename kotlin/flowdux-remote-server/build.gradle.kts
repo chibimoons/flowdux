@@ -24,7 +24,11 @@ kotlin {
 
     jvm {
         compilations.all {
-            kotlinOptions.jvmTarget = "17"
+            compileTaskProvider.configure {
+                compilerOptions {
+                    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                }
+            }
         }
     }
 }
