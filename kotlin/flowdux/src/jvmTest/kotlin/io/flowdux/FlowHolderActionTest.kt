@@ -308,6 +308,120 @@ class FlowHolderActionTest {
             }
         }
 
+    // ============= Delivery Tests =============
+
+    @Test
+    fun `default Dispatch delivery sends inner actions through full middleware pipeline`() =
+        runTest {
+            val middlewareProcessedActions = mutableListOf<Action>()
+
+            val trackingMiddleware = object : Middleware<CounterState, CounterAction> {
+                override val name = "TrackingMiddleware"
+                override val processors: ActionProcessorMap<CounterState, CounterAction> = emptyMap()
+
+                override fun process(
+                    getState: () -> CounterState,
+                    action: CounterAction,
+                ): kotlinx.coroutines.flow.Flow<CounterAction> {
+                    middlewareProcessedActions.add(action)
+                    return kotlinx.coroutines.flow.flowOf(action)
+                }
+            }
+
+            val valueChannel = Channel<Int>(Channel.UNLIMITED)
+
+            val store = createStore(
+                initialState = CounterState(),
+                middlewares = listOf(trackingMiddleware),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // StreamConnected uses default delivery (Dispatch)
+                store.dispatch(CounterAction.StreamConnected(valueChannel.receiveAsFlow()))
+
+                valueChannel.send(5)
+                assertEquals(5, awaitItem().count)
+
+                valueChannel.send(3)
+                assertEquals(8, awaitItem().count)
+
+                valueChannel.close()
+
+                // Inner Add actions should pass through the tracking middleware
+                val innerActionsInMiddleware = middlewareProcessedActions.filterIsInstance<CounterAction.Add>()
+                assertTrue(
+                    innerActionsInMiddleware.isNotEmpty(),
+                    "Default Dispatch delivery should send inner actions through middlewares"
+                )
+                assertEquals(
+                    listOf(CounterAction.Add(5), CounterAction.Add(3)),
+                    innerActionsInMiddleware,
+                    "Expected Add(5) and Add(3) to pass through middleware"
+                )
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `explicit Emit delivery bypasses user middlewares`() =
+        runTest {
+            val middlewareProcessedActions = mutableListOf<Action>()
+
+            val trackingMiddleware = object : Middleware<CounterState, CounterAction> {
+                override val name = "TrackingMiddleware"
+                override val processors: ActionProcessorMap<CounterState, CounterAction> = emptyMap()
+
+                override fun process(
+                    getState: () -> CounterState,
+                    action: CounterAction,
+                ): kotlinx.coroutines.flow.Flow<CounterAction> {
+                    middlewareProcessedActions.add(action)
+                    return kotlinx.coroutines.flow.flowOf(action)
+                }
+            }
+
+            val valueChannel = Channel<Int>(Channel.UNLIMITED)
+
+            val store = createStore(
+                initialState = CounterState(),
+                middlewares = listOf(trackingMiddleware),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
+
+            store.state.test {
+                assertEquals(0, awaitItem().count)
+
+                // EmitDeliveryStreamAction uses explicit Emit delivery
+                store.dispatch(CounterAction.EmitDeliveryStreamAction(valueChannel.receiveAsFlow()))
+
+                valueChannel.send(5)
+                assertEquals(5, awaitItem().count)
+
+                valueChannel.send(3)
+                assertEquals(8, awaitItem().count)
+
+                valueChannel.close()
+
+                // EmitDeliveryStreamAction itself passes through the middleware,
+                // but inner Add actions should NOT appear in the tracking middleware
+                val innerActionsInMiddleware = middlewareProcessedActions.filterIsInstance<CounterAction.Add>()
+                assertTrue(
+                    innerActionsInMiddleware.isEmpty(),
+                    "Emit delivery should bypass user middlewares, but found inner actions: $innerActionsInMiddleware"
+                )
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
     // ============= Strategy-based Tests =============
 
     @Test

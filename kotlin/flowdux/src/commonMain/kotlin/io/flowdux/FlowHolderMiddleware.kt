@@ -20,9 +20,13 @@ import kotlin.reflect.KClass
  * For nested FlowHolderActions (a FlowHolderAction that emits another FlowHolderAction),
  * processing is done recursively within this middleware, not re-dispatched through
  * the entire middleware chain.
+ *
+ * @param dispatch function to re-dispatch actions through the full Store pipeline.
+ *   Used when a FlowHolderAction has [FlowActionDelivery.Dispatch] delivery mode.
  */
 internal class FlowHolderMiddleware<S : State, A : Action>(
     private val logger: StoreLogger<S, A>,
+    private val dispatch: (A) -> Unit,
 ) : Middleware<S, A> {
 
     override val name: String = "FlowHolderMiddleware"
@@ -42,14 +46,24 @@ internal class FlowHolderMiddleware<S : State, A : Action>(
 
         val wrapped = getOrCreateWrappedProcessor(action)
 
-        return flow {
-            wrapped.invoke(this, getState(), action)
-        }.transform { innerAction ->
-            if (innerAction is FlowHolderAction) {
-                // Recursive processing for nested FlowHolderActions
-                emitAll(process(getState, innerAction as A))
-            } else {
-                emit(innerAction)
+        return when (action.delivery) {
+            FlowActionDelivery.Emit -> flow {
+                wrapped.invoke(this, getState(), action)
+            }.transform { innerAction ->
+                if (innerAction is FlowHolderAction) {
+                    // Recursive processing for nested FlowHolderActions
+                    emitAll(process(getState, innerAction as A))
+                } else {
+                    emit(innerAction)
+                }
+            }
+
+            FlowActionDelivery.Dispatch -> flow<A> {
+                wrapped.invoke(this, getState(), action)
+            }.onEach { innerAction ->
+                dispatch(innerAction)
+            }.transform {
+                // Don't emit anything; all inner actions are re-dispatched
             }
         }
     }
