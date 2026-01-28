@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'action.dart';
 import 'middleware.dart';
 import 'store_logger.dart';
@@ -10,14 +12,20 @@ import 'strategy/execution_strategy.dart';
 /// - Applying the action's [ExecutionStrategy]
 /// - Recursive processing of nested FlowHolderActions
 /// - Logging of emitted actions
+///
+/// The [dispatch] function is used when a FlowHolderAction has
+/// [FlowActionDelivery.dispatch] delivery mode.
 class FlowHolderMiddleware<S, A extends Action> extends Middleware<S, A> {
   final StoreLogger<S, A> _logger;
+  final void Function(A) _dispatch;
 
   /// Cached wrapped processors for FlowHolderActions, keyed by runtimeType.
   final Map<Type, Stream<A> Function(S, A)> _wrappedProcessors = {};
 
-  /// Creates a [FlowHolderMiddleware] with the specified [logger].
-  FlowHolderMiddleware(StoreLogger<S, A> logger) : _logger = logger;
+  /// Creates a [FlowHolderMiddleware] with the specified [logger] and [dispatch].
+  FlowHolderMiddleware(StoreLogger<S, A> logger, void Function(A) dispatch)
+      : _logger = logger,
+        _dispatch = dispatch;
 
   @override
   Stream<A> process(S Function() getState, A action) {
@@ -26,8 +34,21 @@ class FlowHolderMiddleware<S, A extends Action> extends Middleware<S, A> {
     }
 
     final wrapped = _getOrCreateWrappedProcessor(action);
-    return wrapped(getState(), action)
-        .asyncExpand((innerAction) => _processRecursively(getState, innerAction));
+
+    switch (action.delivery) {
+      case FlowActionDelivery.emit:
+        return wrapped(getState(), action).asyncExpand(
+          (innerAction) => _processRecursively(getState, innerAction),
+        );
+
+      case FlowActionDelivery.dispatch:
+        // Re-dispatch through full pipeline; nested FlowHolderActions
+        // will be processed when they reach this middleware again
+        return wrapped(getState(), action).asyncExpand((innerAction) {
+          _dispatch(innerAction);
+          return const Stream.empty();
+        });
+    }
   }
 
   /// Recursively processes nested FlowHolderActions.
