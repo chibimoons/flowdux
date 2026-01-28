@@ -59,10 +59,14 @@ class FlowDuxBenchmark(
         override val name = "Working"
         override val processors: ActionProcessorMap<BenchState, BenchAction> = emptyMap()
 
+        @Volatile
+        private var sinkhole = 0
+
         override fun process(getState: () -> BenchState, action: BenchAction): Flow<BenchAction> = flow {
-            // Simulate some work
+            // Simulate some work (sinkhole prevents JIT from eliminating the loop)
             var sum = 0
             repeat(workIterations) { sum += it }
+            sinkhole = sum
             emit(action)
         }
     }

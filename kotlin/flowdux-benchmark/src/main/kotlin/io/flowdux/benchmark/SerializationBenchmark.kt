@@ -71,7 +71,12 @@ class SerializationBenchmark(
             }
             json.contains("\"type\":\"Large\"") -> {
                 val userId = Regex(""""userId":"([^"]+)"""").find(json)!!.groupValues[1]
-                BenchAction.Large(userId, listOf("item"), listOf(0), "nested")
+                val items = Regex(""""items":\[([^\]]*)]""").find(json)!!.groupValues[1]
+                    .split(",").map { it.trim().removeSurrounding("\"") }
+                val scores = Regex(""""scores":\[([^\]]*)]""").find(json)!!.groupValues[1]
+                    .split(",").map { it.trim().toInt() }
+                val nested = Regex(""""nested":"((?:[^"\\]|\\.)*)"""").find(json)!!.groupValues[1]
+                BenchAction.Large(userId, items, scores, nested)
             }
             else -> throw IllegalArgumentException("Unknown: $json")
         }

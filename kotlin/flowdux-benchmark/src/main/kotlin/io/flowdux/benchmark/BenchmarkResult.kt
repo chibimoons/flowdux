@@ -41,7 +41,7 @@ data class BenchmarkResult(
     }
 
     /** Check if average latency allows 60 FPS (16.67ms per frame) */
-    fun canSustain60Fps(): Boolean = avgLatency.inWholeMilliseconds < 16
+    fun canSustain60Fps(): Boolean = avgLatency.inWholeMicroseconds < 16_667
 
     /** Calculate max sustainable FPS based on average latency */
     fun maxSustainableFps(): Double {
