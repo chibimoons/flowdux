@@ -1,6 +1,7 @@
 package io.flowdux.sample.chat.client
 
 import io.flowdux.createStore
+import io.flowdux.remote.ktor.KtorWebSocketConnection
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatEvent
 import io.flowdux.sample.chat.ChatState
@@ -17,7 +18,12 @@ fun main() = runBlocking {
     println()
 
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    val connection = WebSocketConnection(scope = scope)
+    val connection = KtorWebSocketConnection.create(
+        host = "localhost",
+        port = 8080,
+        path = "/chat",
+        scope = scope,
+    )
     val middleware = ChatRemoteMiddleware(connection, scope)
     val store = createStore(
         initialState = ChatState(),
