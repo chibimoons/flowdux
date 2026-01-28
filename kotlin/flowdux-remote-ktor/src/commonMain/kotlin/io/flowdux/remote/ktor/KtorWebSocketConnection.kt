@@ -47,6 +47,10 @@ class KtorWebSocketConnection(
     }
 
     override suspend fun connect() {
+        // Prevent multiple concurrent connections
+        if (_connectionState.value != ConnectionState.DISCONNECTED) {
+            return
+        }
         _connectionState.value = ConnectionState.CONNECTING
 
         scope.launch {
