@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Abstraction for the transport layer between server and client.
  *
- * Server-side counterpart to `RemoteConnection` in `flowdux-remote-client`.
+ * Server-side counterpart to [ClientConnection][io.flowdux.remote.ClientConnection].
  * Implementations handle the actual network communication (e.g., WebSocket session).
  */
 interface ServerConnection {

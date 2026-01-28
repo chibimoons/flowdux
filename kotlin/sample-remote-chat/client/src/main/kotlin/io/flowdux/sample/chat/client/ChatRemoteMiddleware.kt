@@ -1,14 +1,14 @@
 package io.flowdux.sample.chat.client
 
 import io.flowdux.ActionProcessorMap
-import io.flowdux.remote.RemoteConnection
+import io.flowdux.remote.ClientConnection
 import io.flowdux.remote.ClientRemoteMiddleware
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatState
 import kotlinx.coroutines.CoroutineScope
 
 class ChatRemoteMiddleware(
-    connection: RemoteConnection,
+    connection: ClientConnection,
     scope: CoroutineScope,
 ) : ClientRemoteMiddleware<ChatState, ChatAction>(
     connection = connection,

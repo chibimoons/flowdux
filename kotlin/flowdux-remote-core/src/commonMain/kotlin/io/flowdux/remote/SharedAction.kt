@@ -15,7 +15,7 @@ interface SharedAction : Action
  * Marker for actions sent from client to server.
  *
  * Actions implementing this interface will be intercepted by `ClientRemoteMiddleware`,
- * serialized, and sent to the server via the configured [RemoteConnection].
+ * serialized, and sent to the server via the configured [ClientConnection].
  * They will NOT be dispatched to the local (client) reducer.
  *
  * Example:

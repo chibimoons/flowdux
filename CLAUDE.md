@@ -47,5 +47,5 @@ Check `gh auth status` output to identify available accounts and ensure the corr
 - `SharedAction` - Marker interface for actions shared between client and server
   - `ServerSharedAction` - Client → server (intercepted by `ClientRemoteMiddleware`)
   - `ClientSharedAction` - Server → client (intercepted by `ServerRemoteMiddleware`)
-- `RemoteConnection` - Client-side transport abstraction (WebSocket, SSE, etc.)
+- `ClientConnection` - Client-side transport abstraction (WebSocket, SSE, etc.)
 - `ServerConnection` - Server-side transport abstraction (incoming Flow + send)

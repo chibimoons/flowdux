@@ -44,13 +44,13 @@ import kotlinx.coroutines.launch
  * }
  * ```
  *
- * @param connection The transport layer for communicating with the server.
+ * @param connection The [ClientConnection] for communicating with the server.
  * @param actionCodec Codec for serializing/deserializing actions.
  * @param messageCodec Codec for wire-level message framing. Defaults to [JsonMessageCodec].
  * @param scope Coroutine scope for background tasks.
  */
 open class ClientRemoteMiddleware<S : State, A : Action>(
-    private val connection: RemoteConnection,
+    private val connection: ClientConnection,
     private val actionCodec: ActionCodec<A>,
     private val messageCodec: MessageCodec = JsonMessageCodec(),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),

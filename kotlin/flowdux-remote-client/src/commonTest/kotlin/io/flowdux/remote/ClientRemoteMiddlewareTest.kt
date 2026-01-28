@@ -17,7 +17,7 @@ class ClientRemoteMiddlewareTest {
 
     @Test
     fun `ServerSharedAction is intercepted and sent to server`() = runTest {
-        val connection = MockRemoteConnection()
+        val connection = MockClientConnection()
         val middleware = TestClientRemoteMiddleware(
             connection = connection,
             actionCodec = actionCodec,
@@ -54,7 +54,7 @@ class ClientRemoteMiddlewareTest {
 
     @Test
     fun `non-ServerSharedAction passes through to local reducer`() = runTest {
-        val connection = MockRemoteConnection()
+        val connection = MockClientConnection()
         val middleware = TestClientRemoteMiddleware(
             connection = connection,
             actionCodec = actionCodec,
@@ -90,7 +90,7 @@ class ClientRemoteMiddlewareTest {
 
     @Test
     fun `server response actions are dispatched to local store`() = runTest {
-        val connection = MockRemoteConnection()
+        val connection = MockClientConnection()
         val middleware = TestClientRemoteMiddleware(
             connection = connection,
             actionCodec = actionCodec,
@@ -125,7 +125,7 @@ class ClientRemoteMiddlewareTest {
 
     @Test
     fun `non-ServerSharedAction server responses pass through without being sent to server`() = runTest {
-        val connection = MockRemoteConnection()
+        val connection = MockClientConnection()
         val middleware = TestClientRemoteMiddleware(
             connection = connection,
             actionCodec = actionCodec,
@@ -163,7 +163,7 @@ class ClientRemoteMiddlewareTest {
 
     @Test
     fun `multiple server response actions are all dispatched`() = runTest {
-        val connection = MockRemoteConnection()
+        val connection = MockClientConnection()
         val middleware = TestClientRemoteMiddleware(
             connection = connection,
             actionCodec = actionCodec,

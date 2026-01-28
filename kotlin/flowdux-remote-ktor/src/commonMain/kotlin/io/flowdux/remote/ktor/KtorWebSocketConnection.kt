@@ -1,7 +1,7 @@
 package io.flowdux.remote.ktor
 
 import io.flowdux.remote.ConnectionState
-import io.flowdux.remote.RemoteConnection
+import io.flowdux.remote.ClientConnection
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 /**
- * Ktor-based WebSocket implementation of [RemoteConnection].
+ * Ktor-based WebSocket implementation of [ClientConnection].
  *
  * This class provides a multiplatform WebSocket connection using Ktor client.
  * It handles connection lifecycle, message sending/receiving, and exposes
@@ -30,7 +30,7 @@ class KtorWebSocketConnection(
     private val url: String,
     private val scope: CoroutineScope,
     httpClient: HttpClient? = null,
-) : RemoteConnection {
+) : ClientConnection {
 
     private val httpClient: HttpClient
     private val isClientOwned: Boolean
@@ -109,7 +109,7 @@ class KtorWebSocketConnection(
 
     companion object {
         /**
-         * Create a [KtorWebSocketConnection] with host, port, and path components.
+         * Create a [KtorWebSocketConnection] with host, port, and path components
          *
          * @param host Server hostname (default: "localhost")
          * @param port Server port (default: 8080)

@@ -85,7 +85,7 @@ class TestActionCodec : ActionCodec<TestAction> {
 // -- Test ClientRemoteMiddleware subclass --
 
 class TestClientRemoteMiddleware(
-    connection: RemoteConnection,
+    connection: ClientConnection,
     actionCodec: ActionCodec<TestAction>,
     messageCodec: MessageCodec = JsonMessageCodec(),
     scope: CoroutineScope,
@@ -102,11 +102,11 @@ class TestClientRemoteMiddleware(
     }
 }
 
-// -- Mock RemoteConnection --
+// -- Mock Client Connection --
 
-class MockRemoteConnection(
+class MockClientConnection(
     private val autoConnect: Boolean = true,
-) : RemoteConnection {
+) : ClientConnection {
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     override val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
