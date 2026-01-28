@@ -2,21 +2,19 @@
 
 ## Git/GitHub Multi-Account Setup
 
-This project uses multiple GitHub accounts. **Before any git push operation**, always verify the active account:
+This environment uses multiple GitHub accounts. **Before any git push operation**, always verify the active account:
 
 ```bash
 gh auth status
 ```
 
-If the wrong account is active, switch to the correct one:
+If the wrong account is active, switch to the repository owner's account:
 
 ```bash
-gh auth switch -u chibimoons
+gh auth switch -u <owner-account>
 ```
 
-Available accounts:
-- `chibimoons` - Main account for this repository
-- `FreedomFactories` - Secondary account
+Check `gh auth status` output to identify available accounts and ensure the correct one is active before pushing.
 
 ## Project Structure
 
