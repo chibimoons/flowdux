@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class Store<S : State, A : Action>(
+class Store<S : State, A : Action> internal constructor(
     initialState: S,
     private val reducer: Reducer<S, A>,
     private val middlewares: List<Middleware<S, A>>,
