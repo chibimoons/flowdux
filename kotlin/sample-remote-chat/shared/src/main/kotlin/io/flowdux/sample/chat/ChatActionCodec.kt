@@ -7,6 +7,7 @@ class ChatActionCodec : ActionCodec<ChatAction> {
     override fun encode(action: ChatAction): String = when (action) {
         is ChatAction.Connect -> """{"type":"Connect"}"""
         is ChatAction.Disconnect -> """{"type":"Disconnect"}"""
+        is ChatAction.StartListening -> """{"type":"StartListening"}"""
         is ChatAction.SendMessage ->
             """{"type":"SendMessage","user":"${escape(action.user)}","text":"${escape(action.text)}"}"""
         is ChatAction.JoinRoom ->
@@ -26,6 +27,7 @@ class ChatActionCodec : ActionCodec<ChatAction> {
         return when (type) {
             "Connect" -> ChatAction.Connect
             "Disconnect" -> ChatAction.Disconnect
+            "StartListening" -> ChatAction.StartListening
             "SendMessage" -> ChatAction.SendMessage(
                 user = extractString(json, "user"),
                 text = extractString(json, "text"),

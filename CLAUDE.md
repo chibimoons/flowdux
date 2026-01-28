@@ -44,5 +44,8 @@ Check `gh auth status` output to identify available accounts and ensure the corr
 
 - `FlowHolderAction` - Action that holds a Flow/Stream of inner actions
 - `FlowActionDelivery` - `Emit` (default, bypasses middleware) or `Dispatch` (full pipeline)
-- `SharedAction` - Marker interface for actions sent to server
-- `RemoteConnection` - Transport abstraction (WebSocket, SSE, etc.)
+- `SharedAction` - Marker interface for actions shared between client and server
+  - `ServerSharedAction` - Client → server (intercepted by `ClientRemoteMiddleware`)
+  - `ClientSharedAction` - Server → client (intercepted by `ServerRemoteMiddleware`)
+- `RemoteConnection` - Client-side transport abstraction (WebSocket, SSE, etc.)
+- `ServerConnection` - Server-side transport abstraction (incoming Flow + send)

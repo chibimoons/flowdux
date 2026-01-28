@@ -1,8 +1,8 @@
 package io.flowdux.sample.chat.server
 
+import io.flowdux.Store
 import io.flowdux.createStore
-import io.flowdux.remote.server.ResponseCollector
-import io.flowdux.remote.server.ServerSessionHandler
+import io.flowdux.remote.server.ServerConnection
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatState
 import io.flowdux.sample.chat.chatReducer
@@ -15,23 +15,9 @@ import io.ktor.websocket.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-
-fun createChatSessionHandler(): ServerSessionHandler<ChatState, ChatAction> {
-    return ServerSessionHandler(
-        storeFactory = {
-            val collector = ResponseCollector<ChatState, ChatAction>()
-            val store = createStore(
-                initialState = ChatState(),
-                reducer = chatReducer,
-                middlewares = listOf(ChatServerMiddleware()),
-                logger = collector,
-                scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-            )
-            Pair(store, collector)
-        },
-        actionCodec = io.flowdux.sample.chat.ChatActionCodec(),
-    )
-}
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 
 fun main() {
     embeddedServer(CIO, port = 8080) {
@@ -40,26 +26,35 @@ fun main() {
         routing {
             webSocket("/chat") {
                 println("[Server] Client connected")
-                val handler = createChatSessionHandler()
-                handler.initialize()
+
+                val store = createChatStore(this)
+                store.dispatch(ChatAction.StartListening)
 
                 try {
-                    for (frame in incoming) {
-                        if (frame is Frame.Text) {
-                            val message = frame.readText()
-                            println("[Server] Received: $message")
-                            val response = handler.handleMessage(message)
-                            println("[Server] Sending: $response")
-                            send(Frame.Text(response))
-                        }
-                    }
+                    closeReason.await()
                 } finally {
-                    handler.close()
+                    store.close()
                     println("[Server] Client disconnected")
                 }
             }
         }
     }.start(wait = true)
+}
 
-    println("Chat WebSocket server started on ws://localhost:8080/chat")
+private fun createChatStore(session: DefaultWebSocketServerSession): Store<ChatState, ChatAction> {
+    val connection = object : ServerConnection {
+        override val incoming = session.incoming.receiveAsFlow()
+            .filterIsInstance<Frame.Text>()
+            .map { it.readText() }
+
+        override suspend fun send(message: String) {
+            session.send(Frame.Text(message))
+        }
+    }
+    return createStore(
+        initialState = ChatState(),
+        reducer = chatReducer,
+        middlewares = listOf(ChatServerMiddleware(), ChatServerRemoteMiddleware(connection)),
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    )
 }

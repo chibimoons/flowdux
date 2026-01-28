@@ -4,7 +4,8 @@ import io.flowdux.Action
 import io.flowdux.Reducer
 import io.flowdux.State
 import io.flowdux.buildReducer
-import io.flowdux.remote.SharedAction
+import io.flowdux.remote.ClientSharedAction
+import io.flowdux.remote.ServerSharedAction
 
 data class ChatState(
     val messages: List<ChatMessage> = emptyList(),
@@ -24,16 +25,17 @@ sealed interface ChatAction : Action {
     // Lifecycle (local only)
     data object Connect : ChatAction
     data object Disconnect : ChatAction
+    data object StartListening : ChatAction
 
-    // Client → Server (SharedAction)
-    data class SendMessage(val user: String, val text: String) : ChatAction, SharedAction
-    data class JoinRoom(val user: String) : ChatAction, SharedAction
-    data class LeaveRoom(val user: String) : ChatAction, SharedAction
+    // Client → Server (intercepted by CRM)
+    data class SendMessage(val user: String, val text: String) : ChatAction, ServerSharedAction
+    data class JoinRoom(val user: String) : ChatAction, ServerSharedAction
+    data class LeaveRoom(val user: String) : ChatAction, ServerSharedAction
 
-    // Server → Client (local reducer only)
-    data class MessageReceived(val user: String, val text: String) : ChatAction
-    data class UserJoined(val user: String) : ChatAction
-    data class UserLeft(val user: String) : ChatAction
+    // Server → Client (intercepted by SRM)
+    data class MessageReceived(val user: String, val text: String) : ChatAction, ClientSharedAction
+    data class UserJoined(val user: String) : ChatAction, ClientSharedAction
+    data class UserLeft(val user: String) : ChatAction, ClientSharedAction
 }
 
 val chatReducer: Reducer<ChatState, ChatAction> = buildReducer {

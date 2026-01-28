@@ -10,15 +10,15 @@ import kotlin.test.assertTrue
 import kotlin.test.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class RemoteFlowMiddlewareTest {
+class ClientRemoteMiddlewareTest {
 
     private val actionCodec = TestActionCodec()
     private val messageCodec = JsonMessageCodec()
 
     @Test
-    fun `SharedAction is intercepted and sent to server`() = runTest {
+    fun `ServerSharedAction is intercepted and sent to server`() = runTest {
         val connection = MockRemoteConnection()
-        val middleware = TestRemoteFlowMiddleware(
+        val middleware = TestClientRemoteMiddleware(
             connection = connection,
             actionCodec = actionCodec,
             scope = backgroundScope,
@@ -41,7 +41,7 @@ class RemoteFlowMiddlewareTest {
             store.dispatch(TestAction.ServerAdd(5))
             delay(100) // wait for send
 
-            // No state change because SharedAction is NOT emitted locally
+            // No state change because ServerSharedAction is NOT emitted locally
             expectNoEvents()
 
             // Verify it was sent to the server
@@ -53,9 +53,9 @@ class RemoteFlowMiddlewareTest {
     }
 
     @Test
-    fun `non-SharedAction passes through to local reducer`() = runTest {
+    fun `non-ServerSharedAction passes through to local reducer`() = runTest {
         val connection = MockRemoteConnection()
-        val middleware = TestRemoteFlowMiddleware(
+        val middleware = TestClientRemoteMiddleware(
             connection = connection,
             actionCodec = actionCodec,
             scope = backgroundScope,
@@ -91,7 +91,7 @@ class RemoteFlowMiddlewareTest {
     @Test
     fun `server response actions are dispatched to local store`() = runTest {
         val connection = MockRemoteConnection()
-        val middleware = TestRemoteFlowMiddleware(
+        val middleware = TestClientRemoteMiddleware(
             connection = connection,
             actionCodec = actionCodec,
             scope = backgroundScope,
@@ -111,7 +111,7 @@ class RemoteFlowMiddlewareTest {
             store.dispatch(TestAction.Connect)
             delay(100)
 
-            // Simulate server sending a response with an Add action (non-SharedAction)
+            // Simulate server sending a response with an Add action (non-ServerSharedAction)
             val serverResponse = messageCodec.encodeServerResponse(
                 actions = listOf("""{"type":"Add","value":42}"""),
             )
@@ -124,9 +124,9 @@ class RemoteFlowMiddlewareTest {
     }
 
     @Test
-    fun `non-SharedAction server responses pass through without being sent to server`() = runTest {
+    fun `non-ServerSharedAction server responses pass through without being sent to server`() = runTest {
         val connection = MockRemoteConnection()
-        val middleware = TestRemoteFlowMiddleware(
+        val middleware = TestClientRemoteMiddleware(
             connection = connection,
             actionCodec = actionCodec,
             scope = backgroundScope,
@@ -146,7 +146,7 @@ class RemoteFlowMiddlewareTest {
             store.dispatch(TestAction.Connect)
             delay(100)
 
-            // Simulate server sending a non-SharedAction response
+            // Simulate server sending a non-ServerSharedAction response
             val serverResponse = messageCodec.encodeServerResponse(
                 actions = listOf("""{"type":"Add","value":10}"""),
             )
@@ -154,7 +154,7 @@ class RemoteFlowMiddlewareTest {
 
             assertEquals(TestState(count = 10), awaitItem())
 
-            // Non-SharedAction server responses should NOT be sent to server
+            // Non-ServerSharedAction server responses should NOT be sent to server
             assertEquals(0, connection.sentMessages.size)
 
             cancelAndIgnoreRemainingEvents()
@@ -164,7 +164,7 @@ class RemoteFlowMiddlewareTest {
     @Test
     fun `multiple server response actions are all dispatched`() = runTest {
         val connection = MockRemoteConnection()
-        val middleware = TestRemoteFlowMiddleware(
+        val middleware = TestClientRemoteMiddleware(
             connection = connection,
             actionCodec = actionCodec,
             scope = backgroundScope,

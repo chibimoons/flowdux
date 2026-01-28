@@ -22,8 +22,8 @@ data class TestState(val count: Int = 0, val message: String = "") : State
 sealed interface TestAction : Action {
     data class Add(val value: Int) : TestAction
     data class SetMessage(val message: String) : TestAction
-    data class ServerAdd(val value: Int) : TestAction, SharedAction
-    data class ServerSetMessage(val message: String) : TestAction, SharedAction
+    data class ServerAdd(val value: Int) : TestAction, ServerSharedAction
+    data class ServerSetMessage(val message: String) : TestAction, ServerSharedAction
     object LocalIncrement : TestAction
     object Connect : TestAction
 }
@@ -82,14 +82,14 @@ class TestActionCodec : ActionCodec<TestAction> {
     }
 }
 
-// -- Test RemoteFlowMiddleware subclass --
+// -- Test ClientRemoteMiddleware subclass --
 
-class TestRemoteFlowMiddleware(
+class TestClientRemoteMiddleware(
     connection: RemoteConnection,
     actionCodec: ActionCodec<TestAction>,
     messageCodec: MessageCodec = JsonMessageCodec(),
     scope: CoroutineScope,
-) : RemoteFlowMiddleware<TestState, TestAction>(
+) : ClientRemoteMiddleware<TestState, TestAction>(
     connection = connection,
     actionCodec = actionCodec,
     messageCodec = messageCodec,

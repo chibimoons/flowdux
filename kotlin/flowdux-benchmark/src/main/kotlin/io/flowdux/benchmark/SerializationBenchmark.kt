@@ -4,7 +4,7 @@ import io.flowdux.Action
 import io.flowdux.remote.ActionCodec
 import io.flowdux.remote.JsonMessageCodec
 import io.flowdux.remote.MessageCodec
-import io.flowdux.remote.SharedAction
+import io.flowdux.remote.ServerSharedAction
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.measureTime
@@ -25,7 +25,7 @@ class SerializationBenchmark(
 
     sealed interface BenchAction : Action {
         /** Small payload (~40 bytes) */
-        data class Small(val value: Int) : BenchAction, SharedAction
+        data class Small(val value: Int) : BenchAction, ServerSharedAction
 
         /** Medium payload (~200 bytes) */
         data class Medium(
@@ -33,7 +33,7 @@ class SerializationBenchmark(
             val message: String,
             val timestamp: Long,
             val metadata: String,
-        ) : BenchAction, SharedAction
+        ) : BenchAction, ServerSharedAction
 
         /** Large payload (~1KB+) */
         data class Large(
@@ -41,7 +41,7 @@ class SerializationBenchmark(
             val items: List<String>,
             val scores: List<Int>,
             val nested: String,
-        ) : BenchAction, SharedAction
+        ) : BenchAction, ServerSharedAction
     }
 
     class BenchActionCodec : ActionCodec<BenchAction> {
