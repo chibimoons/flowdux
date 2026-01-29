@@ -41,7 +41,6 @@ kotlin {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.turbine)
-            implementation(project(":kotlin:flowdux-remote-serialization"))
         }
     }
 
