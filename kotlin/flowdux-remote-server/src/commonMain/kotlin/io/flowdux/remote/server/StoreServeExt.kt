@@ -7,7 +7,8 @@ import io.flowdux.Store
 /**
  * Collect state changes and dispatch each as a wrapped action.
  *
- * Suspends until the store is closed or the calling coroutine is cancelled.
+ * Suspends indefinitely until the calling coroutine is cancelled
+ * (e.g., by WebSocket disconnect or [use]/[serve] cleanup).
  * This is a low-level primitive used internally by [serve].
  * Prefer [serve] which handles listening, state sync, and cleanup automatically.
  *
@@ -45,7 +46,9 @@ suspend inline fun <S : State, A : Action> Store<S, A>.use(
  * All-in-one server helper: starts client listener, syncs state, and closes the store.
  *
  * Combines [use], client listener setup, and [serveState] into a single call.
- * Suspends until the store is closed or the calling coroutine is cancelled.
+ * Suspends until the calling coroutine is cancelled (e.g., by WebSocket disconnect).
+ *
+ * **Requires [ServerRemoteMiddleware] in the store's middleware list.**
  *
  * ```kotlin
  * webSocket("/game") {

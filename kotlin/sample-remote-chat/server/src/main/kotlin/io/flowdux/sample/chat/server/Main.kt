@@ -32,7 +32,6 @@ fun main() {
                         )
                     )
                 }
-                println("[Server] Client disconnected")
             }
         }
     }.start(wait = true)
