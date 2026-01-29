@@ -12,5 +12,4 @@ data class ServerChatState(
 
     // Server-local
     val totalMessagesProcessed: Int = 0,
-    val isListening: Boolean = false,
 ) : State

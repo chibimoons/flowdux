@@ -5,7 +5,7 @@ import io.flowdux.createStore
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.serialization.typedJson
 import io.flowdux.remote.server.TypedServerConnection
-import io.flowdux.remote.server.serveState
+import io.flowdux.remote.server.serve
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatState
 import io.flowdux.sample.chat.SharedChatAction
@@ -23,22 +23,14 @@ fun main() {
         routing {
             webSocket("/chat") {
                 println("[Server] Client connected")
-
-                val store = createChatStore(this)
-                try {
-                    store.dispatch(ServerChatAction.StartListening)
-                    store.serveState { serverState ->
-                        SharedChatAction.SyncState(
-                            ChatState(
-                                messages = serverState.messages,
-                                users = serverState.users,
-                                lastEvent = serverState.lastEvent,
-                            )
+                createChatStore(this).serve { serverState ->
+                    SharedChatAction.SyncState(
+                        ChatState(
+                            messages = serverState.messages,
+                            users = serverState.users,
+                            lastEvent = serverState.lastEvent,
                         )
-                    }
-                } finally {
-                    store.close()
-                    println("[Server] Client disconnected")
+                    )
                 }
             }
         }

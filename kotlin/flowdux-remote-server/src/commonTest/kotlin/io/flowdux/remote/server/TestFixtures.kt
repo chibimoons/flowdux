@@ -1,10 +1,10 @@
 package io.flowdux.remote.server
 
 import io.flowdux.Action
-import io.flowdux.ActionProcessorMap
 import io.flowdux.ErrorProcessor
 import io.flowdux.Reducer
 import io.flowdux.State
+import io.flowdux.Store
 import io.flowdux.remote.ClientSharedAction
 import io.flowdux.remote.ServerSharedAction
 import kotlinx.coroutines.channels.Channel
@@ -15,9 +15,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 data class ServerState(val count: Int = 0) : State
 
 sealed interface ServerAction : Action {
-    // Lifecycle
-    object StartListening : ServerAction
-
     // Client → Server (received from client via incoming)
     data class ClientAdd(val value: Int) : ServerAction, ServerSharedAction
 
@@ -33,7 +30,6 @@ sealed interface ServerAction : Action {
 
 val serverReducer = Reducer<ServerState, ServerAction> { state, action ->
     when (action) {
-        is ServerAction.StartListening -> state
         is ServerAction.ClientAdd -> state.copy(count = state.count + action.value)
         is ServerAction.Add -> state.copy(count = state.count + action.value)
         is ServerAction.SetValue -> state.copy(count = action.value)
@@ -47,20 +43,6 @@ val serverErrorProcessor = object : ErrorProcessor<ServerAction> {
     override fun process(throwable: Throwable): Flow<ServerAction> = emptyFlow()
 }
 
-// -- Test SRM subclass --
-
-class TestServerRemoteMiddleware(
-    connection: TypedServerConnection<ServerAction>,
-) : ServerRemoteMiddleware<ServerState, ServerAction>(
-    connection = connection,
-) {
-    override val processors: ActionProcessorMap<ServerState, ServerAction> = buildProcessors {
-        on<ServerAction.StartListening> { _, _ ->
-            startListening()
-        }
-    }
-}
-
 /**
  * SRM subclass whose processor emits a [ClientSharedAction].
  * Reproduces the scenario where the emitted action bypasses the SRM's
@@ -71,14 +53,17 @@ class ProcessorEmittingSRM(
 ) : ServerRemoteMiddleware<ServerState, ServerAction>(
     connection = connection,
 ) {
-    override val processors: ActionProcessorMap<ServerState, ServerAction> = buildProcessors {
-        on<ServerAction.StartListening> { _, _ ->
-            startListening()
-        }
+    override val processors = buildProcessors {
         on<ServerAction.ClientAdd> { _, action ->
             emit(ServerAction.Add(action.value))
         }
     }
+}
+
+/** Dispatch [InternalStartListening] via unchecked cast (type-erased at runtime). */
+@Suppress("UNCHECKED_CAST")
+fun <S : State, A : Action> Store<S, A>.dispatchStartListening() {
+    dispatch(InternalStartListening() as A)
 }
 
 // -- Mock TypedServerConnection --
