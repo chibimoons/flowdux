@@ -7,7 +7,6 @@ import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.serialization.typedJson
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatEvent
-import io.flowdux.sample.chat.ChatState
 import io.flowdux.sample.chat.SharedChatAction
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -31,7 +30,8 @@ fun main() = runBlocking {
         }
     }
 
-    // Connect to server
+    // Set current user and connect
+    store.dispatch(ClientChatAction.SetCurrentUser("Alice"))
     store.dispatch(ClientChatAction.Connect)
     delay(500)
 
@@ -61,6 +61,7 @@ fun main() = runBlocking {
     println()
     println("--- Final State ---")
     val finalState = store.currentState
+    println("Current user: ${finalState.currentUser}")
     println("Users online: ${finalState.users}")
     println("Message history:")
     for (msg in finalState.messages) {
@@ -77,14 +78,14 @@ fun main() = runBlocking {
 }
 
 @Suppress("UNCHECKED_CAST")
-private fun createChatStore(): Store<ChatState, ChatAction> {
+private fun createChatStore(): Store<ClientChatState, ChatAction> {
     val connection = KtorWebSocketClientConnection.create(
         host = "localhost",
         port = 8080,
         path = "/chat",
     ).typedJson<SharedChatAction>() as TypedClientConnection<ChatAction>
     return createStore(
-        initialState = ChatState(),
+        initialState = ClientChatState(),
         reducer = clientChatReducer,
         middlewares = listOf(ChatRemoteMiddleware(connection)),
     )

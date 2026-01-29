@@ -27,7 +27,15 @@ fun main() {
                 val store = createChatStore(this)
                 try {
                     store.dispatch(ServerChatAction.StartListening)
-                    store.serveState { SharedChatAction.SyncState(it) }
+                    store.serveState { serverState ->
+                        SharedChatAction.SyncState(
+                            ChatState(
+                                messages = serverState.messages,
+                                users = serverState.users,
+                                lastEvent = serverState.lastEvent,
+                            )
+                        )
+                    }
                 } finally {
                     store.close()
                     println("[Server] Client disconnected")
@@ -38,11 +46,11 @@ fun main() {
 }
 
 @Suppress("UNCHECKED_CAST")
-private fun createChatStore(session: DefaultWebSocketServerSession): Store<ChatState, ChatAction> {
+private fun createChatStore(session: DefaultWebSocketServerSession): Store<ServerChatState, ChatAction> {
     val typedConnection = KtorWebSocketServerConnection(session)
         .typedJson<SharedChatAction>() as TypedServerConnection<ChatAction>
     return createStore(
-        initialState = ChatState(),
+        initialState = ServerChatState(),
         reducer = serverChatReducer,
         middlewares = listOf(ChatServerRemoteMiddleware(typedConnection)),
     )

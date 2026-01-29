@@ -5,13 +5,16 @@ import io.flowdux.buildReducer
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatEvent
 import io.flowdux.sample.chat.ChatMessage
-import io.flowdux.sample.chat.ChatState
 
-val serverChatReducer: Reducer<ChatState, ChatAction> = buildReducer {
+val serverChatReducer: Reducer<ServerChatState, ChatAction> = buildReducer {
+    on<ServerChatAction.StartListening> { state, _ ->
+        state.copy(isListening = true)
+    }
     on<ServerChatAction.MessageReceived> { state, action ->
         state.copy(
             messages = state.messages + ChatMessage(action.user, action.text),
             lastEvent = ChatEvent.MessageReceived(user = action.user, text = action.text),
+            totalMessagesProcessed = state.totalMessagesProcessed + 1,
         )
     }
     on<ServerChatAction.UserJoined> { state, action ->

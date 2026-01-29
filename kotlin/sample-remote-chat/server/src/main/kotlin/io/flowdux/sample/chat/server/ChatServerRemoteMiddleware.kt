@@ -4,17 +4,16 @@ import io.flowdux.ActionProcessorMap
 import io.flowdux.remote.server.ServerRemoteMiddleware
 import io.flowdux.remote.server.TypedServerConnection
 import io.flowdux.sample.chat.ChatAction
-import io.flowdux.sample.chat.ChatState
 import io.flowdux.sample.chat.SharedChatAction
 
 class ChatServerRemoteMiddleware(
     connection: TypedServerConnection<ChatAction>,
-) : ServerRemoteMiddleware<ChatState, ChatAction>(
+) : ServerRemoteMiddleware<ServerChatState, ChatAction>(
     connection = connection,
 ) {
     override val name: String = "ChatServerRemoteMiddleware"
 
-    override val processors: ActionProcessorMap<ChatState, ChatAction> = buildProcessors {
+    override val processors: ActionProcessorMap<ServerChatState, ChatAction> = buildProcessors {
         on<ServerChatAction.StartListening> { _, _ ->
             startListening()
         }
