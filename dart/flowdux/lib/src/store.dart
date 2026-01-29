@@ -31,7 +31,7 @@ class Store<S, A extends Action> {
   final StreamController<A> _actionController;
   final Reducer<S, A> _reducer;
   final List<Middleware<S, A>> _middlewares;
-  final FlowHolderMiddleware<S, A> _flowHolderMiddleware;
+  late final FlowHolderMiddleware<S, A> _flowHolderMiddleware;
   final ErrorProcessor<A> _errorProcessor;
   final StoreLogger<S, A> _logger;
 
@@ -55,9 +55,9 @@ class Store<S, A extends Action> {
   })  : _actionController = StreamController<A>.broadcast(),
         _reducer = reducer,
         _middlewares = middlewares,
-        _flowHolderMiddleware = FlowHolderMiddleware<S, A>(logger),
         _errorProcessor = errorProcessor,
         _logger = logger {
+    _flowHolderMiddleware = FlowHolderMiddleware<S, A>(logger, dispatch);
     _allMiddlewares = [..._middlewares, _flowHolderMiddleware];
     _currentState = initialState;
     _state = _buildStateStream(initialState);
