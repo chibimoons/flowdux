@@ -1,0 +1,68 @@
+---
+title: FlowDux Multiplayer Request Flow
+---
+sequenceDiagram
+    actor Player
+    participant Client as RemoteFlow<br/>Middleware
+    participant WS as Ktor WebSocket<br/>Gateway
+    participant Auth as Auth<br/>Middleware
+    participant Room as Room<br/>Manager
+    participant Store as FlowDux Store<br/>(Middleware Pipeline)
+    participant Collector as Response<br/>Collector
+    participant View as StateView<br/>Filter
+    participant Tick as Tick Batcher<br/>(60fps)
+
+    Player->>Client: Action 발생 (캐릭터 이동)
+    activate Client
+    Client->>Client: SharedAction 감지
+    Client->>Client: ActionCodec.encode()
+    Client->>Client: MessageCodec.encodeActionMessage()
+    Client->>WS: WSS 전송
+    deactivate Client
+
+    activate WS
+    WS->>Auth: JWT 검증
+    activate Auth
+    Auth-->>WS: userId 확인
+    deactivate Auth
+
+    WS->>Room: getRoom(userId)
+    activate Room
+    Room-->>WS: Room A
+    deactivate Room
+
+    WS->>Store: handleMessage(raw)
+    activate Store
+    Store->>Store: decodeActionFromClient()
+    Store->>Store: ActionCodec.decode()
+    Store->>Store: dispatch(action)
+
+    Note over Store: Middleware Pipeline<br/>1. Validation<br/>2. AuthCheck<br/>3. GameLogic
+
+    Store->>Collector: onStateReduced()
+    activate Collector
+    Collector-->>Store: awaitNextReduction()
+    Store->>Collector: drain()
+    Collector-->>Store: 결과 액션 리스트
+    deactivate Collector
+    deactivate Store
+
+    Store->>View: 결과 액션 전달
+    activate View
+    View->>View: 플레이어별 상태 필터링
+    View-->>Tick: 필터된 상태
+    deactivate View
+
+    activate Tick
+    Note over Tick: 16.67ms 간격으로<br/>누적 상태 배치 전송
+
+    Tick->>WS: encodeServerResponse()
+    deactivate Tick
+
+    WS->>Client: WSS 응답
+    deactivate WS
+    activate Client
+    Client->>Client: decodeServerMessage()
+    Client->>Client: ActionCodec.decode()
+    Client->>Player: 상태 업데이트 (UI 반영)
+    deactivate Client

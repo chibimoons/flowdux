@@ -1,0 +1,59 @@
+---
+title: FlowDux Multiplayer Game Server Architecture
+---
+flowchart TD
+    subgraph Clients
+        P1["Player 1\n(Android)"]
+        P2["Player 2\n(iOS)"]
+        P3["Player 3\n(Web)"]
+        PN["Player N\n(Desktop)"]
+    end
+
+    P1 & P2 & P3 & PN -->|"WSS + JWT"| LB
+
+    LB["Load Balancer\n(Nginx - Sticky Session)"]
+
+    LB --> AUTH
+
+    subgraph Server["Game Server (Ktor)"]
+        AUTH["Auth Middleware\nJWT 검증 → User ID 추출"]
+        AUTH --> RM
+
+        RM["Room Manager\nRoom 생성/삭제/매칭\nPlayer → Room 매핑"]
+
+        RM --> RA & RB & RC
+
+        subgraph RA["Room A"]
+            direction TB
+            SA["FlowDux Store\n(GameState)"]
+            SA --> MWA
+
+            subgraph MWA["Middleware Pipeline"]
+                direction TB
+                V1["1. Validation\n좌표 범위, 턴 순서"]
+                V2["2. AuthCheck\n액션 수행 권한 확인"]
+                V3["3. GameLogic\n충돌 판정, 점수 계산"]
+                V4["4. StateView\n플레이어별 상태 필터"]
+                V1 --> V2 --> V3 --> V4
+            end
+
+            MWA --> TICK_A["Tick Loop (60fps)\n상태 변경 배치"]
+            TICK_A --> BC_A["Broadcast\n(per player)"]
+        end
+
+        subgraph RB["Room B"]
+            SB["FlowDux Store"] --> MWB["Middleware\nPipeline"] --> TICK_B["Tick Loop"] --> BC_B["Broadcast"]
+        end
+
+        subgraph RC["Room C"]
+            SC["FlowDux Store"] --> MWC["Middleware\nPipeline"] --> TICK_C["Tick Loop"] --> BC_C["Broadcast"]
+        end
+    end
+
+    BC_A -->|"WSS"| P1 & P2
+    BC_A -->|"WSS"| P3
+
+    Server --> REDIS & DB
+
+    REDIS[("Redis\n• 서버 간 Room 동기화\n• Session 저장\n• Presence 관리\n• 매치메이킹 큐")]
+    DB[("Database\n• User 프로필\n• 매치 히스토리\n• 랭킹/리더보드\n• 인벤토리/재화")]
