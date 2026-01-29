@@ -20,6 +20,7 @@ dependencies {
     implementation(project(":kotlin:flowdux-remote-core"))
     implementation(project(":kotlin:flowdux-remote-server"))
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.cio)
     implementation(libs.ktor.server.websockets)

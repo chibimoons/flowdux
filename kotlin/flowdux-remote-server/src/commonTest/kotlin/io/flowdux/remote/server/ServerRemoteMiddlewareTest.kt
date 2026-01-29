@@ -1,7 +1,6 @@
 package io.flowdux.remote.server
 
 import io.flowdux.createStore
-import io.flowdux.remote.JsonMessageCodec
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -11,16 +10,11 @@ import kotlin.test.assertTrue
 
 class ServerRemoteMiddlewareTest {
 
-    private val actionCodec = ServerActionCodec()
-    private val messageCodec = JsonMessageCodec()
-
     @Test
     fun `ClientSharedAction is intercepted and sent to client`() = runTest {
-        val connection = MockServerConnection()
+        val connection = MockTypedServerConnection<ServerAction>()
         val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(
             connection = connection,
-            actionCodec = actionCodec,
-            messageCodec = messageCodec,
         )
 
         val result = middleware.process(
@@ -31,20 +25,17 @@ class ServerRemoteMiddlewareTest {
         // ClientSharedAction is consumed — not emitted downstream
         assertTrue(result.isEmpty())
 
-        // Verify it was sent to client
-        assertEquals(1, connection.sentMessages.size)
-        val response = messageCodec.decodeServerMessage(connection.sentMessages[0])
-        assertEquals(1, response.actions.size)
-        assertEquals("""{"type":"Add","value":10}""", response.actions[0])
+        // Verify it was sent to client as a typed action
+        assertEquals(1, connection.sentActions.size)
+        assertTrue(connection.sentActions[0] is ServerAction.Add)
+        assertEquals(10, (connection.sentActions[0] as ServerAction.Add).value)
     }
 
     @Test
     fun `non-ClientSharedAction passes through unchanged`() = runTest {
-        val connection = MockServerConnection()
+        val connection = MockTypedServerConnection<ServerAction>()
         val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(
             connection = connection,
-            actionCodec = actionCodec,
-            messageCodec = messageCodec,
         )
 
         val action = ServerAction.InternalReset(42)
@@ -57,16 +48,14 @@ class ServerRemoteMiddlewareTest {
         assertEquals(listOf(action), result)
 
         // Nothing sent to client
-        assertTrue(connection.sentMessages.isEmpty())
+        assertTrue(connection.sentActions.isEmpty())
     }
 
     @Test
     fun `multiple ClientSharedActions are each sent separately`() = runTest {
-        val connection = MockServerConnection()
+        val connection = MockTypedServerConnection<ServerAction>()
         val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(
             connection = connection,
-            actionCodec = actionCodec,
-            messageCodec = messageCodec,
         )
 
         middleware.process(
@@ -79,22 +68,18 @@ class ServerRemoteMiddlewareTest {
             action = ServerAction.Add(5),
         ).toList()
 
-        assertEquals(2, connection.sentMessages.size)
+        assertEquals(2, connection.sentActions.size)
 
-        val resp1 = messageCodec.decodeServerMessage(connection.sentMessages[0])
-        assertEquals("""{"type":"Increment"}""", resp1.actions[0])
-
-        val resp2 = messageCodec.decodeServerMessage(connection.sentMessages[1])
-        assertEquals("""{"type":"Add","value":5}""", resp2.actions[0])
+        assertTrue(connection.sentActions[0] is ServerAction.Increment)
+        assertTrue(connection.sentActions[1] is ServerAction.Add)
+        assertEquals(5, (connection.sentActions[1] as ServerAction.Add).value)
     }
 
     @Test
-    fun `encoding roundtrip preserves action data`() = runTest {
-        val connection = MockServerConnection()
+    fun `typed action roundtrip preserves action data`() = runTest {
+        val connection = MockTypedServerConnection<ServerAction>()
         val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(
             connection = connection,
-            actionCodec = actionCodec,
-            messageCodec = messageCodec,
         )
 
         middleware.process(
@@ -102,18 +87,16 @@ class ServerRemoteMiddlewareTest {
             action = ServerAction.Add(42),
         ).toList()
 
-        val response = messageCodec.decodeServerMessage(connection.sentMessages[0])
-        val decoded = actionCodec.decode(response.actions[0])
-        assertTrue(decoded is ServerAction.Add)
-        assertEquals(42, (decoded as ServerAction.Add).value)
+        val sentAction = connection.sentActions[0]
+        assertTrue(sentAction is ServerAction.Add)
+        assertEquals(42, (sentAction as ServerAction.Add).value)
     }
 
     @Test
     fun `incoming client messages are dispatched through pipeline via FlowHolderAction`() = runTest {
-        val connection = MockServerConnection()
+        val connection = MockTypedServerConnection<ServerAction>()
         val middleware = TestServerRemoteMiddleware(
             connection = connection,
-            actionCodec = actionCodec,
         )
 
         val store = createStore(
@@ -128,9 +111,8 @@ class ServerRemoteMiddlewareTest {
         store.dispatch(ServerAction.StartListening)
         delay(100)
 
-        // Simulate client sending a ClientAdd action
-        val clientMessage = messageCodec.encodeActionMessage("""{"type":"ClientAdd","value":10}""")
-        connection.simulateClientMessage(clientMessage)
+        // Simulate client sending a ClientAdd action (typed)
+        connection.simulateClientAction(ServerAction.ClientAdd(10))
         delay(100)
 
         // ClientAdd is ServerSharedAction — passes through SRM, reaches reducer

@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.kotlinSerialization)
     `maven-publish`
 }
 
@@ -34,13 +35,13 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":kotlin:flowdux"))
-            implementation(project(":kotlin:flowdux-remote-core"))
+            implementation(project(":kotlin:flowdux-remote-client"))
+            implementation(project(":kotlin:flowdux-remote-server"))
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.serialization.json)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation(libs.kotlinx.coroutines.test)
-            implementation(libs.turbine)
         }
     }
 
@@ -59,8 +60,8 @@ publishing {
     publications {
         withType<MavenPublication> {
             pom {
-                name.set("Flowdux Remote Server")
-                description.set("Server-side components for Flowdux remote state management")
+                name.set("Flowdux Remote Serialization")
+                description.set("kotlinx.serialization-based ActionCodec for Flowdux remote state management")
                 url.set("https://github.com/chibimoons/flowdux")
 
                 licenses {
