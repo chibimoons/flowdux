@@ -6,6 +6,14 @@
 - `emit` (default): Inner actions bypass user middlewares, go directly to reducer
 - `dispatch`: Inner actions are re-dispatched through full middleware pipeline
 
+## 0.2.4
+
+- Improve README documentation with comprehensive examples
+- Add detailed execution strategies documentation (takeLatest, takeLeading, sequential, debounce, throttle, retry)
+- Add FlowHolderAction usage examples
+- Add ErrorProcessor documentation
+- Add Architecture section
+
 ## 0.2.3
 
 - Add distinct() to state stream to filter consecutive identical states
