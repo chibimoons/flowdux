@@ -46,7 +46,7 @@ REST + flowdux-remote가 공존하는 구조가 자연스럽다.
 
 ### flowdux-remote가 이미 해결하고 있는 것
 
-- **타입 안전한 와이어 계약**: `SharedAction` sealed interface로 컴파일 타임에 계약 보장
+- **타입 안전한 와이어 계약**: 공유 액션을 `sealed interface`로 정의하고, `ServerSharedAction`/`ClientSharedAction` 마커로 방향을 명시하여 컴파일 타임에 계약 보장
 - **방향성이 타입에 녹아있음**: `ServerSharedAction`/`ClientSharedAction` 마커로 어떤 액션이 어느 방향인지 명확
 - **인프라 분리**: 미들웨어가 직렬화/라우팅 처리, 개발자는 비즈니스 로직만 작성
 - **선택적 상태 동기화**: `serve`로 서버 State에서 필요한 것만 골라 클라이언트에 전송

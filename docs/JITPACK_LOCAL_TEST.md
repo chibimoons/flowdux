@@ -101,7 +101,7 @@ Required by: project > com.github.chibimoons:flowdux:X.X.X
 
 ## 실패 시 해결 방법
 
-`kotlin/flowdux/build.gradle.kts`와 `kotlin/flowdux-timetravel/build.gradle.kts`에 다음 코드가 있는지 확인:
+`kotlin/flowdux/build.gradle.kts`와 `kotlin/timetravel/build.gradle.kts`에 다음 코드가 있는지 확인:
 
 ```kotlin
 // 파일 맨 아래에 있어야 함

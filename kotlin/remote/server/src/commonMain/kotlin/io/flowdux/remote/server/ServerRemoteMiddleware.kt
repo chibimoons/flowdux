@@ -24,8 +24,8 @@ internal class InternalStartListening : Action
  * and listens for client messages via a [FlowHolderAction]-based client listener.
  *
  * This is the server-side counterpart to [ClientRemoteMiddleware][io.flowdux.remote.ClientRemoteMiddleware]:
- * - Client CRM: intercepts [ServerSharedAction][io.flowdux.remote.ServerSharedAction]s → sends to server, consumed locally
- * - **Server SRM: intercepts [ClientSharedAction]s → sends to client, consumed locally**
+ * - Client CRM: intercepts [ServerSharedAction][io.flowdux.remote.ServerSharedAction]s → sends to server, NOT emitted locally
+ * - **Server SRM: intercepts [ClientSharedAction]s → sends to client, NOT emitted locally**
  *
  * Data flow:
  * ```

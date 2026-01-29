@@ -69,12 +69,12 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     actor Player
-    participant Client as RemoteFlow<br/>Middleware
+    participant Client as ClientRemote<br/>Middleware
     participant WS as Ktor WebSocket<br/>Gateway
     participant Auth as Auth<br/>Middleware
     participant Room as Room<br/>Manager
+    participant SRM as ServerRemote<br/>Middleware
     participant Store as FlowDux Store<br/>(Middleware Pipeline)
-    participant Collector as Response<br/>Collector
     participant View as StateView<br/>Filter
     participant Tick as Tick Batcher<br/>(60fps)
 
@@ -331,9 +331,8 @@ class RoomManager {
             return available
         }
 
-        // 새 Room 생성
+        // 새 Room 생성 (initialize는 WebSocket 핸들러에서 connection과 함께 호출)
         val room = Room(id = "room-${rooms.size + 1}")
-        room.initialize()
         rooms[room.id] = room
         playerRoomMap[playerId] = room.id
         return room
@@ -442,5 +441,4 @@ main()                               GameState, GameAction (상태/액션 정의
 
 - Room 내부 (Store + Middleware + Broadcast): **구현 가능**
 - KtorWebSocketClientConnection disconnect 정리: [#76](https://github.com/chibimoons/flowdux/issues/76)
-- ResponseCollector race condition 수정: [#77](https://github.com/chibimoons/flowdux/issues/77)
 - StateView, Tick Batching: 추가 개발 필요

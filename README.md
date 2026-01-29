@@ -17,6 +17,9 @@ A lightweight Redux-style state management library for **Kotlin Multiplatform** 
 - Built on Kotlin Coroutines and Flow / Dart Streams
 - Kotlin Multiplatform support (JVM, iOS, JS, WASM)
 - Dart/Flutter support with Flutter bindings
+- Real-time remote state synchronization over WebSocket (flowdux-remote)
+- Type-safe shared action contracts (`ServerSharedAction` / `ClientSharedAction`)
+- Automatic serialization with `kotlinx.serialization`
 
 ## Architecture
 
@@ -74,6 +77,36 @@ flowchart TB
 | **FlowHolderAction** | Convert existing Flow to Action stream |
 | **ErrorProcessor** | Catch errors and convert to Actions |
 | **Reducer** | Pure function: (State, Action) → NewState |
+
+### Remote Architecture (flowdux-remote)
+
+For real-time client-server state synchronization over WebSocket:
+
+```mermaid
+flowchart LR
+    subgraph Client
+        CS["Store"] --> CRM["ClientRemote\nMiddleware"]
+    end
+
+    CRM -- "ServerSharedAction\n(encode → send)" --> WS(("WebSocket"))
+    WS -- "ClientSharedAction\n(receive → decode)" --> CRM
+
+    subgraph Server
+        SRM["ServerRemote\nMiddleware"] --> SS["Store"]
+    end
+
+    WS -- "ServerSharedAction\n(receive → decode)" --> SRM
+    SRM -- "ClientSharedAction\n(encode → send)" --> WS
+```
+
+| Component | Role |
+|-----------|------|
+| **ServerSharedAction** | Client → Server action marker (intercepted by CRM, sent over wire) |
+| **ClientSharedAction** | Server → Client action marker (intercepted by SRM, sent over wire) |
+| **ClientRemoteMiddleware** | Intercepts `ServerSharedAction`s, sends to server; listens for server messages |
+| **ServerRemoteMiddleware** | Intercepts `ClientSharedAction`s, sends to client; listens for client messages |
+| **TypedConnection** | Type-safe transport abstraction (encode/decode via `ActionCodec`) |
+| **ActionCodec** | Serialization interface (`kotlinx.serialization` binding provided) |
 
 ### Action Flow
 
@@ -173,6 +206,25 @@ Add the dependency to your `build.gradle.kts`:
 ```kotlin
 dependencies {
     implementation("com.github.chibimoons:flowdux:1.8.2")
+}
+```
+
+#### Remote Modules (WebSocket)
+
+For real-time client-server state sync, add the relevant modules:
+
+```kotlin
+dependencies {
+    // Shared action markers (ServerSharedAction, ClientSharedAction)
+    implementation("com.github.chibimoons.flowdux:flowdux-remote-core:1.8.2")
+    // Client middleware (ClientRemoteMiddleware)
+    implementation("com.github.chibimoons.flowdux:flowdux-remote-client:1.8.2")
+    // Server middleware (ServerRemoteMiddleware)
+    implementation("com.github.chibimoons.flowdux:flowdux-remote-server:1.8.2")
+    // kotlinx.serialization codecs (ActionCodec, MessageCodec)
+    implementation("com.github.chibimoons.flowdux:flowdux-remote-serialization:1.8.2")
+    // Ktor WebSocket transport
+    implementation("com.github.chibimoons.flowdux:flowdux-remote-ktor:1.8.2")
 }
 ```
 
@@ -292,6 +344,63 @@ if (!store.isClosed) {
 ```
 
 **Note:** Dispatching after `close()` is logged via `StoreLogger.onDispatchAfterClose()` and may indicate a bug in your application.
+
+### Remote State Sync (WebSocket)
+
+#### 1. Define Shared Actions
+
+Actions shared between client and server use direction markers:
+
+```kotlin
+@Serializable
+sealed interface SharedChatAction : ChatAction {
+    // Client → Server
+    @Serializable data class SendMessage(val text: String) : SharedChatAction, ServerSharedAction
+    @Serializable data class JoinRoom(val user: String) : SharedChatAction, ServerSharedAction
+
+    // Server → Client
+    @Serializable data class SyncState(val state: ChatState) : SharedChatAction, ClientSharedAction
+}
+```
+
+#### 2. Server Setup
+
+```kotlin
+webSocket("/chat") {
+    val typedConnection = KtorWebSocketServerConnection(this)
+        .typedJson<SharedChatAction>() as TypedServerConnection<ChatAction>
+
+    createStore(
+        initialState = ServerChatState(),
+        reducer = serverChatReducer,
+        middlewares = listOf(ChatServerRemoteMiddleware(typedConnection)),
+    ).serve { serverState ->
+        SharedChatAction.SyncState(serverState.toChatState())
+    }
+}
+```
+
+`serve()` handles client message listening, state synchronization, and store cleanup automatically.
+
+#### 3. Client Setup
+
+```kotlin
+val connection = KtorWebSocketClientConnection.create(
+    host = "localhost", port = 8080, path = "/chat",
+).typedJson<SharedChatAction>() as TypedClientConnection<ChatAction>
+
+val store = createStore(
+    initialState = ClientChatState(),
+    reducer = clientChatReducer,
+    middlewares = listOf(ChatRemoteMiddleware(connection)),
+)
+
+// Connect and interact
+store.dispatch(ClientChatAction.Connect)
+store.dispatch(SharedChatAction.SendMessage("Hello!"))
+```
+
+See `kotlin/samples/remote-chat` for the complete working example.
 
 ### FlowHolderAction (Wrap Existing Flow as Actions)
 
@@ -791,13 +900,43 @@ State: count = 42 [api]
   Result: LoadUser was canceled, only RefreshUser completed!
 ```
 
+### Run Remote Chat Sample (WebSocket)
+
+Start the server:
+```bash
+./gradlew :kotlin:sample-remote-chat:server:run
+```
+
+In a separate terminal, start the client:
+```bash
+./gradlew :kotlin:sample-remote-chat:client:run
+```
+
+Output:
+```
+=== Flowdux Remote Chat Demo ===
+
+[System] Alice joined the room
+[Alice] Hello everyone!
+[System] Bob joined the room
+[Bob] Hi Alice!
+
+--- Final State ---
+Users online: [Alice, Bob]
+Message history:
+  [Alice] Hello everyone!
+  [Bob] Hi Alice!
+
+=== Demo Complete ===
+```
+
 ### Build Android Sample
 
 ```bash
 ./gradlew :kotlin:sample-android:assembleDebug
 ```
 
-APK location: `kotlin/sample-android/build/outputs/apk/debug/sample-android-debug.apk`
+APK location: `kotlin/samples/android/build/outputs/apk/debug/sample-android-debug.apk`
 
 ### Build KMM Sample (Android)
 
@@ -805,7 +944,7 @@ APK location: `kotlin/sample-android/build/outputs/apk/debug/sample-android-debu
 ./gradlew :kotlin:sample-shared:androidApp:assembleDebug
 ```
 
-APK location: `kotlin/sample-shared/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
+APK location: `kotlin/samples/shared/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
 
 ### Build KMM Sample (iOS)
 
@@ -816,16 +955,16 @@ APK location: `kotlin/sample-shared/androidApp/build/outputs/apk/debug/androidAp
 ./gradlew :kotlin:sample-shared:shared:linkDebugFrameworkIosSimulatorArm64
 
 # Build iOS app
-xcodebuild -project kotlin/sample-shared/iosApp/iosApp.xcodeproj \
+xcodebuild -project kotlin/samples/shared/iosApp/iosApp.xcodeproj \
   -target iosApp -sdk iphonesimulator -arch arm64 build
 ```
 
-App location: `kotlin/sample-shared/iosApp/build/Debug-iphonesimulator/iosApp.app`
+App location: `kotlin/samples/shared/iosApp/build/Debug-iphonesimulator/iosApp.app`
 
 ### KMM Sample Structure
 
 ```
-kotlin/sample-shared/
+kotlin/samples/shared/
 ├── shared/           # Shared Kotlin code (commonMain)
 │   └── CounterStore  # Shared business logic
 ├── androidApp/       # Android UI (Compose)
@@ -854,11 +993,12 @@ Opens browser at `http://localhost:8080` with an interactive Counter app (WASM v
 
 | Platform | Status | Sample |
 |----------|--------|--------|
-| JVM | ✅ | `kotlin/sample-jvm` |
-| Android | ✅ | `kotlin/sample-android`, `kotlin/sample-shared/androidApp` |
-| iOS | ✅ | `kotlin/sample-shared/iosApp` |
-| JavaScript | ✅ | `kotlin/sample-web` |
-| WebAssembly | ✅ | `kotlin/sample-wasm` |
+| JVM | ✅ | `kotlin/samples/jvm` |
+| JVM (Remote/WebSocket) | ✅ | `kotlin/samples/remote-chat` |
+| Android | ✅ | `kotlin/samples/android`, `kotlin/samples/shared/androidApp` |
+| iOS | ✅ | `kotlin/samples/shared/iosApp` |
+| JavaScript | ✅ | `kotlin/samples/web` |
+| WebAssembly | ✅ | `kotlin/samples/wasm` |
 
 ### Dart / Flutter
 
