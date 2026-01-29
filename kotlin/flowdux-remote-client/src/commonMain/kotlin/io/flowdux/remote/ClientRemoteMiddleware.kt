@@ -95,11 +95,10 @@ open class ClientRemoteMiddleware<S : State, A : Action>(
         emit(action)
     }
 
-    @Suppress("UNCHECKED_CAST")
     private inner class ServerListenerAction : FlowHolderAction {
         override val delivery: FlowActionDelivery get() = FlowActionDelivery.Dispatch
         override val strategy: ExecutionStrategy get() = concurrent()
 
-        override fun toFlowAction(): Flow<Action> = connection.incoming.map { it as Action }
+        override fun toFlowAction(): Flow<Action> = connection.incoming.map { it }
     }
 }
