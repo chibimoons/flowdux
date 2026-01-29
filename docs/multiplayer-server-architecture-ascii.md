@@ -101,12 +101,10 @@ Server: Ktor WebSocket Handler                              │
 RoomManager.getRoom(userId)                                 │
   │                                                         │
   ▼                                                         │
-ServerSessionHandler.handleMessage(raw)                     │
+ServerRemoteMiddleware (FlowHolderAction으로 수신)           │
   │  TypedServerConnection.incoming 에서 디코딩:            │
   │    내부: MessageCodec → ActionCodec.decode()            │
   │  store.dispatch(action)  ← Middleware Pipeline 통과     │
-  │  4. collector.awaitNextReduction()                      │
-  │  5. collector.drain() → 결과 액션들                     │
   ▼                                                         │
 StateView: 플레이어별 필터링                                │
   │  Player 1 → 자기 주변 상태만                            │

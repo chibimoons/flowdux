@@ -167,8 +167,7 @@ flowchart TD
 | **RoomManager** | 서버 자체 로직 (Room 생성/매칭/삭제) | X |
 | **Room 안의 Store** | `createStore()` - 게임 상태 관리 | **O** |
 | **Room 안의 Middleware Pipeline** | FlowDux `Middleware` (검증, 게임 로직) | **O** |
-| **ServerSessionHandler** | FlowDux remote 모듈 (메시지 ↔ Store 연결) | **O** |
-| **ResponseCollector** | FlowDux remote 모듈 (결과 액션 수집) | **O** |
+| **ServerRemoteMiddleware** | FlowDux remote 모듈 (클라이언트 ↔ Store 연결) | **O** |
 | **Tick Loop / StateView** | 서버 코드 (향후 FlowDux 기능으로 추가 가능) | X |
 
 ```mermaid
@@ -182,11 +181,10 @@ flowchart LR
     subgraph FLOWDUX["FlowDux 영역"]
         STORE["Store\n(GameState)"]
         MW["Middleware\nPipeline"]
-        SSH["ServerSession\nHandler"]
-        RC["Response\nCollector"]
+        SRM["ServerRemote\nMiddleware"]
     end
 
-    WS --> SSH --> STORE --> MW --> RC --> SSH
+    WS --> SRM --> STORE --> MW --> SRM
 ```
 
 ## 5. 샘플 코드: 서버와 FlowDux 통합
@@ -280,27 +278,24 @@ class Room(
     val id: String,
     val maxPlayers: Int = 4,
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val players = ConcurrentHashMap<String, WebSocketSession>()
+
     // FlowDux 영역 ────────────────────────────────
-    private val handler = ServerSessionHandler<GameState, GameAction>(
-        storeFactory = { connection ->
-            val typedConn = connection.typed(actionCodecOf<GameAction>(), JsonMessageCodec())
-            val srm = GameServerRemoteMiddleware(typedConn)
-            createStore(
-                initialState = GameState(),
-                reducer = gameReducer,
-                middlewares = listOf(GameLogicMiddleware(), srm),
-                scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-            )
-        },
-        connection = serverConnection,
-    )
+    private lateinit var store: Store<GameState, GameAction>
+
+    fun initialize(connection: TypedServerConnection<GameAction>) {
+        val srm = GameServerRemoteMiddleware(connection)
+        store = createStore(
+            initialState = GameState(),
+            reducer = gameReducer,
+            middlewares = listOf(GameLogicMiddleware(), srm),
+            scope = scope,
+        )
+    }
     // ──────────────────────────────────────────────
 
     // 서버 코드 영역 ──────────────────────────────
-    private val players = ConcurrentHashMap<String, WebSocketSession>()
-
-    fun initialize() = handler.initialize()
-
     val playerCount: Int get() = players.size
     val isFull: Boolean get() = players.size >= maxPlayers
 
@@ -312,18 +307,10 @@ class Room(
         players.remove(playerId)
     }
 
-    /** 클라이언트 메시지 처리 → 결과를 같은 Room의 모든 플레이어에게 브로드캐스트 */
-    suspend fun handleMessage(raw: String) {
-        val response = handler.handleMessage(raw)
-
-        // 같은 Room의 모든 플레이어에게 전송
-        players.values.forEach { session ->
-            session.send(Frame.Text(response))
-        }
-    }
+    fun dispatch(action: GameAction) = store.dispatch(action)
 
     fun close() {
-        handler.close()
+        store.close()
         players.clear()
     }
     // ──────────────────────────────────────────────
@@ -408,10 +395,9 @@ fun main() {
                         for (frame in incoming) {
                             if (frame is Frame.Text) {
                                 // 여기서 FlowDux 영역 진입:
-                                //   handleMessage → ServerSessionHandler
-                                //   → dispatch → Middleware → Reducer
-                                //   → ResponseCollector → broadcast
-                                room.handleMessage(frame.readText())
+                                //   dispatch → Middleware Pipeline
+                                //   → SRM이 TypedServerConnection.incoming으로 수신 처리
+                                room.dispatch(GameAction./* ... */)
                             }
                         }
                     } finally {
@@ -434,15 +420,15 @@ fun main() {
 main()                               GameState, GameAction (상태/액션 정의)
 ├─ install(Authentication)           gameReducer (상태 변환 로직)
 ├─ install(WebSockets)               GameLogicMiddleware (게임 로직)
-├─ authenticate("game-auth")         ServerSessionHandler (메시지 ↔ Store)
-├─ RoomManager.findOrCreateRoom()    ResponseCollector (결과 수집)
-├─ room.addPlayer()                  createStore() (Store 생성)
+├─ authenticate("game-auth")         ServerRemoteMiddleware (클라이언트 ↔ Store)
+├─ RoomManager.findOrCreateRoom()    createStore() (Store 생성)
+├─ room.addPlayer()
+├─ room.initialize(typedConn)
+│   └─ createStore() ────────────→  Store + Middleware Pipeline
+│       └─ SRM listens ─────────→  TypedServerConnection.incoming
 ├─ for (frame in incoming)
-│   └─ room.handleMessage() ──────→  handler.handleMessage()
-│                                      ├─ decode → dispatch → middleware
-│                                      ├─ reducer → collector
-│                                      └─ encode response
-├─ room.broadcast() ◄────────────── response
+│   └─ 메시지는 SRM이 자동 수신 (FlowHolderAction)
+├─ room.dispatch() ──────────────→  store.dispatch()
 └─ room.removePlayer()
 ```
 
