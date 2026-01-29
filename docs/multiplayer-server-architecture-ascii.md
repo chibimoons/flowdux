@@ -1,5 +1,8 @@
 # FlowDux Multiplayer Game Server Architecture (ASCII)
 
+> **Design Document** — 이 문서는 FlowDux 기반 멀티플레이어 게임 서버의 **목표 아키텍처**를 설명합니다.
+> 현재 구현 상태는 [§5. 현재 구현 상태](#5-현재-구현-상태)를 참고하세요.
+
 ## 1. 전체 아키텍처
 
 ```
