@@ -14,7 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
  *
  * Data flow:
  * ```
- * dispatch(ServerSharedAction) → middleware intercepts → serialize & send via connection
+ * dispatch(ServerSharedAction) → middleware intercepts → connection.send(action)
  *                              → NOT emitted locally
  *
  * startConnection() → emits ServerListenerAction (FlowHolderAction)
@@ -44,15 +44,11 @@ import kotlinx.coroutines.launch
  * }
  * ```
  *
- * @param connection The [ClientConnection] for communicating with the server.
- * @param actionCodec Codec for serializing/deserializing actions.
- * @param messageCodec Codec for wire-level message framing. Defaults to [io.flowdux.remote.serialization.JsonMessageCodec].
+ * @param connection The [TypedClientConnection] for communicating with the server.
  * @param scope Coroutine scope for background tasks.
  */
 open class ClientRemoteMiddleware<S : State, A : Action>(
-    private val connection: ClientConnection,
-    private val actionCodec: ActionCodec<A>,
-    private val messageCodec: MessageCodec = io.flowdux.remote.serialization.JsonMessageCodec(),
+    private val connection: TypedClientConnection<A>,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : Middleware<S, A> {
 
@@ -84,7 +80,7 @@ open class ClientRemoteMiddleware<S : State, A : Action>(
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
         // 1. ServerSharedAction: send to server, do NOT emit locally
         if (action is ServerSharedAction) {
-            sendToServer(action)
+            connection.send(action)
             return@flow
         }
 
@@ -99,22 +95,11 @@ open class ClientRemoteMiddleware<S : State, A : Action>(
         emit(action)
     }
 
-    private suspend fun sendToServer(action: A) {
-        val actionJson = actionCodec.encode(action)
-        val message = messageCodec.encodeActionMessage(actionJson)
-        connection.send(message)
-    }
-
     @Suppress("UNCHECKED_CAST")
     private inner class ServerListenerAction : FlowHolderAction {
         override val delivery: FlowActionDelivery get() = FlowActionDelivery.Dispatch
         override val strategy: ExecutionStrategy get() = concurrent()
 
-        override fun toFlowAction(): Flow<Action> = connection.incoming.transform { raw ->
-            val response = messageCodec.decodeServerMessage(raw)
-            for (actionJson in response.actions) {
-                emit(actionCodec.decode(actionJson) as Action)
-            }
-        }
+        override fun toFlowAction(): Flow<Action> = connection.incoming.map { it as Action }
     }
 }

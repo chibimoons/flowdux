@@ -15,7 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
  * ```kotlin
  * val handler = ServerSessionHandler(
  *     storeFactory = { connection ->
- *         val srm = MyChatSRM(connection)
+ *         val typedConn = connection.typed(actionCodecOf<MyAction>())
+ *         val srm = MyChatSRM(typedConn)
  *         createStore(
  *             initialState = ServerState(),
  *             reducer = serverReducer,

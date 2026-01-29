@@ -8,14 +8,11 @@ import io.flowdux.FlowHolderAction
 import io.flowdux.Middleware
 import io.flowdux.State
 import io.flowdux.concurrent
-import io.flowdux.remote.ActionCodec
 import io.flowdux.remote.ClientSharedAction
-import io.flowdux.remote.MessageCodec
-import io.flowdux.remote.serialization.JsonMessageCodec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.flow.map
 
 /**
  * Server-side middleware that intercepts [ClientSharedAction]s and sends them to the client,
@@ -27,7 +24,7 @@ import kotlinx.coroutines.flow.transform
  *
  * Data flow:
  * ```
- * dispatch(ClientSharedAction) → middleware intercepts → serialize & send via connection
+ * dispatch(ClientSharedAction) → middleware intercepts → connection.send(action)
  *                               → NOT emitted locally
  *
  * startListening() → emits ClientListenerAction (FlowHolderAction)
@@ -40,10 +37,9 @@ import kotlinx.coroutines.flow.transform
  * Subclasses should override [processors] to handle lifecycle actions:
  * ```kotlin
  * class MyChatSRM(
- *     connection: ServerConnection,
+ *     connection: TypedServerConnection<ChatAction>,
  * ) : ServerRemoteMiddleware<ChatState, ChatAction>(
  *     connection = connection,
- *     actionCodec = ChatActionCodec(),
  * ) {
  *     override val processors = buildProcessors {
  *         on<ChatAction.StartListening> { _, _ -> startListening() }
@@ -51,14 +47,10 @@ import kotlinx.coroutines.flow.transform
  * }
  * ```
  *
- * @param connection The transport layer for communicating with the client.
- * @param actionCodec Codec for serializing/deserializing actions.
- * @param messageCodec Codec for wire-level message framing.
+ * @param connection The [TypedServerConnection] for communicating with the client.
  */
 open class ServerRemoteMiddleware<S : State, A : Action>(
-    private val connection: ServerConnection,
-    private val actionCodec: ActionCodec<A>,
-    private val messageCodec: MessageCodec = JsonMessageCodec(),
+    private val connection: TypedServerConnection<A>,
 ) : Middleware<S, A> {
 
     override val name: String = "ServerRemoteMiddleware"
@@ -77,20 +69,18 @@ open class ServerRemoteMiddleware<S : State, A : Action>(
     }
 
     /**
-     * Send an action to the client as an encoded wire message.
+     * Send an action to the client.
      *
      * Call this from within a processor to send a custom message to the client.
      */
     protected suspend fun sendToClient(action: A) {
-        val actionJson = actionCodec.encode(action)
-        val wireMessage = messageCodec.encodeServerResponse(listOf(actionJson))
-        connection.send(wireMessage)
+        connection.send(action)
     }
 
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
         // 1. ClientSharedAction: send to client, do NOT emit locally
         if (action is ClientSharedAction) {
-            sendToClient(action)
+            connection.send(action)
             return@flow
         }
 
@@ -110,9 +100,6 @@ open class ServerRemoteMiddleware<S : State, A : Action>(
         override val delivery: FlowActionDelivery get() = FlowActionDelivery.Dispatch
         override val strategy: ExecutionStrategy get() = concurrent()
 
-        override fun toFlowAction(): Flow<Action> = connection.incoming.transform { raw ->
-            val actionJson = messageCodec.decodeActionFromClient(raw)
-            emit(actionCodec.decode(actionJson) as Action)
-        }
+        override fun toFlowAction(): Flow<Action> = connection.incoming.map { it as Action }
     }
 }

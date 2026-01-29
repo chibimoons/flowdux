@@ -2,7 +2,9 @@ package io.flowdux.sample.chat.server
 
 import io.flowdux.Store
 import io.flowdux.createStore
+import io.flowdux.remote.serialization.actionCodecOf
 import io.flowdux.remote.server.ServerConnection
+import io.flowdux.remote.server.typed
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatState
 import io.flowdux.sample.chat.chatReducer
@@ -51,10 +53,11 @@ private fun createChatStore(session: DefaultWebSocketServerSession): Store<ChatS
             session.send(Frame.Text(message))
         }
     }
+    val typedConnection = connection.typed(actionCodecOf<ChatAction>())
     return createStore(
         initialState = ChatState(),
         reducer = chatReducer,
-        middlewares = listOf(ChatServerMiddleware(), ChatServerRemoteMiddleware(connection)),
+        middlewares = listOf(ChatServerMiddleware(), ChatServerRemoteMiddleware(typedConnection)),
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     )
 }

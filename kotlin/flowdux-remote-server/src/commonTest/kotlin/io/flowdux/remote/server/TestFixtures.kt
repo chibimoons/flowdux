@@ -5,7 +5,6 @@ import io.flowdux.ActionProcessorMap
 import io.flowdux.ErrorProcessor
 import io.flowdux.Reducer
 import io.flowdux.State
-import io.flowdux.remote.ActionCodec
 import io.flowdux.remote.ClientSharedAction
 import io.flowdux.remote.ServerSharedAction
 import kotlinx.coroutines.channels.Channel
@@ -46,49 +45,12 @@ val serverErrorProcessor = object : ErrorProcessor<ServerAction> {
     override fun process(throwable: Throwable): Flow<ServerAction> = emptyFlow()
 }
 
-class ServerActionCodec : ActionCodec<ServerAction> {
-    override fun encode(action: ServerAction): String = when (action) {
-        is ServerAction.StartListening -> """{"type":"StartListening"}"""
-        is ServerAction.ClientAdd -> """{"type":"ClientAdd","value":${action.value}}"""
-        is ServerAction.Add -> """{"type":"Add","value":${action.value}}"""
-        is ServerAction.SetValue -> """{"type":"SetValue","value":${action.value}}"""
-        is ServerAction.Increment -> """{"type":"Increment"}"""
-        is ServerAction.InternalReset -> """{"type":"InternalReset","value":${action.value}}"""
-    }
-
-    override fun decode(json: String): ServerAction = when {
-        json.contains("\"type\":\"StartListening\"") -> ServerAction.StartListening
-        json.contains("\"type\":\"ClientAdd\"") -> {
-            val value = Regex(""""value":(\d+)""").find(json)!!.groupValues[1].toInt()
-            ServerAction.ClientAdd(value)
-        }
-        json.contains("\"type\":\"Add\"") -> {
-            val value = Regex(""""value":(\d+)""").find(json)!!.groupValues[1].toInt()
-            ServerAction.Add(value)
-        }
-        json.contains("\"type\":\"SetValue\"") -> {
-            val value = Regex(""""value":(\d+)""").find(json)!!.groupValues[1].toInt()
-            ServerAction.SetValue(value)
-        }
-        json.contains("\"type\":\"Increment\"") -> ServerAction.Increment
-        json.contains("\"type\":\"InternalReset\"") -> {
-            val value = Regex(""""value":(\d+)""").find(json)!!.groupValues[1].toInt()
-            ServerAction.InternalReset(value)
-        }
-        else -> throw IllegalArgumentException("Unknown action JSON: $json")
-    }
-}
-
 // -- Test SRM subclass --
 
 class TestServerRemoteMiddleware(
-    connection: ServerConnection,
-    actionCodec: ActionCodec<ServerAction>,
-    messageCodec: io.flowdux.remote.MessageCodec = io.flowdux.remote.serialization.JsonMessageCodec(),
+    connection: TypedServerConnection<ServerAction>,
 ) : ServerRemoteMiddleware<ServerState, ServerAction>(
     connection = connection,
-    actionCodec = actionCodec,
-    messageCodec = messageCodec,
 ) {
     override val processors: ActionProcessorMap<ServerState, ServerAction> = buildProcessors {
         on<ServerAction.StartListening> { _, _ ->
@@ -97,20 +59,20 @@ class TestServerRemoteMiddleware(
     }
 }
 
-// -- Mock ServerConnection --
+// -- Mock TypedServerConnection --
 
-class MockServerConnection : ServerConnection {
-    private val incomingChannel = Channel<String>(Channel.BUFFERED)
-    override val incoming: Flow<String> = incomingChannel.receiveAsFlow()
+class MockTypedServerConnection<A : Action> : TypedServerConnection<A> {
+    private val incomingChannel = Channel<A>(Channel.BUFFERED)
+    override val incoming: Flow<A> = incomingChannel.receiveAsFlow()
 
-    val sentMessages = mutableListOf<String>()
+    val sentActions = mutableListOf<A>()
 
-    override suspend fun send(message: String) {
-        sentMessages.add(message)
+    override suspend fun send(action: A) {
+        sentActions.add(action)
     }
 
-    /** Simulate receiving a message from the client. */
-    suspend fun simulateClientMessage(message: String) {
-        incomingChannel.send(message)
+    /** Simulate receiving a typed action from the client. */
+    suspend fun simulateClientAction(action: A) {
+        incomingChannel.send(action)
     }
 }
