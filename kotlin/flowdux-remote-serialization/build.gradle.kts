@@ -35,7 +35,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":kotlin:flowdux"))
-            implementation(project(":kotlin:flowdux-remote-core"))
+            implementation(project(":kotlin:flowdux-remote-client"))
+            implementation(project(":kotlin:flowdux-remote-server"))
+            implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
         }
         commonTest.dependencies {

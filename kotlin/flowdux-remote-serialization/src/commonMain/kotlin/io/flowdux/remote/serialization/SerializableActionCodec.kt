@@ -38,7 +38,7 @@ class SerializableActionCodec<A : Action>(
  *
  * The type parameter is inferred from context, so explicit specification is usually unnecessary:
  * ```kotlin
- * val typedConnection = rawConnection.typed(actionCodecOf<MyAction>())
+ * val typedConnection = rawConnection.typed(actionCodecOf<MyAction>(), JsonMessageCodec())
  * val srm = MyServerRemoteMiddleware(typedConnection)
  * ```
  */

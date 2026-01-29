@@ -1,7 +1,6 @@
 package io.flowdux.remote
 
 import io.flowdux.Action
-import io.flowdux.remote.serialization.JsonMessageCodec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -27,14 +26,3 @@ interface TypedClientConnection<A : Action> {
     /** Close the connection. */
     suspend fun disconnect()
 }
-
-/**
- * Wraps a [ClientConnection] with an [ActionCodec] and [MessageCodec] to produce a [TypedClientConnection].
- *
- * @param actionCodec Codec for serializing/deserializing actions.
- * @param messageCodec Codec for wire-level message framing.
- */
-fun <A : Action> ClientConnection.typed(
-    actionCodec: ActionCodec<A>,
-    messageCodec: MessageCodec = JsonMessageCodec(),
-): TypedClientConnection<A> = DefaultTypedClientConnection(this, actionCodec, messageCodec)

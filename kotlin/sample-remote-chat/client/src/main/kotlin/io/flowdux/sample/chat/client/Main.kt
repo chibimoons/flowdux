@@ -3,6 +3,7 @@ package io.flowdux.sample.chat.client
 import io.flowdux.Store
 import io.flowdux.createStore
 import io.flowdux.remote.ktor.KtorWebSocketConnection
+import io.flowdux.remote.serialization.JsonMessageCodec
 import io.flowdux.remote.serialization.actionCodecOf
 import io.flowdux.remote.typed
 import io.flowdux.sample.chat.ChatAction
@@ -87,7 +88,7 @@ private fun createChatStore(): Store<ChatState, ChatAction> {
         path = "/chat",
         scope = scope,
     )
-    val typedConnection = connection.typed(actionCodecOf<ChatAction>())
+    val typedConnection = connection.typed(actionCodecOf<ChatAction>(), JsonMessageCodec())
     return createStore(
         initialState = ChatState(),
         reducer = chatReducer,

@@ -2,6 +2,7 @@ package io.flowdux.sample.chat.server
 
 import io.flowdux.Store
 import io.flowdux.createStore
+import io.flowdux.remote.serialization.JsonMessageCodec
 import io.flowdux.remote.serialization.actionCodecOf
 import io.flowdux.remote.server.ServerConnection
 import io.flowdux.remote.server.typed
@@ -53,7 +54,7 @@ private fun createChatStore(session: DefaultWebSocketServerSession): Store<ChatS
             session.send(Frame.Text(message))
         }
     }
-    val typedConnection = connection.typed(actionCodecOf<ChatAction>())
+    val typedConnection = connection.typed(actionCodecOf<ChatAction>(), JsonMessageCodec())
     return createStore(
         initialState = ChatState(),
         reducer = chatReducer,
