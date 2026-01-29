@@ -1,58 +1,43 @@
 package io.flowdux.sample.chat
 
 import io.flowdux.Action
-import io.flowdux.Reducer
 import io.flowdux.State
-import io.flowdux.buildReducer
-import io.flowdux.remote.SharedAction
+import io.flowdux.remote.ClientSharedAction
+import io.flowdux.remote.ServerSharedAction
+import kotlinx.serialization.Serializable
 
+// -- State --
+
+@Serializable
 data class ChatState(
     val messages: List<ChatMessage> = emptyList(),
     val users: Set<String> = emptySet(),
     val lastEvent: ChatEvent? = null,
 ) : State
 
+@Serializable
 data class ChatMessage(val user: String, val text: String)
 
+@Serializable
 sealed interface ChatEvent {
-    data class UserJoined(val user: String) : ChatEvent
-    data class UserLeft(val user: String) : ChatEvent
-    data class MessageReceived(val user: String, val text: String) : ChatEvent
+    @Serializable data class UserJoined(val user: String) : ChatEvent
+    @Serializable data class UserLeft(val user: String) : ChatEvent
+    @Serializable data class MessageReceived(val user: String, val text: String) : ChatEvent
 }
 
-sealed interface ChatAction : Action {
-    // Lifecycle (local only)
-    data object Connect : ChatAction
-    data object Disconnect : ChatAction
+// -- Actions --
 
-    // Client → Server (SharedAction)
-    data class SendMessage(val user: String, val text: String) : ChatAction, SharedAction
-    data class JoinRoom(val user: String) : ChatAction, SharedAction
-    data class LeaveRoom(val user: String) : ChatAction, SharedAction
+/** Base action type for the chat sample. Non-sealed to allow local subtypes per module. */
+interface ChatAction : Action
 
-    // Server → Client (local reducer only)
-    data class MessageReceived(val user: String, val text: String) : ChatAction
-    data class UserJoined(val user: String) : ChatAction
-    data class UserLeft(val user: String) : ChatAction
-}
+/** Actions that cross the wire between client and server. */
+@Serializable
+sealed interface SharedChatAction : ChatAction {
+    // Client → Server
+    @Serializable data class SendMessage(val user: String, val text: String) : SharedChatAction, ServerSharedAction
+    @Serializable data class JoinRoom(val user: String) : SharedChatAction, ServerSharedAction
+    @Serializable data class LeaveRoom(val user: String) : SharedChatAction, ServerSharedAction
 
-val chatReducer: Reducer<ChatState, ChatAction> = buildReducer {
-    on<ChatAction.MessageReceived> { state, action ->
-        state.copy(
-            messages = state.messages + ChatMessage(action.user, action.text),
-            lastEvent = ChatEvent.MessageReceived(user = action.user, text = action.text),
-        )
-    }
-    on<ChatAction.UserJoined> { state, action ->
-        state.copy(
-            users = state.users + action.user,
-            lastEvent = ChatEvent.UserJoined(user = action.user),
-        )
-    }
-    on<ChatAction.UserLeft> { state, action ->
-        state.copy(
-            users = state.users - action.user,
-            lastEvent = ChatEvent.UserLeft(user = action.user),
-        )
-    }
+    // Server → Client
+    @Serializable data class SyncState(val state: ChatState) : SharedChatAction, ClientSharedAction
 }

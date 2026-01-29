@@ -1,14 +1,13 @@
 package io.flowdux.sample.chat.client
 
+import io.flowdux.Store
 import io.flowdux.createStore
-import io.flowdux.remote.ktor.KtorWebSocketConnection
+import io.flowdux.remote.TypedClientConnection
+import io.flowdux.remote.ktor.KtorWebSocketClientConnection
+import io.flowdux.remote.serialization.typedJson
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatEvent
-import io.flowdux.sample.chat.ChatState
-import io.flowdux.sample.chat.chatReducer
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import io.flowdux.sample.chat.SharedChatAction
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -17,20 +16,8 @@ fun main() = runBlocking {
     println("=== Flowdux Remote Chat Demo ===")
     println()
 
-    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    val connection = KtorWebSocketConnection.create(
-        host = "localhost",
-        port = 8080,
-        path = "/chat",
-        scope = scope,
-    )
-    val middleware = ChatRemoteMiddleware(connection, scope)
-    val store = createStore(
-        initialState = ChatState(),
-        reducer = chatReducer,
-        middlewares = listOf(middleware),
-        scope = scope,
-    )
+    val store = createChatStore()
+
     // Observe state changes
     val collectorJob = launch {
         store.state.collect { state ->
@@ -43,36 +30,38 @@ fun main() = runBlocking {
         }
     }
 
-    // Connect to server
-    store.dispatch(ChatAction.Connect)
+    // Set current user and connect
+    store.dispatch(ClientChatAction.SetCurrentUser("Alice"))
+    store.dispatch(ClientChatAction.Connect)
     delay(500)
 
     // Simulate chat
     println("--- Simulating chat ---")
     println()
 
-    store.dispatch(ChatAction.JoinRoom("Alice"))
+    store.dispatch(SharedChatAction.JoinRoom("Alice"))
     delay(500)
 
-    store.dispatch(ChatAction.JoinRoom("Bob"))
+    store.dispatch(SharedChatAction.JoinRoom("Bob"))
     delay(500)
 
-    store.dispatch(ChatAction.SendMessage("Alice", "Hello everyone!"))
+    store.dispatch(SharedChatAction.SendMessage("Alice", "Hello everyone!"))
     delay(500)
 
-    store.dispatch(ChatAction.SendMessage("Bob", "Hi Alice!"))
+    store.dispatch(SharedChatAction.SendMessage("Bob", "Hi Alice!"))
     delay(500)
 
-    store.dispatch(ChatAction.SendMessage("Alice", "How are you?"))
+    store.dispatch(SharedChatAction.SendMessage("Alice", "How are you?"))
     delay(500)
 
-    store.dispatch(ChatAction.LeaveRoom("Bob"))
+    store.dispatch(SharedChatAction.LeaveRoom("Bob"))
     delay(500)
 
     // Print final state
     println()
     println("--- Final State ---")
     val finalState = store.currentState
+    println("Current user: ${finalState.currentUser}")
     println("Users online: ${finalState.users}")
     println("Message history:")
     for (msg in finalState.messages) {
@@ -81,9 +70,23 @@ fun main() = runBlocking {
 
     // Cleanup
     collectorJob.cancel()
-    store.dispatch(ChatAction.Disconnect)
+    store.dispatch(ClientChatAction.Disconnect)
     store.close()
 
     println()
     println("=== Demo Complete ===")
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun createChatStore(): Store<ClientChatState, ChatAction> {
+    val connection = KtorWebSocketClientConnection.create(
+        host = "localhost",
+        port = 8080,
+        path = "/chat",
+    ).typedJson<SharedChatAction>() as TypedClientConnection<ChatAction>
+    return createStore(
+        initialState = ClientChatState(),
+        reducer = clientChatReducer,
+        middlewares = listOf(ChatRemoteMiddleware(connection)),
+    )
 }

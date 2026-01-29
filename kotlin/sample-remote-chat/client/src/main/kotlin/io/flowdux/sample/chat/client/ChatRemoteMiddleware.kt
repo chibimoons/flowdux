@@ -1,27 +1,22 @@
 package io.flowdux.sample.chat.client
 
 import io.flowdux.ActionProcessorMap
-import io.flowdux.remote.RemoteConnection
-import io.flowdux.remote.RemoteFlowMiddleware
+import io.flowdux.remote.ClientRemoteMiddleware
+import io.flowdux.remote.TypedClientConnection
 import io.flowdux.sample.chat.ChatAction
-import io.flowdux.sample.chat.ChatState
-import kotlinx.coroutines.CoroutineScope
 
 class ChatRemoteMiddleware(
-    connection: RemoteConnection,
-    scope: CoroutineScope,
-) : RemoteFlowMiddleware<ChatState, ChatAction>(
+    connection: TypedClientConnection<ChatAction>,
+) : ClientRemoteMiddleware<ClientChatState, ChatAction>(
     connection = connection,
-    actionCodec = io.flowdux.sample.chat.ChatActionCodec(),
-    scope = scope,
 ) {
     override val name: String = "ChatRemoteMiddleware"
 
-    override val processors: ActionProcessorMap<ChatState, ChatAction> = buildProcessors {
-        on<ChatAction.Connect> { _, _ ->
+    override val processors: ActionProcessorMap<ClientChatState, ChatAction> = buildProcessors {
+        on<ClientChatAction.Connect> { _, _ ->
             startConnection()
         }
-        on<ChatAction.Disconnect> { _, _ ->
+        on<ClientChatAction.Disconnect> { _, _ ->
             stopConnection()
         }
     }

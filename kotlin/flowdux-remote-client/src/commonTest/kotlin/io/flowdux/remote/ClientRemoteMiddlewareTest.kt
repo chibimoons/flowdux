@@ -10,17 +10,13 @@ import kotlin.test.assertTrue
 import kotlin.test.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class RemoteFlowMiddlewareTest {
-
-    private val actionCodec = TestActionCodec()
-    private val messageCodec = JsonMessageCodec()
+class ClientRemoteMiddlewareTest {
 
     @Test
-    fun `SharedAction is intercepted and sent to server`() = runTest {
-        val connection = MockRemoteConnection()
-        val middleware = TestRemoteFlowMiddleware(
+    fun `ServerSharedAction is intercepted and sent to server`() = runTest {
+        val connection = MockTypedClientConnection<TestAction>()
+        val middleware = TestClientRemoteMiddleware(
             connection = connection,
-            actionCodec = actionCodec,
             scope = backgroundScope,
         )
 
@@ -41,23 +37,23 @@ class RemoteFlowMiddlewareTest {
             store.dispatch(TestAction.ServerAdd(5))
             delay(100) // wait for send
 
-            // No state change because SharedAction is NOT emitted locally
+            // No state change because ServerSharedAction is NOT emitted locally
             expectNoEvents()
 
-            // Verify it was sent to the server
-            assertEquals(1, connection.sentMessages.size)
-            assertTrue(connection.sentMessages[0].contains("ServerAdd"))
+            // Verify it was sent to the server as a typed action
+            assertEquals(1, connection.sentActions.size)
+            assertTrue(connection.sentActions[0] is TestAction.ServerAdd)
+            assertEquals(5, (connection.sentActions[0] as TestAction.ServerAdd).value)
 
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `non-SharedAction passes through to local reducer`() = runTest {
-        val connection = MockRemoteConnection()
-        val middleware = TestRemoteFlowMiddleware(
+    fun `non-ServerSharedAction passes through to local reducer`() = runTest {
+        val connection = MockTypedClientConnection<TestAction>()
+        val middleware = TestClientRemoteMiddleware(
             connection = connection,
-            actionCodec = actionCodec,
             scope = backgroundScope,
         )
 
@@ -82,7 +78,7 @@ class RemoteFlowMiddlewareTest {
             assertEquals(TestState(count = 11), awaitItem())
 
             // Nothing sent to server
-            assertEquals(0, connection.sentMessages.size)
+            assertEquals(0, connection.sentActions.size)
 
             cancelAndIgnoreRemainingEvents()
         }
@@ -90,10 +86,9 @@ class RemoteFlowMiddlewareTest {
 
     @Test
     fun `server response actions are dispatched to local store`() = runTest {
-        val connection = MockRemoteConnection()
-        val middleware = TestRemoteFlowMiddleware(
+        val connection = MockTypedClientConnection<TestAction>()
+        val middleware = TestClientRemoteMiddleware(
             connection = connection,
-            actionCodec = actionCodec,
             scope = backgroundScope,
         )
 
@@ -111,11 +106,8 @@ class RemoteFlowMiddlewareTest {
             store.dispatch(TestAction.Connect)
             delay(100)
 
-            // Simulate server sending a response with an Add action (non-SharedAction)
-            val serverResponse = messageCodec.encodeServerResponse(
-                actions = listOf("""{"type":"Add","value":42}"""),
-            )
-            connection.simulateServerMessage(serverResponse)
+            // Simulate server sending a typed Add action
+            connection.simulateServerAction(TestAction.Add(42))
 
             assertEquals(TestState(count = 42), awaitItem())
 
@@ -124,11 +116,10 @@ class RemoteFlowMiddlewareTest {
     }
 
     @Test
-    fun `non-SharedAction server responses pass through without being sent to server`() = runTest {
-        val connection = MockRemoteConnection()
-        val middleware = TestRemoteFlowMiddleware(
+    fun `non-ServerSharedAction server responses pass through without being sent to server`() = runTest {
+        val connection = MockTypedClientConnection<TestAction>()
+        val middleware = TestClientRemoteMiddleware(
             connection = connection,
-            actionCodec = actionCodec,
             scope = backgroundScope,
         )
 
@@ -146,16 +137,13 @@ class RemoteFlowMiddlewareTest {
             store.dispatch(TestAction.Connect)
             delay(100)
 
-            // Simulate server sending a non-SharedAction response
-            val serverResponse = messageCodec.encodeServerResponse(
-                actions = listOf("""{"type":"Add","value":10}"""),
-            )
-            connection.simulateServerMessage(serverResponse)
+            // Simulate server sending a non-ServerSharedAction response
+            connection.simulateServerAction(TestAction.Add(10))
 
             assertEquals(TestState(count = 10), awaitItem())
 
-            // Non-SharedAction server responses should NOT be sent to server
-            assertEquals(0, connection.sentMessages.size)
+            // Non-ServerSharedAction server responses should NOT be sent to server
+            assertEquals(0, connection.sentActions.size)
 
             cancelAndIgnoreRemainingEvents()
         }
@@ -163,10 +151,9 @@ class RemoteFlowMiddlewareTest {
 
     @Test
     fun `multiple server response actions are all dispatched`() = runTest {
-        val connection = MockRemoteConnection()
-        val middleware = TestRemoteFlowMiddleware(
+        val connection = MockTypedClientConnection<TestAction>()
+        val middleware = TestClientRemoteMiddleware(
             connection = connection,
-            actionCodec = actionCodec,
             scope = backgroundScope,
         )
 
@@ -184,14 +171,10 @@ class RemoteFlowMiddlewareTest {
             store.dispatch(TestAction.Connect)
             delay(100)
 
-            val serverResponse = messageCodec.encodeServerResponse(
-                actions = listOf(
-                    """{"type":"Add","value":10}""",
-                    """{"type":"Add","value":20}""",
-                    """{"type":"SetMessage","message":"done"}""",
-                ),
-            )
-            connection.simulateServerMessage(serverResponse)
+            // Simulate server sending multiple actions sequentially
+            connection.simulateServerAction(TestAction.Add(10))
+            connection.simulateServerAction(TestAction.Add(20))
+            connection.simulateServerAction(TestAction.SetMessage("done"))
 
             // All three actions should be dispatched; collect the final state
             var lastState = TestState()

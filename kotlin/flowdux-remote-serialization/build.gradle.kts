@@ -1,10 +1,11 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.kotlinSerialization)
     `maven-publish`
 }
 
 group = "io.flowdux"
-version = "1.0.0"
+version = "1.8.2"
 
 // JitPack only publishes JVM artifacts to avoid variant resolution issues for JVM/Android consumers
 val isJitPack = System.getenv("JITPACK") == "true"
@@ -17,23 +18,30 @@ kotlin {
         iosX64()
         iosArm64()
         iosSimulatorArm64()
+
+        // JavaScript
+        js(IR) {
+            browser()
+            nodejs()
+        }
+
+        // WebAssembly
+        @OptIn(org.jetbrains.kotlin.gradle.targets.js.dsl.ExperimentalWasmDsl::class)
+        wasmJs {
+            browser()
+        }
     }
 
     sourceSets {
         commonMain.dependencies {
-            api(project(":kotlin:flowdux-remote-client"))
+            implementation(project(":kotlin:flowdux"))
+            implementation(project(":kotlin:flowdux-remote-client"))
+            implementation(project(":kotlin:flowdux-remote-server"))
             implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.ktor.client.core.multiplatform)
-            implementation(libs.ktor.client.websockets.multiplatform)
+            implementation(libs.kotlinx.serialization.json)
         }
-        jvmMain.dependencies {
-            implementation(libs.ktor.client.cio.multiplatform)
-            api(project(":kotlin:flowdux-remote-server"))
-        }
-        if (!isJitPack) {
-            iosMain.dependencies {
-                implementation(libs.ktor.client.darwin)
-            }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
         }
     }
 
@@ -52,8 +60,8 @@ publishing {
     publications {
         withType<MavenPublication> {
             pom {
-                name.set("Flowdux Remote Ktor")
-                description.set("Ktor WebSocket implementation for Flowdux remote modules")
+                name.set("Flowdux Remote Serialization")
+                description.set("kotlinx.serialization-based ActionCodec for Flowdux remote state management")
                 url.set("https://github.com/chibimoons/flowdux")
 
                 licenses {

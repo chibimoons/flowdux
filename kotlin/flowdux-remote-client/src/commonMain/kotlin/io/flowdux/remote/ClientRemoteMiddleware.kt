@@ -14,27 +14,27 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * Middleware that intercepts [SharedAction]s and sends them to a remote server,
+ * Client-side middleware that intercepts [ServerSharedAction]s and sends them to the server,
  * and listens for server responses via a [FlowHolderAction]-based server listener.
  *
  * Data flow:
  * ```
- * dispatch(SharedAction) → middleware intercepts → serialize & send via connection
- *                        → NOT emitted locally
+ * dispatch(ServerSharedAction) → middleware intercepts → connection.send(action)
+ *                              → NOT emitted locally
  *
  * startConnection() → emits ServerListenerAction (FlowHolderAction)
  *   → FlowHolderMiddleware resolves → listens for server messages
  *   → server actions dispatched through full middleware pipeline
  * ```
  *
- * Non-[SharedAction] actions pass through unmodified, unless a processor is registered.
+ * Non-[ServerSharedAction] actions pass through unmodified, unless a processor is registered.
  *
- * Server response actions must NOT implement [SharedAction] to avoid
- * being re-sent to the server when dispatched through the pipeline.
+ * Server response actions should implement [ClientSharedAction] instead of [ServerSharedAction]
+ * to avoid being re-sent to the server when dispatched through the pipeline.
  *
  * Subclasses should override [processors] to handle specific actions:
  * ```kotlin
@@ -44,19 +44,15 @@ import kotlinx.coroutines.launch
  * }
  * ```
  *
- * @param connection The transport layer for communicating with the server.
- * @param actionCodec Codec for serializing/deserializing actions.
- * @param messageCodec Codec for wire-level message framing. Defaults to [JsonMessageCodec].
+ * @param connection The [TypedClientConnection] for communicating with the server.
  * @param scope Coroutine scope for background tasks.
  */
-open class RemoteFlowMiddleware<S : State, A : Action>(
-    private val connection: RemoteConnection,
-    private val actionCodec: ActionCodec<A>,
-    private val messageCodec: MessageCodec = JsonMessageCodec(),
+open class ClientRemoteMiddleware<S : State, A : Action>(
+    private val connection: TypedClientConnection<A>,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : Middleware<S, A> {
 
-    override val name: String = "RemoteFlowMiddleware"
+    override val name: String = "ClientRemoteMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     /**
@@ -82,9 +78,9 @@ open class RemoteFlowMiddleware<S : State, A : Action>(
     }
 
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
-        // 1. SharedAction: send to server, do NOT emit locally
-        if (action is SharedAction) {
-            sendToServer(action)
+        // 1. ServerSharedAction: send to server, do NOT emit locally
+        if (action is ServerSharedAction) {
+            connection.send(action)
             return@flow
         }
 
@@ -99,22 +95,10 @@ open class RemoteFlowMiddleware<S : State, A : Action>(
         emit(action)
     }
 
-    private suspend fun sendToServer(action: A) {
-        val actionJson = actionCodec.encode(action)
-        val message = messageCodec.encodeActionMessage(actionJson)
-        connection.send(message)
-    }
-
-    @Suppress("UNCHECKED_CAST")
     private inner class ServerListenerAction : FlowHolderAction {
         override val delivery: FlowActionDelivery get() = FlowActionDelivery.Dispatch
         override val strategy: ExecutionStrategy get() = concurrent()
 
-        override fun toFlowAction(): Flow<Action> = connection.incoming.transform { raw ->
-            val response = messageCodec.decodeServerMessage(raw)
-            for (actionJson in response.actions) {
-                emit(actionCodec.decode(actionJson) as Action)
-            }
-        }
+        override fun toFlowAction(): Flow<Action> = connection.incoming.map { it }
     }
 }

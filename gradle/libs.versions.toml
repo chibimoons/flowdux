@@ -9,6 +9,7 @@ compose-bom = "2024.02.00"
 activity-compose = "1.8.2"
 lifecycle = "2.7.0"
 ktor = "2.3.7"
+kotlinx-serialization-json = "1.7.3"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -34,6 +35,7 @@ ktor-client-core-multiplatform = { module = "io.ktor:ktor-client-core", version.
 ktor-client-cio-multiplatform = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-websockets-multiplatform = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -42,3 +44,4 @@ kotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
 kotlinCompose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

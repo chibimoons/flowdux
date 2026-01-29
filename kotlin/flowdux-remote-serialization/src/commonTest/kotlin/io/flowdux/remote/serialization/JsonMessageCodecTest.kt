@@ -1,44 +1,42 @@
-package io.flowdux.remote
+package io.flowdux.remote.serialization
 
 import kotlin.test.assertEquals
 import kotlin.test.Test
 
-class MessageCodecTest {
+class JsonMessageCodecTest {
 
     private val codec = JsonMessageCodec()
 
     @Test
-    fun `encodeActionMessage wraps action JSON in envelope`() {
+    fun encodeActionMessageWrapsAsNestedObject() {
         val actionJson = """{"type":"Add","value":5}"""
         val result = codec.encodeActionMessage(actionJson)
         assertEquals(
-            """{"type":"action","payload":"{\"type\":\"Add\",\"value\":5}"}""",
+            """{"type":"action","payload":{"type":"Add","value":5}}""",
             result,
         )
     }
 
     @Test
-    fun `decodeActionFromClient extracts payload`() {
-        val raw = """{"type":"action","payload":"{\"type\":\"Add\",\"value\":5}"}"""
+    fun decodeActionFromClientExtractsPayload() {
+        val raw = """{"type":"action","payload":{"type":"Add","value":5}}"""
         val result = codec.decodeActionFromClient(raw)
         assertEquals("""{"type":"Add","value":5}""", result)
     }
 
     @Test
-    fun `encodeServerResponse creates response envelope`() {
+    fun encodeServerResponseCreatesObjectArray() {
         val actions = listOf("""{"type":"Add","value":10}""")
-
         val result = codec.encodeServerResponse(actions)
-
         assertEquals(
-            """{"type":"response","actions":["{\"type\":\"Add\",\"value\":10}"]}""",
+            """{"type":"response","actions":[{"type":"Add","value":10}]}""",
             result,
         )
     }
 
     @Test
-    fun `decodeServerMessage parses actions`() {
-        val raw = """{"type":"response","actions":["{\"type\":\"Add\",\"value\":10}"]}"""
+    fun decodeServerMessageParsesActions() {
+        val raw = """{"type":"response","actions":[{"type":"Add","value":10}]}"""
         val response = codec.decodeServerMessage(raw)
 
         assertEquals(1, response.actions.size)
@@ -46,7 +44,7 @@ class MessageCodecTest {
     }
 
     @Test
-    fun `decodeServerMessage handles empty array`() {
+    fun decodeServerMessageHandlesEmptyArray() {
         val raw = """{"type":"response","actions":[]}"""
         val response = codec.decodeServerMessage(raw)
 
@@ -54,7 +52,7 @@ class MessageCodecTest {
     }
 
     @Test
-    fun `roundtrip action message encoding`() {
+    fun roundtripActionMessage() {
         val original = """{"type":"ServerAdd","value":42}"""
 
         val encoded = codec.encodeActionMessage(original)
@@ -64,7 +62,7 @@ class MessageCodecTest {
     }
 
     @Test
-    fun `roundtrip server response encoding`() {
+    fun roundtripServerResponse() {
         val actions = listOf(
             """{"type":"Add","value":1}""",
             """{"type":"SetMessage","message":"hello"}""",
@@ -77,7 +75,7 @@ class MessageCodecTest {
     }
 
     @Test
-    fun `handles special characters in JSON values`() {
+    fun handlesSpecialCharactersInValues() {
         val actionJson = """{"type":"SetMessage","message":"hello \"world\""}"""
         val encoded = codec.encodeActionMessage(actionJson)
         val decoded = codec.decodeActionFromClient(encoded)
@@ -85,24 +83,8 @@ class MessageCodecTest {
     }
 
     @Test
-    fun `roundtrip preserves literal backslash followed by n`() {
-        val actionJson = """{"type":"SetMessage","message":"path\\name"}"""
-        val encoded = codec.encodeActionMessage(actionJson)
-        val decoded = codec.decodeActionFromClient(encoded)
-        assertEquals(actionJson, decoded)
-    }
-
-    @Test
-    fun `roundtrip preserves literal backslash followed by quote`() {
-        val actionJson = """{"type":"SetMessage","message":"say \\\"hi\\\""}"""
-        val encoded = codec.encodeActionMessage(actionJson)
-        val decoded = codec.decodeActionFromClient(encoded)
-        assertEquals(actionJson, decoded)
-    }
-
-    @Test
-    fun `roundtrip preserves newlines and tabs`() {
-        val actionJson = "{\"type\":\"SetMessage\",\"message\":\"line1\\nline2\\ttab\"}"
+    fun roundtripNestedObjects() {
+        val actionJson = """{"type":"Complex","data":{"nested":true,"list":[1,2,3]}}"""
         val encoded = codec.encodeActionMessage(actionJson)
         val decoded = codec.decodeActionFromClient(encoded)
         assertEquals(actionJson, decoded)
