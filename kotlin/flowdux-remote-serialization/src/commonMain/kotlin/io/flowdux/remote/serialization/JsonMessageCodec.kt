@@ -31,7 +31,9 @@ class JsonMessageCodec(
 
     override fun decodeActionFromClient(raw: String): String {
         val obj = json.parseToJsonElement(raw).jsonObject
-        return json.encodeToString(JsonElement.serializer(), obj["payload"]!!)
+        val payload = obj["payload"]
+            ?: error("Missing \"payload\" field in client message: $raw")
+        return json.encodeToString(JsonElement.serializer(), payload)
     }
 
     override fun encodeServerResponse(actions: List<String>): String {
@@ -44,7 +46,9 @@ class JsonMessageCodec(
 
     override fun decodeServerMessage(raw: String): ServerResponse {
         val obj = json.parseToJsonElement(raw).jsonObject
-        val actions = obj["actions"]!!.jsonArray.map {
+        val actionsElement = obj["actions"]
+            ?: error("Missing \"actions\" field in server message: $raw")
+        val actions = actionsElement.jsonArray.map {
             json.encodeToString(JsonElement.serializer(), it)
         }
         return ServerResponse(actions = actions)

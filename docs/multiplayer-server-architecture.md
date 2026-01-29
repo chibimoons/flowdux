@@ -80,7 +80,7 @@ sequenceDiagram
 
     Player->>Client: Action 발생 (캐릭터 이동)
     activate Client
-    Client->>Client: SharedAction 감지
+    Client->>Client: ServerSharedAction 감지
     Client->>Client: TypedClientConnection.send(action)
     Note right of Client: 내부: ActionCodec.encode()<br/>→ MessageCodec.encodeActionMessage()
     Client->>WS: WSS 전송
@@ -97,23 +97,19 @@ sequenceDiagram
     Room-->>WS: Room A
     deactivate Room
 
-    WS->>Store: handleMessage(raw)
-    activate Store
-    Store->>Store: TypedServerConnection.incoming
-    Note right of Store: 내부: MessageCodec.decodeActionFromClient()<br/>→ ActionCodec.decode()
-    Store->>Store: dispatch(action)
+    WS->>SRM: TypedServerConnection.incoming
+    activate SRM
+    Note right of SRM: 내부: MessageCodec.decodeActionFromClient()<br/>→ ActionCodec.decode()
+    SRM->>Store: dispatch(action)
 
-    Note over Store: Middleware Pipeline<br/>1. Validation<br/>2. AuthCheck<br/>3. GameLogic
+    Note over Store: Middleware Pipeline<br/>1. Validation<br/>2. AuthCheck<br/>3. GameLogic<br/>4. ServerRemoteMiddleware
 
-    Store->>Collector: onStateReduced()
-    activate Collector
-    Collector-->>Store: awaitNextReduction()
-    Store->>Collector: drain()
-    Collector-->>Store: 결과 액션 리스트
-    deactivate Collector
-    deactivate Store
+    Store->>Store: reducer → state 업데이트
+    Store->>SRM: serve() → state 변경 감지
+    Note right of SRM: ClientSharedAction 인터셉트<br/>→ connection.send(action)
+    deactivate SRM
 
-    Store->>View: 결과 액션 전달
+    SRM->>View: 상태 전달
     activate View
     View->>View: 플레이어별 상태 필터링
     View-->>Tick: 필터된 상태
@@ -122,7 +118,7 @@ sequenceDiagram
     activate Tick
     Note over Tick: 16.67ms 간격으로<br/>누적 상태 배치 전송
 
-    Tick->>WS: encodeServerResponse()
+    Tick->>WS: TypedServerConnection.send()
     deactivate Tick
 
     WS->>Client: WSS 응답
@@ -204,17 +200,17 @@ data class Player(val id: String, val x: Float, val y: Float, val hp: Int = 100)
 data class Projectile(val ownerId: String, val x: Float, val y: Float, val dx: Float, val dy: Float)
 
 sealed interface GameAction : Action {
-    // Client → Server (SharedAction)
-    data class Move(val playerId: String, val x: Float, val y: Float) : GameAction, SharedAction
-    data class Shoot(val playerId: String, val dx: Float, val dy: Float) : GameAction, SharedAction
-    data class JoinGame(val playerId: String) : GameAction, SharedAction
+    // Client → Server (ServerSharedAction)
+    data class Move(val playerId: String, val x: Float, val y: Float) : GameAction, ServerSharedAction
+    data class Shoot(val playerId: String, val dx: Float, val dy: Float) : GameAction, ServerSharedAction
+    data class JoinGame(val playerId: String) : GameAction, ServerSharedAction
 
-    // Server → Client (결과 액션, 로컬 리듀서용)
-    data class PlayerMoved(val playerId: String, val x: Float, val y: Float) : GameAction
-    data class ProjectileFired(val projectile: Projectile) : GameAction
-    data class PlayerJoined(val player: Player) : GameAction
-    data class PlayerHit(val playerId: String, val damage: Int) : GameAction
-    data class TickUpdate(val tick: Long) : GameAction
+    // Server → Client (ClientSharedAction)
+    data class PlayerMoved(val playerId: String, val x: Float, val y: Float) : GameAction, ClientSharedAction
+    data class ProjectileFired(val projectile: Projectile) : GameAction, ClientSharedAction
+    data class PlayerJoined(val player: Player) : GameAction, ClientSharedAction
+    data class PlayerHit(val playerId: String, val damage: Int) : GameAction, ClientSharedAction
+    data class TickUpdate(val tick: Long) : GameAction, ClientSharedAction
 }
 
 val gameReducer: Reducer<GameState, GameAction> = buildReducer {
@@ -240,7 +236,7 @@ val gameReducer: Reducer<GameState, GameAction> = buildReducer {
 ```kotlin
 // server 모듈
 
-/** SharedAction을 검증하고 결과 액션으로 변환하는 미들웨어 */
+/** ServerSharedAction을 검증하고 결과 액션으로 변환하는 미들웨어 */
 class GameLogicMiddleware : Middleware<GameState, GameAction> {
     override val name = "GameLogic"
 
@@ -445,6 +441,6 @@ main()                               GameState, GameAction (상태/액션 정의
 ## 7. 현재 구현 상태
 
 - Room 내부 (Store + Middleware + Broadcast): **구현 가능**
-- KtorWebSocketConnection disconnect 정리: [#76](https://github.com/chibimoons/flowdux/issues/76)
+- KtorWebSocketClientConnection disconnect 정리: [#76](https://github.com/chibimoons/flowdux/issues/76)
 - ResponseCollector race condition 수정: [#77](https://github.com/chibimoons/flowdux/issues/77)
 - StateView, Tick Batching: 추가 개발 필요

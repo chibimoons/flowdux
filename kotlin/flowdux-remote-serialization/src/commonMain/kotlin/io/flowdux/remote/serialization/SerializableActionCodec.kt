@@ -9,8 +9,12 @@ import kotlinx.serialization.serializer
 /**
  * [ActionCodec] implementation backed by `kotlinx.serialization`.
  *
- * Uses `classDiscriminator = "type"` by default so the wire format matches
- * the manual codec convention (`{"type":"ActionName", ...}`).
+ * Configures `classDiscriminator = "type"` by default so the discriminator
+ * **field name** matches the manual codec convention (`{"type": "...", ...}`).
+ * Note that the discriminator **value** is determined by `kotlinx.serialization`
+ * (the serial name of each subclass, which defaults to the qualified class name).
+ * To use short names like `{"type":"SendMessage", ...}`, annotate subclasses
+ * with `@SerialName("SendMessage")`.
  *
  * Usage:
  * ```kotlin

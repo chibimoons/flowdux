@@ -2,25 +2,19 @@ package io.flowdux.sample.chat.server
 
 import io.flowdux.Store
 import io.flowdux.createStore
-import io.flowdux.remote.serialization.JsonMessageCodec
-import io.flowdux.remote.serialization.actionCodecOf
-import io.flowdux.remote.server.ServerConnection
-import io.flowdux.remote.server.typed
+import io.flowdux.remote.ktor.KtorWebSocketServerConnection
+import io.flowdux.remote.serialization.typedJson
+import io.flowdux.remote.server.TypedServerConnection
+import io.flowdux.remote.server.serve
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatState
-import io.flowdux.sample.chat.chatReducer
+import io.flowdux.sample.chat.SharedChatAction
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.receiveAsFlow
 
 fun main() {
     embeddedServer(CIO, port = 8080) {
@@ -29,36 +23,27 @@ fun main() {
         routing {
             webSocket("/chat") {
                 println("[Server] Client connected")
-
-                val store = createChatStore(this)
-                store.dispatch(ChatAction.StartListening)
-
-                try {
-                    closeReason.await()
-                } finally {
-                    store.close()
-                    println("[Server] Client disconnected")
+                createChatStore(this).serve { serverState ->
+                    SharedChatAction.SyncState(
+                        ChatState(
+                            messages = serverState.messages,
+                            users = serverState.users,
+                            lastEvent = serverState.lastEvent,
+                        )
+                    )
                 }
             }
         }
     }.start(wait = true)
 }
 
-private fun createChatStore(session: DefaultWebSocketServerSession): Store<ChatState, ChatAction> {
-    val connection = object : ServerConnection {
-        override val incoming = session.incoming.receiveAsFlow()
-            .filterIsInstance<Frame.Text>()
-            .map { it.readText() }
-
-        override suspend fun send(message: String) {
-            session.send(Frame.Text(message))
-        }
-    }
-    val typedConnection = connection.typed(actionCodecOf<ChatAction>(), JsonMessageCodec())
+@Suppress("UNCHECKED_CAST")
+private fun createChatStore(session: DefaultWebSocketServerSession): Store<ServerChatState, ChatAction> {
+    val typedConnection = KtorWebSocketServerConnection(session)
+        .typedJson<SharedChatAction>() as TypedServerConnection<ChatAction>
     return createStore(
-        initialState = ChatState(),
-        reducer = chatReducer,
+        initialState = ServerChatState(),
+        reducer = serverChatReducer,
         middlewares = listOf(ChatServerRemoteMiddleware(typedConnection)),
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     )
 }

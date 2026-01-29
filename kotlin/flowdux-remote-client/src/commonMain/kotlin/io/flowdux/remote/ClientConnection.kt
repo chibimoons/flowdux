@@ -21,7 +21,7 @@ interface ClientConnection {
     /** Send a raw message to the server. */
     suspend fun send(message: String)
 
-    /** Establish the connection. */
+    /** Establish the connection and suspend until disconnected. */
     suspend fun connect()
 
     /** Close the connection. */

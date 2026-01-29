@@ -95,7 +95,7 @@ class ServerRemoteMiddlewareTest {
     @Test
     fun `incoming client messages are dispatched through pipeline via FlowHolderAction`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = TestServerRemoteMiddleware(
+        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(
             connection = connection,
         )
 
@@ -108,7 +108,7 @@ class ServerRemoteMiddlewareTest {
         )
 
         // Start listening
-        store.dispatch(ServerAction.StartListening)
+        store.dispatchStartListening()
         delay(100)
 
         // Simulate client sending a ClientAdd action (typed)
@@ -119,5 +119,69 @@ class ServerRemoteMiddlewareTest {
         assertEquals(10, store.state.value.count)
 
         store.close()
+    }
+
+    @Test
+    fun `InternalStartListening is consumed by middleware and does not reach reducer`() = runTest {
+        val connection = MockTypedServerConnection<ServerAction>()
+        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(connection)
+        val store = createStore(
+            initialState = ServerState(),
+            reducer = serverReducer, // sealed when — would crash if InternalStartListening leaked
+            middlewares = listOf(middleware),
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        // If InternalStartListening leaked to the reducer, the sealed when would crash
+        store.dispatchStartListening()
+        delay(100)
+
+        // State unchanged — action was consumed by middleware
+        assertEquals(0, store.state.value.count)
+
+        store.close()
+    }
+
+    @Test
+    fun `InternalStartListening is handled before processors`() = runTest {
+        val connection = MockTypedServerConnection<ServerAction>()
+        val middleware = ProcessorEmittingSRM(connection) // has processors for ClientAdd
+        val store = createStore(
+            initialState = ServerState(),
+            reducer = serverReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        // InternalStartListening should be caught at step 0, not fall into processors
+        store.dispatchStartListening()
+        delay(100)
+
+        // Verify listening works — client action reaches reducer
+        connection.simulateClientAction(ServerAction.ClientAdd(5))
+        delay(100)
+        assertEquals(5, store.state.value.count)
+
+        store.close()
+    }
+
+    @Test
+    fun `ServerSharedAction passes through unchanged`() = runTest {
+        val connection = MockTypedServerConnection<ServerAction>()
+        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(connection)
+
+        val action = ServerAction.ClientAdd(10)
+        val result = middleware.process(
+            getState = { ServerState() },
+            action = action,
+        ).toList()
+
+        // ServerSharedAction passes through (not intercepted by SRM)
+        assertEquals(listOf(action), result)
+
+        // Nothing sent to client
+        assertTrue(connection.sentActions.isEmpty())
     }
 }

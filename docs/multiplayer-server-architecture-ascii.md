@@ -149,6 +149,6 @@ Tick Batcher (16.67ms 간격)                                 │
 ## 5. 현재 구현 상태
 
 - Room 내부 (Store + Middleware + Broadcast): **구현 가능**
-- KtorWebSocketConnection disconnect 정리: [#76](https://github.com/chibimoons/flowdux/issues/76)
+- KtorWebSocketClientConnection disconnect 정리: [#76](https://github.com/chibimoons/flowdux/issues/76)
 - ResponseCollector race condition 수정: [#77](https://github.com/chibimoons/flowdux/issues/77)
 - StateView, Tick Batching: 추가 개발 필요

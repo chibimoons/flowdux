@@ -10,9 +10,14 @@ import io.flowdux.State
 import io.flowdux.concurrent
 import io.flowdux.remote.ClientSharedAction
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+
+/**
+ * Internal action dispatched by [serve] to trigger client message listening.
+ * Not intended for direct use — use [Store.serve][serve] instead.
+ */
+internal class InternalStartListening : Action
 
 /**
  * Server-side middleware that intercepts [ClientSharedAction]s and sends them to the client,
@@ -27,23 +32,17 @@ import kotlinx.coroutines.flow.map
  * dispatch(ClientSharedAction) → middleware intercepts → connection.send(action)
  *                               → NOT emitted locally
  *
- * startListening() → emits ClientListenerAction (FlowHolderAction)
+ * serve() → dispatches InternalStartListening → emits ClientListenerAction (FlowHolderAction)
  *   → FlowHolderMiddleware resolves → listens for client messages
  *   → client actions dispatched through full middleware pipeline
  * ```
  *
  * Non-[ClientSharedAction] actions pass through unmodified, unless a processor is registered.
  *
- * Subclasses should override [processors] to handle lifecycle actions:
+ * Typical usage with [serve]:
  * ```kotlin
- * class MyChatSRM(
- *     connection: TypedServerConnection<ChatAction>,
- * ) : ServerRemoteMiddleware<ChatState, ChatAction>(
- *     connection = connection,
- * ) {
- *     override val processors = buildProcessors {
- *         on<ChatAction.StartListening> { _, _ -> startListening() }
- *     }
+ * createGameStore(session).serve { state ->
+ *     SyncState(GameState(score = state.score))
  * }
  * ```
  *
@@ -57,18 +56,6 @@ open class ServerRemoteMiddleware<S : State, A : Action>(
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     /**
-     * Start listening for incoming client messages.
-     *
-     * Call this from within a processor to start receiving client messages.
-     * The emitted FlowHolderAction uses [FlowActionDelivery.Dispatch] delivery,
-     * so client actions are dispatched through the full middleware pipeline.
-     */
-    @Suppress("UNCHECKED_CAST")
-    protected suspend fun FlowCollector<A>.startListening() {
-        emit(ClientListenerAction() as A)
-    }
-
-    /**
      * Send an action to the client.
      *
      * Call this from within a processor to send a custom message to the client.
@@ -77,7 +64,14 @@ open class ServerRemoteMiddleware<S : State, A : Action>(
         connection.send(action)
     }
 
+    @Suppress("UNCHECKED_CAST")
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
+        // 0. InternalStartListening: emitted by serve(), triggers client listener
+        if (action is InternalStartListening) {
+            emit(ClientListenerAction() as A)
+            return@flow
+        }
+
         // 1. ClientSharedAction: send to client, do NOT emit locally
         if (action is ClientSharedAction) {
             connection.send(action)

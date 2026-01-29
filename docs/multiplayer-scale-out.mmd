@@ -1,0 +1,21 @@
+---
+title: FlowDux Multiplayer Scale-Out
+---
+flowchart TD
+    LB["Load Balancer"]
+
+    LB --> S1 & S2 & S3
+
+    subgraph S1["Server 1"]
+        R_A["Room A"] & R_B["Room B"]
+    end
+
+    subgraph S2["Server 2"]
+        R_C["Room C"] & R_D["Room D"]
+    end
+
+    subgraph S3["Server 3"]
+        R_E["Room E"] & R_F["Room F"]
+    end
+
+    S1 & S2 & S3 <-->|"Pub/Sub"| REDIS[("Redis Cluster\n서버 간 이벤트 전달\n매칭 결과, 글로벌 이벤트")]
