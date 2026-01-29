@@ -2,8 +2,10 @@ package io.flowdux.remote.serialization
 
 import io.flowdux.Action
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class SerializableActionCodecTest {
 
@@ -67,5 +69,26 @@ class SerializableActionCodecTest {
     fun classDiscriminatorUsesTypeField() {
         val json = codec.encode(TestAction.Add(10))
         assert(json.contains("\"type\":")) { "Expected 'type' discriminator in: $json" }
+    }
+
+    @Test
+    fun decodeMalformedJsonThrows() {
+        assertFailsWith<SerializationException> {
+            codec.decode("not json at all")
+        }
+    }
+
+    @Test
+    fun decodeUnknownTypeThrows() {
+        assertFailsWith<SerializationException> {
+            codec.decode("""{"type":"NonExistent","value":1}""")
+        }
+    }
+
+    @Test
+    fun decodeMissingRequiredFieldThrows() {
+        assertFailsWith<SerializationException> {
+            codec.decode("""{"type":"io.flowdux.remote.serialization.SerializableActionCodecTest.TestAction.Add"}""")
+        }
     }
 }
