@@ -17,5 +17,14 @@ class ChatServerRemoteMiddleware(
         on<ChatAction.StartListening> { _, _ ->
             startListening()
         }
+        on<ChatAction.SendMessage> { _, action ->
+            emit(ChatAction.MessageReceived(user = action.user, text = action.text))
+        }
+        on<ChatAction.JoinRoom> { _, action ->
+            emit(ChatAction.UserJoined(user = action.user))
+        }
+        on<ChatAction.LeaveRoom> { _, action ->
+            emit(ChatAction.UserLeft(user = action.user))
+        }
     }
 }

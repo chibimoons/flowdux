@@ -58,7 +58,7 @@ private fun createChatStore(session: DefaultWebSocketServerSession): Store<ChatS
     return createStore(
         initialState = ChatState(),
         reducer = chatReducer,
-        middlewares = listOf(ChatServerMiddleware(), ChatServerRemoteMiddleware(typedConnection)),
+        middlewares = listOf(ChatServerRemoteMiddleware(typedConnection)),
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     )
 }
