@@ -6,6 +6,7 @@ import io.flowdux.State
 import io.flowdux.buildReducer
 import io.flowdux.remote.ClientSharedAction
 import io.flowdux.remote.ServerSharedAction
+import kotlinx.serialization.Serializable
 
 data class ChatState(
     val messages: List<ChatMessage> = emptyList(),
@@ -21,21 +22,22 @@ sealed interface ChatEvent {
     data class MessageReceived(val user: String, val text: String) : ChatEvent
 }
 
+@Serializable
 sealed interface ChatAction : Action {
     // Lifecycle (local only)
-    data object Connect : ChatAction
-    data object Disconnect : ChatAction
-    data object StartListening : ChatAction
+    @Serializable data object Connect : ChatAction
+    @Serializable data object Disconnect : ChatAction
+    @Serializable data object StartListening : ChatAction
 
     // Client → Server (intercepted by CRM)
-    data class SendMessage(val user: String, val text: String) : ChatAction, ServerSharedAction
-    data class JoinRoom(val user: String) : ChatAction, ServerSharedAction
-    data class LeaveRoom(val user: String) : ChatAction, ServerSharedAction
+    @Serializable data class SendMessage(val user: String, val text: String) : ChatAction, ServerSharedAction
+    @Serializable data class JoinRoom(val user: String) : ChatAction, ServerSharedAction
+    @Serializable data class LeaveRoom(val user: String) : ChatAction, ServerSharedAction
 
     // Server → Client (intercepted by SRM)
-    data class MessageReceived(val user: String, val text: String) : ChatAction, ClientSharedAction
-    data class UserJoined(val user: String) : ChatAction, ClientSharedAction
-    data class UserLeft(val user: String) : ChatAction, ClientSharedAction
+    @Serializable data class MessageReceived(val user: String, val text: String) : ChatAction, ClientSharedAction
+    @Serializable data class UserJoined(val user: String) : ChatAction, ClientSharedAction
+    @Serializable data class UserLeft(val user: String) : ChatAction, ClientSharedAction
 }
 
 val chatReducer: Reducer<ChatState, ChatAction> = buildReducer {

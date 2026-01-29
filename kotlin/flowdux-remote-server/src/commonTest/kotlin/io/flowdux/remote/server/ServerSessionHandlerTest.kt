@@ -1,7 +1,7 @@
 package io.flowdux.remote.server
 
 import io.flowdux.createStore
-import io.flowdux.remote.JsonMessageCodec
+import io.flowdux.remote.serialization.JsonMessageCodec
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest

@@ -13,7 +13,7 @@ import kotlin.test.Test
 class ClientRemoteMiddlewareTest {
 
     private val actionCodec = TestActionCodec()
-    private val messageCodec = JsonMessageCodec()
+    private val messageCodec = io.flowdux.remote.serialization.JsonMessageCodec()
 
     @Test
     fun `ServerSharedAction is intercepted and sent to server`() = runTest {

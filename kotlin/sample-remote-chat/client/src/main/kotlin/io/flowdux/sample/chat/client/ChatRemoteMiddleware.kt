@@ -3,6 +3,7 @@ package io.flowdux.sample.chat.client
 import io.flowdux.ActionProcessorMap
 import io.flowdux.remote.ClientConnection
 import io.flowdux.remote.ClientRemoteMiddleware
+import io.flowdux.remote.serialization.actionCodecOf
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatState
 import kotlinx.coroutines.CoroutineScope
@@ -12,7 +13,7 @@ class ChatRemoteMiddleware(
     scope: CoroutineScope,
 ) : ClientRemoteMiddleware<ChatState, ChatAction>(
     connection = connection,
-    actionCodec = io.flowdux.sample.chat.ChatActionCodec(),
+    actionCodec = actionCodecOf(),
     scope = scope,
 ) {
     override val name: String = "ChatRemoteMiddleware"

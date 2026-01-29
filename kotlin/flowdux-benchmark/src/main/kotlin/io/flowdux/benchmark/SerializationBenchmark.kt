@@ -2,8 +2,8 @@ package io.flowdux.benchmark
 
 import io.flowdux.Action
 import io.flowdux.remote.ActionCodec
-import io.flowdux.remote.JsonMessageCodec
 import io.flowdux.remote.MessageCodec
+import io.flowdux.remote.serialization.JsonMessageCodec
 import io.flowdux.remote.ServerSharedAction
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds

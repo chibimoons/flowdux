@@ -84,7 +84,7 @@ class ServerActionCodec : ActionCodec<ServerAction> {
 class TestServerRemoteMiddleware(
     connection: ServerConnection,
     actionCodec: ActionCodec<ServerAction>,
-    messageCodec: io.flowdux.remote.MessageCodec = io.flowdux.remote.JsonMessageCodec(),
+    messageCodec: io.flowdux.remote.MessageCodec = io.flowdux.remote.serialization.JsonMessageCodec(),
 ) : ServerRemoteMiddleware<ServerState, ServerAction>(
     connection = connection,
     actionCodec = actionCodec,

@@ -10,8 +10,8 @@ import io.flowdux.State
 import io.flowdux.concurrent
 import io.flowdux.remote.ActionCodec
 import io.flowdux.remote.ClientSharedAction
-import io.flowdux.remote.JsonMessageCodec
 import io.flowdux.remote.MessageCodec
+import io.flowdux.remote.serialization.JsonMessageCodec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow

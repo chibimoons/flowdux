@@ -87,7 +87,7 @@ class TestActionCodec : ActionCodec<TestAction> {
 class TestClientRemoteMiddleware(
     connection: ClientConnection,
     actionCodec: ActionCodec<TestAction>,
-    messageCodec: MessageCodec = JsonMessageCodec(),
+    messageCodec: MessageCodec = io.flowdux.remote.serialization.JsonMessageCodec(),
     scope: CoroutineScope,
 ) : ClientRemoteMiddleware<TestState, TestAction>(
     connection = connection,

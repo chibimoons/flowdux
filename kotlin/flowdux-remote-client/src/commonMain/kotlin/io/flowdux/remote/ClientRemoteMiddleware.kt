@@ -46,13 +46,13 @@ import kotlinx.coroutines.launch
  *
  * @param connection The [ClientConnection] for communicating with the server.
  * @param actionCodec Codec for serializing/deserializing actions.
- * @param messageCodec Codec for wire-level message framing. Defaults to [JsonMessageCodec].
+ * @param messageCodec Codec for wire-level message framing. Defaults to [io.flowdux.remote.serialization.JsonMessageCodec].
  * @param scope Coroutine scope for background tasks.
  */
 open class ClientRemoteMiddleware<S : State, A : Action>(
     private val connection: ClientConnection,
     private val actionCodec: ActionCodec<A>,
-    private val messageCodec: MessageCodec = JsonMessageCodec(),
+    private val messageCodec: MessageCodec = io.flowdux.remote.serialization.JsonMessageCodec(),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : Middleware<S, A> {
 
