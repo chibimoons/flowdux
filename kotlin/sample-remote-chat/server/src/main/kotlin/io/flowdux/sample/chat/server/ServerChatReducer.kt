@@ -7,9 +7,6 @@ import io.flowdux.sample.chat.ChatEvent
 import io.flowdux.sample.chat.ChatMessage
 
 val serverChatReducer: Reducer<ServerChatState, ChatAction> = buildReducer {
-    on<ServerChatAction.StartListening> { state, _ ->
-        state.copy(isListening = true)
-    }
     on<ServerChatAction.MessageReceived> { state, action ->
         state.copy(
             messages = state.messages + ChatMessage(action.user, action.text),

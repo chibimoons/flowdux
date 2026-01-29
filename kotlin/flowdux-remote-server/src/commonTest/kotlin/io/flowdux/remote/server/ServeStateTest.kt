@@ -39,11 +39,11 @@ class ServeStateTest {
             scope = backgroundScope,
         )
 
-        // Server starts listening (like sample server: store.dispatch(StartListening))
-        store.dispatch(ServerAction.StartListening)
+        // Server starts listening
+        store.dispatchStartListening()
         delay(100)
 
-        // Client sends actions (like sample client dispatching JoinRoom, SendMessage, etc.)
+        // Client sends actions
         connection.simulateClientAction(ServerAction.ClientAdd(10))
         delay(100)
         connection.simulateClientAction(ServerAction.ClientAdd(20))
@@ -81,7 +81,7 @@ class ServeStateTest {
         }
         delay(100)
 
-        store.dispatch(ServerAction.StartListening)
+        store.dispatchStartListening()
         delay(100)
 
         // Client sends actions
@@ -100,5 +100,92 @@ class ServeStateTest {
 
         serveJob.cancel()
         store.close()
+    }
+
+    /**
+     * Verifies that [serve] auto-dispatches [InternalStartListening]
+     * and syncs state to the client, then closes the store.
+     */
+    @Test
+    fun `serve - auto starts listening and syncs state`() = runTest {
+        val connection = MockTypedServerConnection<ServerAction>()
+        val middleware = ProcessorEmittingSRM(connection)
+        val store = createStore(
+            initialState = ServerState(),
+            reducer = serverReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        val serveJob = backgroundScope.launch {
+            store.serve { ServerAction.SyncState(it) }
+        }
+        delay(100)
+
+        // Client sends actions
+        connection.simulateClientAction(ServerAction.ClientAdd(10))
+        delay(100)
+        connection.simulateClientAction(ServerAction.ClientAdd(20))
+        delay(100)
+
+        // Server state is correct
+        assertEquals(30, store.state.value.count)
+
+        // Client received SyncState with the final state
+        val syncStates = connection.sentActions.filterIsInstance<ServerAction.SyncState>()
+        assertTrue(syncStates.isNotEmpty())
+        assertEquals(30, syncStates.last().state.count)
+
+        serveJob.cancel()
+    }
+
+    /**
+     * Verifies that [serve] closes the store when cancelled.
+     */
+    @Test
+    fun `serve - closes store after cancellation`() = runTest {
+        val connection = MockTypedServerConnection<ServerAction>()
+        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(connection)
+        val store = createStore(
+            initialState = ServerState(),
+            reducer = serverReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        val serveJob = backgroundScope.launch {
+            store.serve { ServerAction.SyncState(it) }
+        }
+        delay(100)
+
+        serveJob.cancel()
+        delay(100)
+
+        assertTrue(store.isClosed)
+    }
+
+    /**
+     * Verifies that [use] closes the store after the block completes.
+     */
+    @Test
+    fun `use - closes store after block`() = runTest {
+        val connection = MockTypedServerConnection<ServerAction>()
+        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(connection)
+        val store = createStore(
+            initialState = ServerState(),
+            reducer = serverReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        store.use {
+            delay(50)
+        }
+
+        // Store should be closed after use block
+        assertTrue(store.isClosed)
     }
 }
