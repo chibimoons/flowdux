@@ -25,6 +25,7 @@ sealed interface ServerAction : Action {
     data class Add(val value: Int) : ServerAction, ClientSharedAction
     data class SetValue(val value: Int) : ServerAction, ClientSharedAction
     object Increment : ServerAction, ClientSharedAction
+    data class SyncState(val state: ServerState) : ServerAction, ClientSharedAction
 
     // Server-internal only (passes through SRM, reaches reducer)
     data class InternalReset(val value: Int) : ServerAction
@@ -37,6 +38,7 @@ val serverReducer = Reducer<ServerState, ServerAction> { state, action ->
         is ServerAction.Add -> state.copy(count = state.count + action.value)
         is ServerAction.SetValue -> state.copy(count = action.value)
         is ServerAction.Increment -> state.copy(count = state.count + 1)
+        is ServerAction.SyncState -> state // intercepted by SRM, never reaches reducer
         is ServerAction.InternalReset -> state.copy(count = action.value)
     }
 }
@@ -55,6 +57,26 @@ class TestServerRemoteMiddleware(
     override val processors: ActionProcessorMap<ServerState, ServerAction> = buildProcessors {
         on<ServerAction.StartListening> { _, _ ->
             startListening()
+        }
+    }
+}
+
+/**
+ * SRM subclass whose processor emits a [ClientSharedAction].
+ * Reproduces the scenario where the emitted action bypasses the SRM's
+ * ClientSharedAction interception and is NOT sent to the client.
+ */
+class ProcessorEmittingSRM(
+    connection: TypedServerConnection<ServerAction>,
+) : ServerRemoteMiddleware<ServerState, ServerAction>(
+    connection = connection,
+) {
+    override val processors: ActionProcessorMap<ServerState, ServerAction> = buildProcessors {
+        on<ServerAction.StartListening> { _, _ ->
+            startListening()
+        }
+        on<ServerAction.ClientAdd> { _, action ->
+            emit(ServerAction.Add(action.value))
         }
     }
 }
