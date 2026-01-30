@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1
+
+- Update example to align with Kotlin JVM sample pattern
+- FlowHolderAction example now wraps external Repository stream (no side effects in Action)
+- Move async operations (search, fetch, submit) to middleware with execution strategies
+- Add CounterRepository and SearchApi as external side effect sources
+
 ## 0.3.0
 
 - Add `FlowActionDelivery` enum for `FlowHolderAction` delivery mode
