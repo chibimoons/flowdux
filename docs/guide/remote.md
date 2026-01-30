@@ -7,18 +7,18 @@ FlowDux Remote enables real-time client-server state synchronization over WebSoc
 ```mermaid
 flowchart LR
     subgraph Client
-        CS["Store"] --> CRM["ClientRemote\nMiddleware"]
+        CS["Store"] --> CRM["ClientRemote<br/>Middleware"]
     end
 
-    CRM -- "ServerSharedAction\n(encode → send)" --> WS(("WebSocket"))
-    WS -- "ClientSharedAction\n(receive → decode)" --> CRM
+    CRM -- "ServerSharedAction<br/>(encode → send)" --> WS(("WebSocket"))
+    WS -- "ClientSharedAction<br/>(receive → decode)" --> CRM
 
     subgraph Server
-        SRM["ServerRemote\nMiddleware"] --> SS["Store"]
+        SRM["ServerRemote<br/>Middleware"] --> SS["Store"]
     end
 
-    WS -- "ServerSharedAction\n(receive → decode)" --> SRM
-    SRM -- "ClientSharedAction\n(encode → send)" --> WS
+    WS -- "ServerSharedAction<br/>(receive → decode)" --> SRM
+    SRM -- "ClientSharedAction<br/>(encode → send)" --> WS
 ```
 
 | Component | Role |

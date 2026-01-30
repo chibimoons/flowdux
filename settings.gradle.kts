@@ -38,35 +38,44 @@ project(":kotlin:flowdux-remote-ktor").projectDir = file("kotlin/remote/ktor")
 include(":kotlin:flowdux-remote-serialization")
 project(":kotlin:flowdux-remote-serialization").projectDir = file("kotlin/remote/serialization")
 
-// ── Samples ──
+// ── Samples: flowdux ──
 include(":kotlin:sample-jvm")
-project(":kotlin:sample-jvm").projectDir = file("kotlin/samples/jvm")
+project(":kotlin:sample-jvm").projectDir = file("kotlin/samples/flowdux/jvm")
 
 include(":kotlin:sample-android")
-project(":kotlin:sample-android").projectDir = file("kotlin/samples/android")
+project(":kotlin:sample-android").projectDir = file("kotlin/samples/flowdux/android")
 
 include(":kotlin:sample-web")
-project(":kotlin:sample-web").projectDir = file("kotlin/samples/web")
+project(":kotlin:sample-web").projectDir = file("kotlin/samples/flowdux/web")
 
 include(":kotlin:sample-wasm")
-project(":kotlin:sample-wasm").projectDir = file("kotlin/samples/wasm")
+project(":kotlin:sample-wasm").projectDir = file("kotlin/samples/flowdux/wasm")
 
-include(":kotlin:sample-shared:shared")
-project(":kotlin:sample-shared").projectDir = file("kotlin/samples/shared")
-project(":kotlin:sample-shared:shared").projectDir = file("kotlin/samples/shared/shared")
+include(":kotlin:sample-kmm:shared")
+project(":kotlin:sample-kmm").projectDir = file("kotlin/samples/flowdux/kmm")
+project(":kotlin:sample-kmm:shared").projectDir = file("kotlin/samples/flowdux/kmm/shared")
 
-include(":kotlin:sample-shared:androidApp")
-project(":kotlin:sample-shared:androidApp").projectDir = file("kotlin/samples/shared/androidApp")
+include(":kotlin:sample-kmm:androidApp")
+project(":kotlin:sample-kmm:androidApp").projectDir = file("kotlin/samples/flowdux/kmm/androidApp")
 
-include(":kotlin:sample-remote-chat:shared")
-project(":kotlin:sample-remote-chat").projectDir = file("kotlin/samples/remote-chat")
-project(":kotlin:sample-remote-chat:shared").projectDir = file("kotlin/samples/remote-chat/shared")
+// ── Samples: flowdux-remote ──
+include(":kotlin:sample-remote:shared")
+project(":kotlin:sample-remote").projectDir = file("kotlin/samples/flowdux-remote")
+project(":kotlin:sample-remote:shared").projectDir = file("kotlin/samples/flowdux-remote/shared")
 
-include(":kotlin:sample-remote-chat:server")
-project(":kotlin:sample-remote-chat:server").projectDir = file("kotlin/samples/remote-chat/server")
+include(":kotlin:sample-remote-simple:server")
+project(":kotlin:sample-remote-simple").projectDir = file("kotlin/samples/flowdux-remote/simple")
+project(":kotlin:sample-remote-simple:server").projectDir = file("kotlin/samples/flowdux-remote/simple/server")
 
-include(":kotlin:sample-remote-chat:client")
-project(":kotlin:sample-remote-chat:client").projectDir = file("kotlin/samples/remote-chat/client")
+include(":kotlin:sample-remote-simple:client")
+project(":kotlin:sample-remote-simple:client").projectDir = file("kotlin/samples/flowdux-remote/simple/client")
+
+include(":kotlin:sample-remote-multi:server")
+project(":kotlin:sample-remote-multi").projectDir = file("kotlin/samples/flowdux-remote/multi-client")
+project(":kotlin:sample-remote-multi:server").projectDir = file("kotlin/samples/flowdux-remote/multi-client/server")
+
+include(":kotlin:sample-remote-multi:client")
+project(":kotlin:sample-remote-multi:client").projectDir = file("kotlin/samples/flowdux-remote/multi-client/client")
 
 // ── Benchmark ──
 include(":kotlin:flowdux-benchmark")
