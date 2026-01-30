@@ -75,10 +75,46 @@ fun <S : State, A : Action> Store<S, A>.dispatchAddSession(
     dispatch(InternalAddSession(sessionId, connection) as A)
 }
 
-/** Dispatch [InternalRemoveSession] via unchecked cast (type-erased at runtime). */
-@Suppress("UNCHECKED_CAST")
-fun <S : State, A : Action> Store<S, A>.dispatchRemoveSession(sessionId: String) {
-    dispatch(InternalRemoveSession(sessionId) as A)
+// -- Session-Aware Test Fixtures --
+
+data class PokerState(
+    val hands: Map<String, List<String>> = emptyMap(),
+    val communityCards: List<String> = emptyList(),
+) : State
+
+sealed interface PokerAction : Action {
+    /** Client → Server: a player takes an action. */
+    data class PlayerAction(val playerId: String, val action: String) : PokerAction, io.flowdux.remote.ServerSharedAction
+
+    /** Server → Client: send a player their personal view of the game. */
+    data class SyncPlayerView(
+        val hand: List<String>,
+        val communityCards: List<String>,
+    ) : PokerAction, io.flowdux.remote.ClientSharedAction
+
+    /** Server → Client + SessionAware: send each player their own hand. */
+    data class SyncGameState(val state: PokerState) : PokerAction, io.flowdux.remote.ClientSharedAction, SessionAwareAction<PokerAction> {
+        override fun forSession(sessionId: String): PokerAction? {
+            val hand = state.hands[sessionId] ?: return null
+            return SyncPlayerView(hand = hand, communityCards = state.communityCards)
+        }
+    }
+
+    /** Server-internal: deal cards. */
+    data class DealCards(val hands: Map<String, List<String>>, val communityCards: List<String>) : PokerAction
+}
+
+val pokerReducer = Reducer<PokerState, PokerAction> { state, action ->
+    when (action) {
+        is PokerAction.PlayerAction -> state // handled externally
+        is PokerAction.SyncPlayerView -> state // client-side only
+        is PokerAction.SyncGameState -> state // intercepted by middleware
+        is PokerAction.DealCards -> state.copy(hands = action.hands, communityCards = action.communityCards)
+    }
+}
+
+val pokerErrorProcessor = object : ErrorProcessor<PokerAction> {
+    override fun process(throwable: Throwable): Flow<PokerAction> = emptyFlow()
 }
 
 // -- Mock TypedServerConnection --

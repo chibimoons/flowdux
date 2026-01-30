@@ -1,87 +1,74 @@
 package io.flowdux.remote.server
 
 import io.flowdux.Action
-import io.flowdux.ActionProcessorMap
-import io.flowdux.DefaultErrorProcessor
-import io.flowdux.ErrorProcessor
-import io.flowdux.Middleware
-import io.flowdux.NoOpStoreLogger
-import io.flowdux.Reducer
-import io.flowdux.State
-import io.flowdux.Store
-import io.flowdux.StoreLogger
-import io.flowdux.createStore
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
- * Manages a single [Store] that serves multiple client connections simultaneously.
+ * Manages client session connections for a remote server.
  *
- * Encapsulates the Store, middleware, and state broadcasting so that users
- * only interact with this session object. Clients are added via [handleClient]
- * and automatically removed when the coroutine is cancelled (e.g., WebSocket disconnect).
+ * Responsible for:
+ * - Registering and unregistering client sessions
+ * - Sending actions to specific clients or broadcasting to all
+ * - Tracking connected session IDs
+ *
+ * Does NOT own the Store or middleware — those are wired externally
+ * (see [createRemoteServer]).
  *
  * Example:
  * ```kotlin
- * val session = createRemoteServerSession(
- *     initialState = ServerChatState(),
- *     reducer = serverChatReducer,
- *     stateMapper = { state -> SyncState(state.toChatState()) },
- *     scope = applicationScope,
- * )
- *
- * // In WebSocket handler:
- * webSocket("/chat") {
- *     val connection = KtorWebSocketServerConnection(this)
- *         .typedJson<SharedChatAction>() as TypedServerConnection<ChatAction>
- *     session.handleClient(sessionId, connection)
- * }
- *
- * // Shutdown:
- * session.close()
+ * val session = RemoteServerSession<ChatAction>()
+ * val middleware = MultiClientServerRemoteMiddleware(processors, session)
+ * val store = createStore(middlewares = listOf(middleware), ...)
  * ```
  */
-class RemoteServerSession<S : State, A : Action> internal constructor(
-    private val store: Store<S, A>,
-    private val middleware: MultiClientServerRemoteMiddleware<S, A>,
-    private val serveJob: Job,
-) {
-    /** Current server state as a reactive flow. */
-    val state: StateFlow<S> get() = store.state
+class RemoteServerSession<A : Action> {
 
-    /** Current server state snapshot. */
-    val currentState: S get() = store.currentState
+    private val sessions = mutableMapOf<String, TypedServerConnection<A>>()
+    private val mutex = Mutex()
 
     /** Snapshot of currently connected session IDs. */
-    suspend fun sessionIds(): Set<String> = middleware.sessionIds()
+    suspend fun sessionIds(): Set<String> = mutex.withLock { sessions.keys.toSet() }
 
     /** Number of currently connected sessions. */
-    suspend fun sessionCount(): Int = middleware.sessionCount()
+    suspend fun sessionCount(): Int = mutex.withLock { sessions.size }
 
     /**
-     * Handle a client connection.
+     * Register a client session.
+     */
+    suspend fun addSession(sessionId: String, connection: TypedServerConnection<A>) {
+        mutex.withLock { sessions[sessionId] = connection }
+    }
+
+    /**
+     * Unregister a client session.
+     */
+    suspend fun removeSession(sessionId: String) {
+        mutex.withLock { sessions.remove(sessionId) }
+    }
+
+    /**
+     * Handle a client connection lifecycle.
      *
-     * Registers the client, suspends until the calling coroutine is cancelled
+     * Registers the session, suspends until the calling coroutine is cancelled
      * (e.g., WebSocket disconnect), then automatically removes the session.
+     *
+     * Note: The caller is responsible for dispatching [InternalAddSession]
+     * to the store so that the middleware starts listening for incoming actions.
      *
      * @param sessionId Unique identifier for this client session.
      * @param connection Typed connection for sending/receiving actions.
      */
-    @Suppress("UNCHECKED_CAST")
     suspend fun handleClient(
         sessionId: String,
         connection: TypedServerConnection<A>,
     ) {
-        store.dispatch(InternalAddSession(sessionId, connection) as A)
+        addSession(sessionId, connection)
         try {
             awaitCancellation()
         } finally {
-            store.dispatch(InternalRemoveSession(sessionId) as A)
+            removeSession(sessionId)
         }
     }
 
@@ -90,66 +77,45 @@ class RemoteServerSession<S : State, A : Action> internal constructor(
      * No-op if the session does not exist.
      */
     suspend fun sendToClient(sessionId: String, action: A) {
-        middleware.sendToClient(sessionId, action)
+        val connection = mutex.withLock { sessions[sessionId] } ?: return
+        try {
+            connection.send(action)
+        } catch (_: Exception) {
+            // Isolate send failures
+        }
     }
 
     /**
      * Send an action to all connected clients.
+     * Errors on individual connections are caught and do not affect others.
      */
     suspend fun broadcast(action: A) {
-        middleware.broadcast(action)
+        val snapshot = mutex.withLock { sessions.values.toList() }
+        for (connection in snapshot) {
+            try {
+                connection.send(action)
+            } catch (_: Exception) {
+                // Isolate per-client send failures
+            }
+        }
     }
 
     /**
-     * Close the session, stopping state broadcasting and closing the store.
+     * Send a per-session action to each connected client.
+     *
+     * For each session, calls [SessionAwareAction.forSession] to produce
+     * the action for that session. If `forSession` returns `null`, the session is skipped.
+     * Errors on individual connections are caught and do not affect others.
      */
-    fun close() {
-        serveJob.cancel()
-        store.close()
+    internal suspend fun sendPerSession(action: SessionAwareAction<A>) {
+        val snapshot = mutex.withLock { sessions.toMap() }
+        for ((sessionId, connection) in snapshot) {
+            try {
+                val sessionAction = action.forSession(sessionId) ?: continue
+                connection.send(sessionAction)
+            } catch (_: Exception) {
+                // Isolate per-client send failures
+            }
+        }
     }
-}
-
-/**
- * Create a [RemoteServerSession] that manages a single [Store] serving multiple clients.
- *
- * Internally creates the middleware, store, and state broadcasting coroutine.
- *
- * @param initialState Initial state for the store.
- * @param reducer Reducer for processing actions.
- * @param processors Action processors for server-side action handling.
- * @param stateMapper Maps server state to an action (typically a [ClientSharedAction][io.flowdux.remote.ClientSharedAction])
- *   that will be broadcast to all clients on state change.
- * @param errorProcessor Error processor for the store.
- * @param logger Logger for the store.
- * @param scope Coroutine scope for the store and state broadcasting.
- */
-fun <S : State, A : Action> createRemoteServerSession(
-    initialState: S,
-    reducer: Reducer<S, A>,
-    processors: ActionProcessorMap<S, A> = emptyMap(),
-    stateMapper: (S) -> A,
-    errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
-    logger: StoreLogger<S, A> = NoOpStoreLogger(),
-    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-): RemoteServerSession<S, A> {
-    val middleware = MultiClientServerRemoteMiddleware<S, A>(processors)
-
-    val store = createStore(
-        initialState = initialState,
-        middlewares = listOf(middleware),
-        reducer = reducer,
-        errorProcessor = errorProcessor,
-        logger = logger,
-        scope = scope,
-    )
-
-    val serveJob = scope.launch {
-        store.serveState(stateMapper)
-    }
-
-    return RemoteServerSession(
-        store = store,
-        middleware = middleware,
-        serveJob = serveJob,
-    )
 }
