@@ -31,7 +31,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":kotlin:sample-shared:shared"))
+    implementation(project(":kotlin:sample-kmm:shared"))
     implementation(libs.kotlinx.coroutines.core)
 
     implementation(platform(libs.androidx.compose.bom))

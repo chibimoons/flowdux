@@ -10,6 +10,7 @@ activity-compose = "1.8.2"
 lifecycle = "2.7.0"
 ktor = "2.3.7"
 kotlinx-serialization-json = "1.7.3"
+kotlinx-browser = "0.3"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -36,6 +37,7 @@ ktor-client-cio-multiplatform = { module = "io.ktor:ktor-client-cio", version.re
 ktor-client-websockets-multiplatform = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
+kotlinx-browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version.ref = "kotlinx-browser" }
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

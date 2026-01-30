@@ -7,7 +7,7 @@ group = "io.flowdux.sample.chat"
 version = "1.0.0"
 
 application {
-    mainClass.set("io.flowdux.sample.chat.server.MainKt")
+    mainClass.set("io.flowdux.sample.chat.multiserver.MainKt")
 }
 
 tasks.named<JavaExec>("run") {

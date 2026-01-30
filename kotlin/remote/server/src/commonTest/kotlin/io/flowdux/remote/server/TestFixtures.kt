@@ -66,6 +66,21 @@ fun <S : State, A : Action> Store<S, A>.dispatchStartListening() {
     dispatch(InternalStartListening() as A)
 }
 
+/** Dispatch [InternalAddSession] via unchecked cast (type-erased at runtime). */
+@Suppress("UNCHECKED_CAST")
+fun <S : State, A : Action> Store<S, A>.dispatchAddSession(
+    sessionId: String,
+    connection: TypedServerConnection<A>,
+) {
+    dispatch(InternalAddSession(sessionId, connection) as A)
+}
+
+/** Dispatch [InternalRemoveSession] via unchecked cast (type-erased at runtime). */
+@Suppress("UNCHECKED_CAST")
+fun <S : State, A : Action> Store<S, A>.dispatchRemoveSession(sessionId: String) {
+    dispatch(InternalRemoveSession(sessionId) as A)
+}
+
 // -- Mock TypedServerConnection --
 
 class MockTypedServerConnection<A : Action> : TypedServerConnection<A> {

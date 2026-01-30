@@ -1,37 +1,53 @@
-# flowdux-remote: WebSocket 영역에서의 포지셔닝
+# flowdux-remote: 포지셔닝
 
-> 설계 문서 — 2026-01-29
+> 설계 문서 — 2026-01-29 (updated 2026-01-30)
 
 ## REST와의 관계
 
-flowdux-remote는 REST를 대체하는 것이 아니다. 목적이 다르다.
+flowdux-remote는 REST의 보완재가 아니라, 연결 수립 이후 앱 로직 통신의 대체재다.
 
-### REST가 잘하는 것
+### REST가 설계하는 것
 
-- 무상태 요청-응답 (CRUD)
-- 캐싱 (HTTP 캐시, CDN)
-- 브라우저/범용 클라이언트 호환
-- 스케일아웃이 단순 (로드밸런서 뒤에 stateless 서버)
+- URL 경로 (`/api/v1/chat/messages`)
+- HTTP method (`GET`, `POST`, `PUT`, `DELETE`)
+- Status code (`200`, `201`, `400`, `404`, `409`, `500`)
+- Request DTO, Response DTO
+- 인증 헤더, 페이지네이션 쿼리 파라미터
+- 실시간이 필요하면 별도 WebSocket/SSE 설계
 
-### flowdux-remote가 잘하는 것
+### flowdux-remote가 설계하는 것
 
-- 실시간 양방향 상태 동기화
-- 서버-클라이언트 간 일관된 상태 모델
-- 액션 기반 프로토콜 (무엇이 일어났는지 의미가 명확)
-- 클라이언트/서버 각각 로컬 State를 두면서 필요한 부분만 선택적 동기화
+- Action (사용자가 무엇을 하는가)
+- State (그 결과 상태가 어떻게 바뀌는가)
 
-### 적합한 유스케이스
+실시간 반응성은 자동으로 따라온다.
 
-- 멀티플레이어 게임
-- 실시간 협업 (화이트보드, 문서 공동편집)
-- 채팅/메신저
-- 라이브 대시보드
-- IoT 디바이스 제어
+### 1:1 대응
 
-### 공존 모델
+```
+POST /chat/join  {user: "Alice"}    →   dispatch(JoinRoom("Alice"))
+         ↓                                       ↓ WebSocket
+Response 200 {state: ...}           ←   SyncState(chatState)
 
-REST + flowdux-remote가 공존하는 구조가 자연스럽다.
-정적 데이터는 REST, 실시간 상태는 flowdux-remote.
+GET  /chat/messages                 →   (불필요. 이미 State에 있음)
+DELETE /chat/leave {user: "Alice"}  →   dispatch(LeaveRoom("Alice"))
+```
+
+shared 모듈의 sealed interface 하나가 API 스펙 전체를 대체한다.
+
+### HTTP가 여전히 필요한 영역
+
+파일 업/다운로드 등 HTTP 고유 기능은 HTTP로 처리한다. 이건 패턴의 한계가 아니라 용도가 다른 것이다.
+
+### 흔히 제기되는 우려에 대해
+
+**"로드밸런싱이 복잡하다"** — 아니다. ALB, Nginx, Envoy 등 대부분의 로드밸런서가 WebSocket을 기본 지원한다. 연결이 맺어지면 유지되는 것뿐이다.
+
+**"Request-Response 1:1 매핑이 안 된다"** — REST도 마찬가지다. 응답이 돌아오는 사이에 다른 클라이언트가 상태를 바꿨을 수 있다. Action/State 모델은 오히려 항상 최신 상태를 가진다.
+
+**"에러 핸들링에 표준이 없다"** — REST의 4xx/5xx도 실제로는 부족해서 모든 API가 자체 에러 포맷을 정의한다. 에러를 명시적으로 모델링하는 작업량은 동일하다.
+
+**"캐싱을 못 한다"** — push 모델에서는 서버가 변경 시에만 State를 내려보내므로 중복 요청 자체가 없다. 캐싱이 해결하려는 문제가 존재하지 않는다.
 
 ---
 

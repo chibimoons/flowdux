@@ -11,7 +11,7 @@ application {
 }
 
 dependencies {
-    implementation(project(":kotlin:sample-remote-chat:shared"))
+    implementation(project(":kotlin:sample-remote:shared"))
     implementation(project(":kotlin:flowdux"))
     implementation(project(":kotlin:flowdux-remote-core"))
     implementation(project(":kotlin:flowdux-remote-client"))

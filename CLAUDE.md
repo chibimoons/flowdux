@@ -26,7 +26,8 @@ Check `gh auth status` output to identify available accounts and ensure the corr
   - `flowdux-remote-serialization/` - Codec interfaces, kotlinx.serialization bindings, typed connection bridge
   - `flowdux-remote-ktor/` - Ktor WebSocket implementation
   - `flowdux-timetravel/` - Time travel debugging
-  - `sample-*` - Sample applications
+  - `samples/flowdux/` - Core sample apps (jvm, android, web, wasm, kmm)
+  - `samples/flowdux-remote/` - Remote sample apps (shared, simple, multi-client)
 
 - `dart/` - Dart/Flutter implementation
   - `flowdux/` - Core library (published to pub.dev)

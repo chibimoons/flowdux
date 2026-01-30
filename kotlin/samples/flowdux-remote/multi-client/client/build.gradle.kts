@@ -7,7 +7,7 @@ group = "io.flowdux.sample.chat"
 version = "1.0.0"
 
 application {
-    mainClass.set("io.flowdux.sample.chat.server.MainKt")
+    mainClass.set("io.flowdux.sample.chat.multiclient.MainKt")
 }
 
 tasks.named<JavaExec>("run") {
@@ -18,11 +18,8 @@ dependencies {
     implementation(project(":kotlin:sample-remote:shared"))
     implementation(project(":kotlin:flowdux"))
     implementation(project(":kotlin:flowdux-remote-core"))
-    implementation(project(":kotlin:flowdux-remote-server"))
+    implementation(project(":kotlin:flowdux-remote-client"))
     implementation(project(":kotlin:flowdux-remote-ktor"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.ktor.server.core)
-    implementation(libs.ktor.server.cio)
-    implementation(libs.ktor.server.websockets)
 }

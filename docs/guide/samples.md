@@ -55,12 +55,12 @@ State: count = 42 [api]
 
 Start the server:
 ```bash
-./gradlew :kotlin:sample-remote-chat:server:run
+./gradlew :kotlin:sample-remote-simple:server:run
 ```
 
 In a separate terminal, start the client:
 ```bash
-./gradlew :kotlin:sample-remote-chat:client:run
+./gradlew :kotlin:sample-remote-simple:client:run
 ```
 
 Output:
@@ -81,21 +81,33 @@ Message history:
 === Demo Complete ===
 ```
 
+## Run Multi-Client Remote Chat Sample (WebSocket)
+
+Start the server:
+```bash
+./gradlew :kotlin:sample-remote-multi:server:run
+```
+
+In a separate terminal, start the client:
+```bash
+./gradlew :kotlin:sample-remote-multi:client:run
+```
+
 ## Build Android Sample
 
 ```bash
 ./gradlew :kotlin:sample-android:assembleDebug
 ```
 
-APK location: `kotlin/samples/android/build/outputs/apk/debug/sample-android-debug.apk`
+APK location: `kotlin/samples/flowdux/android/build/outputs/apk/debug/sample-android-debug.apk`
 
 ## Build KMM Sample (Android)
 
 ```bash
-./gradlew :kotlin:sample-shared:androidApp:assembleDebug
+./gradlew :kotlin:sample-kmm:androidApp:assembleDebug
 ```
 
-APK location: `kotlin/samples/shared/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
+APK location: `kotlin/samples/flowdux/kmm/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
 
 ## Build KMM Sample (iOS)
 
@@ -103,19 +115,19 @@ APK location: `kotlin/samples/shared/androidApp/build/outputs/apk/debug/androidA
 
 ```bash
 # Build shared framework
-./gradlew :kotlin:sample-shared:shared:linkDebugFrameworkIosSimulatorArm64
+./gradlew :kotlin:sample-kmm:shared:linkDebugFrameworkIosSimulatorArm64
 
 # Build iOS app
-xcodebuild -project kotlin/samples/shared/iosApp/iosApp.xcodeproj \
+xcodebuild -project kotlin/samples/flowdux/kmm/iosApp/iosApp.xcodeproj \
   -target iosApp -sdk iphonesimulator -arch arm64 build
 ```
 
-App location: `kotlin/samples/shared/iosApp/build/Debug-iphonesimulator/iosApp.app`
+App location: `kotlin/samples/flowdux/kmm/iosApp/build/Debug-iphonesimulator/iosApp.app`
 
 ## KMM Sample Structure
 
 ```
-kotlin/samples/shared/
+kotlin/samples/flowdux/kmm/
 ├── shared/           # Shared Kotlin code (commonMain)
 │   └── CounterStore  # Shared business logic
 ├── androidApp/       # Android UI (Compose)

@@ -20,6 +20,7 @@ kotlin {
             dependencies {
                 implementation(project(":kotlin:flowdux"))
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.browser)
             }
         }
     }
