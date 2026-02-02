@@ -64,6 +64,7 @@ class BrowserWebSocketClientConnection(
         ws.onclose = {
             _connectionState.value = ConnectionState.DISCONNECTED
             webSocket = null
+            incomingChannel.close()
         }
 
         // Suspend until disconnected
@@ -83,6 +84,7 @@ class BrowserWebSocketClientConnection(
     override suspend fun disconnect() {
         webSocket?.close()
         webSocket = null
+        incomingChannel.close()
         _connectionState.value = ConnectionState.DISCONNECTED
     }
 }

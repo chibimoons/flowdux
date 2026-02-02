@@ -5,6 +5,7 @@ import io.flowdux.State
 import io.flowdux.createStore
 import io.flowdux.buildReducer
 import io.flowdux.remote.ClientRemoteMiddleware
+import io.flowdux.remote.ConnectionState
 import io.flowdux.remote.TypedClientConnection
 import io.flowdux.remote.serialization.typedJson
 import io.flowdux.sample.chat.ChatAction
@@ -13,6 +14,7 @@ import io.flowdux.sample.chat.ChatEvent
 import io.flowdux.sample.chat.SharedChatAction
 import kotlinx.browser.document
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLDivElement
@@ -91,8 +93,10 @@ fun main() {
     // Create store (lazily after user joins)
     var storeReady = false
 
+    val rawConnection = BrowserWebSocketClientConnection("ws://localhost:8080/chat")
+
     @Suppress("UNCHECKED_CAST")
-    val connection = BrowserWebSocketClientConnection("ws://localhost:8080/chat")
+    val connection = rawConnection
         .typedJson<SharedChatAction>() as TypedClientConnection<ChatAction>
 
     val store = createStore(
@@ -108,8 +112,18 @@ fun main() {
             val div = document.createElement("div") as HTMLDivElement
             val isMe = msg.user == currentUser
             div.className = if (isMe) "message message-mine" else "message"
-            div.innerHTML = "<span class=\"message-user\">${escapeHtml(msg.user)}</span> " +
-                "<span class=\"message-text\">${escapeHtml(msg.text)}</span>"
+
+            val userSpan = document.createElement("span")
+            userSpan.className = "message-user"
+            userSpan.textContent = msg.user
+
+            val textSpan = document.createElement("span")
+            textSpan.className = "message-text"
+            textSpan.textContent = msg.text
+
+            div.appendChild(userSpan)
+            div.appendChild(document.createTextNode(" "))
+            div.appendChild(textSpan)
             messagesDiv.appendChild(div)
         }
         messagesDiv.scrollTop = messagesDiv.scrollHeight.toDouble()
@@ -160,9 +174,8 @@ fun main() {
         store.dispatch(ClientChatAction.SetCurrentUser(username))
         store.dispatch(ClientChatAction.Connect)
 
-        // Delay JoinRoom slightly to allow WebSocket to connect
         scope.launch {
-            kotlinx.coroutines.delay(500)
+            rawConnection.connectionState.first { it == ConnectionState.CONNECTED }
             store.dispatch(SharedChatAction.JoinRoom(username))
         }
 
@@ -196,7 +209,7 @@ fun main() {
         val user = store.currentState.currentUser
         store.dispatch(SharedChatAction.LeaveRoom(user))
         scope.launch {
-            kotlinx.coroutines.delay(300)
+            store.state.first { user !in it.users }
             store.dispatch(ClientChatAction.Disconnect)
             storeReady = false
             chatScreen.style.display = "none"
@@ -207,9 +220,3 @@ fun main() {
         Unit
     }
 }
-
-private fun escapeHtml(text: String): String =
-    text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
