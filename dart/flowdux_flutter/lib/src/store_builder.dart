@@ -113,6 +113,14 @@ class _SelectorBuilderState<S, A extends Action>
       _currentState = widget.store.currentState;
       _selectedValue = widget.selector(_currentState);
       _subscribe();
+    } else if (oldWidget.selector != widget.selector) {
+      final newSelectedValue = widget.selector(_currentState);
+      if (newSelectedValue != _selectedValue) {
+        _subscription?.cancel();
+        _selectedValue = newSelectedValue;
+        _subscribe();
+        setState(() {});
+      }
     }
   }
 
@@ -192,6 +200,20 @@ class _StoreSelectorState<S, A extends Action, T>
       _store = newStore;
       _selectedValue = widget.selector(newStore.currentState);
       _subscribe();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant StoreSelector<S, A, T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selector != widget.selector) {
+      final newValue = widget.selector(_store!.currentState);
+      if (newValue != _selectedValue) {
+        _subscription?.cancel();
+        _selectedValue = newValue;
+        _subscribe();
+        setState(() {});
+      }
     }
   }
 
