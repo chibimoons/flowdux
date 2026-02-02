@@ -77,6 +77,10 @@ project(":kotlin:sample-remote-multi:server").projectDir = file("kotlin/samples/
 include(":kotlin:sample-remote-multi:client")
 project(":kotlin:sample-remote-multi:client").projectDir = file("kotlin/samples/flowdux-remote/multi-client/client")
 
+include(":kotlin:sample-remote-web:client")
+project(":kotlin:sample-remote-web").projectDir = file("kotlin/samples/flowdux-remote/web")
+project(":kotlin:sample-remote-web:client").projectDir = file("kotlin/samples/flowdux-remote/web/client")
+
 // ── Benchmark ──
 include(":kotlin:flowdux-benchmark")
 project(":kotlin:flowdux-benchmark").projectDir = file("kotlin/benchmark")
