@@ -92,14 +92,6 @@ sealed interface PokerAction : Action {
         val communityCards: List<String>,
     ) : PokerAction, io.flowdux.remote.ClientSharedAction
 
-    /** Server → Client + SessionAware: send each player their own hand. */
-    data class SyncGameState(val state: PokerState) : PokerAction, io.flowdux.remote.ClientSharedAction, SessionAwareAction<PokerAction> {
-        override fun forSession(sessionId: String): PokerAction? {
-            val hand = state.hands[sessionId] ?: return null
-            return SyncPlayerView(hand = hand, communityCards = state.communityCards)
-        }
-    }
-
     /** Server-internal: deal cards. */
     data class DealCards(val hands: Map<String, List<String>>, val communityCards: List<String>) : PokerAction
 }
@@ -108,7 +100,6 @@ val pokerReducer = Reducer<PokerState, PokerAction> { state, action ->
     when (action) {
         is PokerAction.PlayerAction -> state // handled externally
         is PokerAction.SyncPlayerView -> state // client-side only
-        is PokerAction.SyncGameState -> state // intercepted by middleware
         is PokerAction.DealCards -> state.copy(hands = action.hands, communityCards = action.communityCards)
     }
 }

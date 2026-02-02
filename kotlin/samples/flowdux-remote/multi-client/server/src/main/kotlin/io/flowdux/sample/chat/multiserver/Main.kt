@@ -4,7 +4,7 @@ import io.flowdux.Middleware
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.serialization.typedJson
 import io.flowdux.remote.server.TypedServerConnection
-import io.flowdux.remote.server.createRemoteServerSession
+import io.flowdux.remote.server.createRemoteServer
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatState
 import io.flowdux.sample.chat.SharedChatAction
@@ -24,7 +24,7 @@ fun main() {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // Single session serves ALL clients (one Store, shared state)
-    val session = createRemoteServerSession(
+    val session = createRemoteServer(
         initialState = ServerChatState(),
         reducer = serverChatReducer,
         processors = chatProcessors(),

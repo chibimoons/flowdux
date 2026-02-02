@@ -155,6 +155,9 @@ fun <S : State, A : Action> createRemoteServer(
  * this variant calls [sessionStateMapper] with the session ID for each connected client,
  * allowing each client to receive a different view of the state.
  *
+ * State changes are observed directly and mapped per-session without going through
+ * the dispatch pipeline.
+ *
  * @param initialState Initial state for the store.
  * @param reducer Reducer for processing actions.
  * @param processors Action processors for server-side action handling.
@@ -164,7 +167,6 @@ fun <S : State, A : Action> createRemoteServer(
  * @param logger Logger for the store.
  * @param scope Coroutine scope for the store and state broadcasting.
  */
-@Suppress("UNCHECKED_CAST")
 fun <S : State, A : Action> createSessionAwareRemoteServer(
     initialState: S,
     reducer: Reducer<S, A>,
@@ -174,13 +176,29 @@ fun <S : State, A : Action> createSessionAwareRemoteServer(
     logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ): RemoteServer<S, A> {
-    return createRemoteServer(
+    val session = RemoteServerSession<A>()
+    val middleware = MultiClientServerRemoteMiddleware<S, A>(processors, session)
+
+    val store = createStore(
         initialState = initialState,
+        middlewares = listOf(middleware),
         reducer = reducer,
-        processors = processors,
-        stateMapper = { state -> SessionAwareBroadcast(state, sessionStateMapper) as A },
         errorProcessor = errorProcessor,
         logger = logger,
         scope = scope,
+    )
+
+    val serveJob = scope.launch {
+        store.state.collect { state ->
+            session.sendPerSession { sessionId ->
+                sessionStateMapper(state, sessionId)
+            }
+        }
+    }
+
+    return RemoteServer(
+        session = session,
+        store = store,
+        serveJob = serveJob,
     )
 }

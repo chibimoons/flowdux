@@ -103,15 +103,15 @@ class RemoteServerSession<A : Action> {
     /**
      * Send a per-session action to each connected client.
      *
-     * For each session, calls [SessionAwareAction.forSession] to produce
-     * the action for that session. If `forSession` returns `null`, the session is skipped.
+     * For each session, calls [mapper] to produce the action for that session.
+     * If [mapper] returns `null`, the session is skipped.
      * Errors on individual connections are caught and do not affect others.
      */
-    internal suspend fun sendPerSession(action: SessionAwareAction<A>) {
+    internal suspend fun sendPerSession(mapper: (sessionId: String) -> A?) {
         val snapshot = mutex.withLock { sessions.toMap() }
         for ((sessionId, connection) in snapshot) {
             try {
-                val sessionAction = action.forSession(sessionId) ?: continue
+                val sessionAction = mapper(sessionId) ?: continue
                 connection.send(sessionAction)
             } catch (_: Exception) {
                 // Isolate per-client send failures

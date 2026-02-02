@@ -3,6 +3,7 @@ package io.flowdux.remote.server
 import io.flowdux.Middleware
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -197,6 +198,54 @@ class SessionAwareRemoteServerSessionTest {
 
         jobAlice.cancel()
         jobSpectator.cancel()
+        server.close()
+    }
+
+    @Test
+    fun `error in one session does not affect others during per-session send`() = runTest {
+        val connAlice = MockTypedServerConnection<PokerAction>()
+        val failingConn = object : TypedServerConnection<PokerAction> {
+            override val incoming = emptyFlow<PokerAction>()
+            override suspend fun send(action: PokerAction) {
+                throw RuntimeException("Connection failed")
+            }
+        }
+
+        val processors = Middleware.ActionProcessorBuilder<PokerState, PokerAction>().apply {
+            on<PokerAction.DealCards> { _, action -> emit(action) }
+        }.build()
+
+        val server = createSessionAwareRemoteServer(
+            initialState = PokerState(),
+            reducer = pokerReducer,
+            processors = processors,
+            sessionStateMapper = { state, sessionId ->
+                val hand = state.hands[sessionId] ?: return@createSessionAwareRemoteServer null
+                PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
+            },
+            errorProcessor = pokerErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        val jobFailing = backgroundScope.launch { server.handleClient("failing", failingConn) }
+        val jobAlice = backgroundScope.launch { server.handleClient("alice", connAlice) }
+        delay(100)
+
+        connAlice.sentActions.clear()
+
+        connAlice.simulateClientAction(PokerAction.DealCards(
+            hands = mapOf("failing" to listOf("X♠"), "alice" to listOf("A♠", "K♠")),
+            communityCards = listOf("Q♥"),
+        ))
+        delay(200)
+
+        // Alice still receives her view despite failing connection
+        val aliceViews = connAlice.sentActions.filterIsInstance<PokerAction.SyncPlayerView>()
+        assertTrue(aliceViews.isNotEmpty(), "Alice should receive her view")
+        assertEquals(listOf("A♠", "K♠"), aliceViews.last().hand)
+
+        jobFailing.cancel()
+        jobAlice.cancel()
         server.close()
     }
 }

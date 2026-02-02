@@ -52,14 +52,8 @@ internal class MultiClientServerRemoteMiddleware<S : State, A : Action>(
         }
 
         // 1. ClientSharedAction: broadcast to all clients, do NOT emit locally
-        //    SessionAwareAction: send per-session instead of uniform broadcast
         if (action is ClientSharedAction) {
-            if (action is SessionAwareAction<*>) {
-                @Suppress("UNCHECKED_CAST")
-                session.sendPerSession(action as SessionAwareAction<A>)
-            } else {
-                session.broadcast(action)
-            }
+            session.broadcast(action)
             return@flow
         }
 
