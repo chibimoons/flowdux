@@ -25,7 +25,7 @@ import 'store_provider.dart';
 ///   },
 /// )
 /// ```
-class StoreConsumer<S, A extends Action> extends StatelessWidget {
+class StoreConsumer<S, A extends Action> extends StatefulWidget {
   /// Builder function that receives both the store and current state.
   final Widget Function(BuildContext context, Store<S, A> store, S state)
       builder;
@@ -65,8 +65,18 @@ class StoreConsumer<S, A extends Action> extends StatelessWidget {
   });
 
   @override
+  State<StoreConsumer<S, A>> createState() => _StoreConsumerState<S, A>();
+}
+
+class _StoreConsumerState<S, A extends Action>
+    extends State<StoreConsumer<S, A>> {
+  S? _previousState;
+  bool _initialized = false;
+
+  @override
   Widget build(BuildContext context) {
-    final effectiveStore = store ?? StoreProvider.of<S, A>(context);
+    final effectiveStore =
+        widget.store ?? StoreProvider.of<S, A>(context);
 
     return StreamBuilder<S>(
       stream: effectiveStore.state,
@@ -74,14 +84,21 @@ class StoreConsumer<S, A extends Action> extends StatelessWidget {
       builder: (context, snapshot) {
         final state = snapshot.data as S;
 
-        if (listener != null) {
-          // Schedule listener to be called after the build
+        if (!_initialized) {
+          _previousState = state;
+          _initialized = true;
+        } else if (widget.listener != null && _previousState != state) {
+          final capturedState = state;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            listener!(context, effectiveStore, state);
+            if (mounted) {
+              widget.listener!(context, effectiveStore, capturedState);
+            }
           });
         }
 
-        return builder(context, effectiveStore, state);
+        _previousState = state;
+
+        return widget.builder(context, effectiveStore, state);
       },
     );
   }

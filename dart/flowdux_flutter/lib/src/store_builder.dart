@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart' hide Action;
 import 'package:flowdux/flowdux.dart';
 
@@ -93,32 +95,48 @@ class _SelectorBuilderState<S, A extends Action>
     extends State<_SelectorBuilder<S, A>> {
   late S _currentState;
   late dynamic _selectedValue;
+  StreamSubscription<S>? _subscription;
 
   @override
   void initState() {
     super.initState();
     _currentState = widget.store.currentState;
     _selectedValue = widget.selector(_currentState);
+    _subscribe();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SelectorBuilder<S, A> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.store != widget.store) {
+      _subscription?.cancel();
+      _currentState = widget.store.currentState;
+      _selectedValue = widget.selector(_currentState);
+      _subscribe();
+    }
+  }
+
+  void _subscribe() {
+    _subscription = widget.store.state.listen((newState) {
+      final newSelectedValue = widget.selector(newState);
+      if (newSelectedValue != _selectedValue) {
+        setState(() {
+          _currentState = newState;
+          _selectedValue = newSelectedValue;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<S>(
-      stream: widget.store.state,
-      initialData: widget.store.currentState,
-      builder: (context, snapshot) {
-        final newState = snapshot.data as S;
-        final newSelectedValue = widget.selector(newState);
-
-        // Only update if selected value changed
-        if (newSelectedValue != _selectedValue) {
-          _currentState = newState;
-          _selectedValue = newSelectedValue;
-        }
-
-        return widget.builder(context, _currentState);
-      },
-    );
+    return widget.builder(context, _currentState);
   }
 }
 
@@ -161,26 +179,41 @@ class StoreSelector<S, A extends Action, T> extends StatefulWidget {
 
 class _StoreSelectorState<S, A extends Action, T>
     extends State<StoreSelector<S, A, T>> {
-  T? _selectedValue;
-  bool _initialized = false;
+  late T _selectedValue;
+  Store<S, A>? _store;
+  StreamSubscription<S>? _subscription;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final newStore = widget.store ?? StoreProvider.of<S, A>(context);
+    if (newStore != _store) {
+      _subscription?.cancel();
+      _store = newStore;
+      _selectedValue = widget.selector(newStore.currentState);
+      _subscribe();
+    }
+  }
+
+  void _subscribe() {
+    _subscription = _store!.state.listen((newState) {
+      final newValue = widget.selector(newState);
+      if (newValue != _selectedValue) {
+        setState(() {
+          _selectedValue = newValue;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final store = widget.store ?? StoreProvider.of<S, A>(context);
-
-    return StreamBuilder<S>(
-      stream: store.state,
-      initialData: store.currentState,
-      builder: (context, snapshot) {
-        final newValue = widget.selector(snapshot.data as S);
-
-        if (!_initialized || newValue != _selectedValue) {
-          _selectedValue = newValue;
-          _initialized = true;
-        }
-
-        return widget.builder(context, _selectedValue as T);
-      },
-    );
+    return widget.builder(context, _selectedValue);
   }
 }
