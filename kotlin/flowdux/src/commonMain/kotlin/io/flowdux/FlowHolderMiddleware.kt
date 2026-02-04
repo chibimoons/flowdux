@@ -31,7 +31,7 @@ internal class FlowHolderMiddleware<S : State, A : Action>(
 
     override val name: String = "FlowHolderMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
-    private val isLoggingEnabled = logger !is NoOpStoreLogger
+    private val isLoggingEnabled = logger::class != NoOpStoreLogger::class
 
     /**
      * Cache of wrapped processors for each FlowHolderAction type.

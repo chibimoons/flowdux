@@ -34,7 +34,7 @@ class Store<S : State, A : Action> internal constructor(
 ) {
     private val actionFlow = Channel<A>()
     private var _isClosed = false
-    private val isLoggingEnabled = logger !is NoOpStoreLogger
+    private val isLoggingEnabled = logger::class != NoOpStoreLogger::class
 
     val isClosed: Boolean get() = _isClosed
 
