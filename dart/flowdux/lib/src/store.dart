@@ -74,7 +74,7 @@ class Store<S, A extends Action> {
   /// The initial state is injected via startWith() before distinct() to ensure
   /// the first action resulting in the same state is filtered correctly.
   ValueStream<S> _buildStateStream(S initialState) {
-    var stream = _actionController.stream as Stream<A>;
+    var stream = _actionController.stream;
     if (_isLoggingEnabled) {
       stream = stream.doOnData(_logger.onActionDispatched);
     }
