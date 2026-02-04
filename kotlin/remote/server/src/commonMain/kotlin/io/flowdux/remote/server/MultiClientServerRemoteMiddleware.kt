@@ -9,6 +9,7 @@ import io.flowdux.Middleware
 import io.flowdux.State
 import io.flowdux.concurrent
 import io.flowdux.remote.ClientSharedAction
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -63,6 +64,8 @@ internal class MultiClientServerRemoteMiddleware<S : State, A : Action>(
         val connection = mutex.withLock { sessions[sessionId] } ?: return
         try {
             connection.send(action)
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             // Isolate send failures
         }
@@ -77,6 +80,8 @@ internal class MultiClientServerRemoteMiddleware<S : State, A : Action>(
         for (connection in snapshot) {
             try {
                 connection.send(action)
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 // Isolate per-client send failures
             }

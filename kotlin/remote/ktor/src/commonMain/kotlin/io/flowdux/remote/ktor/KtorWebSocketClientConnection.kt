@@ -6,8 +6,11 @@ import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.websocket.Frame
+import io.ktor.websocket.WebSocketSession
+import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,6 +56,8 @@ class KtorWebSocketClientConnection(
 
     private val outgoingChannel = Channel<String>(Channel.UNLIMITED)
 
+    private var session: WebSocketSession? = null
+
     override suspend fun send(message: String) {
         if (_connectionState.value != ConnectionState.CONNECTED) {
             throw IllegalStateException("Cannot send message: WebSocket is not connected")
@@ -61,36 +66,32 @@ class KtorWebSocketClientConnection(
     }
 
     override suspend fun connect() {
-        // Prevent multiple concurrent connections
-        if (_connectionState.value != ConnectionState.DISCONNECTED) {
-            return
-        }
+        if (_connectionState.value != ConnectionState.DISCONNECTED) return
         _connectionState.value = ConnectionState.CONNECTING
 
         try {
             httpClient.webSocket(url) {
+                session = this
                 _connectionState.value = ConnectionState.CONNECTED
-
-                val receiveJob = launch {
-                    for (frame in incoming) {
-                        if (frame is Frame.Text) {
-                            val text = frame.readText()
-                            incomingChannel.send(text)
+                try {
+                    coroutineScope {
+                        launch {
+                            for (frame in incoming) {
+                                if (frame is Frame.Text) {
+                                    incomingChannel.send(frame.readText())
+                                }
+                            }
+                        }
+                        launch {
+                            for (message in outgoingChannel) {
+                                send(Frame.Text(message))
+                            }
                         }
                     }
+                } finally {
+                    session = null
                 }
-
-                val sendJob = launch {
-                    for (message in outgoingChannel) {
-                        send(Frame.Text(message))
-                    }
-                }
-
-                receiveJob.join()
-                sendJob.cancel()
             }
-        } catch (e: Exception) {
-            // Connection error - could add logging or error callback
         } finally {
             _connectionState.value = ConnectionState.DISCONNECTED
         }
@@ -98,6 +99,8 @@ class KtorWebSocketClientConnection(
 
     override suspend fun disconnect() {
         _connectionState.value = ConnectionState.DISCONNECTED
+        session?.close()
+        session = null
         outgoingChannel.close()
         incomingChannel.close()
         if (isClientOwned) {
