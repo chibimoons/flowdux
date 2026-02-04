@@ -1,0 +1,21 @@
+name: Protect main branch
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-source-branch:
+    name: Validate source branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch pattern
+        run: |
+          HEAD_REF="${{ github.head_ref }}"
+          if [[ "$HEAD_REF" =~ ^release/ ]] || [[ "$HEAD_REF" =~ ^hotfix/ ]]; then
+            echo "✅ Source branch '$HEAD_REF' is allowed to merge into main."
+          else
+            echo "❌ Source branch '$HEAD_REF' is not allowed to merge into main."
+            echo "Only 'release/*' and 'hotfix/*' branches can be merged into main."
+            exit 1
+          fi
