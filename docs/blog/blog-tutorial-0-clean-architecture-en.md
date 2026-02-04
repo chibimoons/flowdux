@@ -235,7 +235,7 @@ DELETE /tasks/{id}
 
 ```
 ┌──────┐     ┌──────────┐     ┌─────────┐     ┌────────────┐     ┌─────────────┐
-│  UI  │     │Middleware│     │ UseCase │     │ Repository │     │Port Services│
+│  UI  │     │  Store   │     │ UseCase │     │ Repository │     │Port Services│
 └──┬───┘     └────┬─────┘     └────┬────┘     └─────┬──────┘     └──────┬──────┘
    │              │                │                │                   │
    │ DeleteTask   │                │                │                   │
@@ -266,8 +266,11 @@ DELETE /tasks/{id}
    │              │                │                │                   │
    │◀ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─[Toast shows]─ ─ ─ ─ ─ │
    │              │                │                │                   │
-   │◀═══════════════════════════════════════════════│                   │
-   │         [Flow emits updated task list]         │                   │
+   │              │◀════════════════════════════════│                   │
+   │              │  [Repository Flow emits update] │                   │
+   │              │                │                │                   │
+   │◀─────────────│                │                │                   │
+   │  [Reducer updates state → UI refreshes]        │                   │
    │              │                │                │                   │
 ```
 
