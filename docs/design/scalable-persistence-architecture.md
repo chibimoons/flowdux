@@ -159,6 +159,7 @@ class PersistenceMiddleware<S : State, A : Action>(
 ) : Middleware<S, A> {
 
     override val name = "Persistence"
+    override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     override fun process(
         getState: () -> S,
@@ -256,6 +257,7 @@ class HybridPersistenceMiddleware<S : State, A : Action>(
 ) : Middleware<S, A> {
 
     override val name = "HybridPersistence"
+    override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     override fun process(
         getState: () -> S,
@@ -263,12 +265,12 @@ class HybridPersistenceMiddleware<S : State, A : Action>(
     ): Flow<A> = flow {
         when (action) {
             is CriticalAction -> {
-                // 즉시 DB 저장 (동기)
+                // 액션을 먼저 emit하여 미들웨어 체인을 블로킹하지 않음
+                emit(action)
+                // DB 저장은 emit 이후 비동기로 수행
                 db.transaction {
-                    // 액션별 처리 로직
                     persistCriticalAction(action)
                 }
-                emit(action)
             }
 
             is BufferedAction -> {
@@ -370,6 +372,7 @@ class ClusterSyncMiddleware<S : State, A : Action>(
 ) : Middleware<S, A> {
 
     override val name = "ClusterSync"
+    override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     override fun process(
         getState: () -> S,
@@ -377,7 +380,9 @@ class ClusterSyncMiddleware<S : State, A : Action>(
     ): Flow<A> = flow {
         emit(action)
 
-        // ClientSharedAction을 다른 서버에도 전파
+        // ClientSharedAction을 다른 서버에도 전파 (fire-and-forget)
+        // broadcast 실패 시에도 로컬 액션 처리는 영향받지 않음
+        // 다른 서버와의 동기화는 eventual consistency로 보장
         if (action is ClientSharedAction) {
             broadcaster.broadcast(roomId, action)
         }
