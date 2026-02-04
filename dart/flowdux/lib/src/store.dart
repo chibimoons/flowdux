@@ -34,6 +34,7 @@ class Store<S, A extends Action> {
   late final FlowHolderMiddleware<S, A> _flowHolderMiddleware;
   final ErrorProcessor<A> _errorProcessor;
   final StoreLogger<S, A> _logger;
+  final bool _isLoggingEnabled;
 
   /// All middlewares including FlowHolderMiddleware at the end.
   late final List<Middleware<S, A>> _allMiddlewares;
@@ -56,7 +57,8 @@ class Store<S, A extends Action> {
         _reducer = reducer,
         _middlewares = middlewares,
         _errorProcessor = errorProcessor,
-        _logger = logger {
+        _logger = logger,
+        _isLoggingEnabled = logger is! NoOpStoreLogger {
     _flowHolderMiddleware = FlowHolderMiddleware<S, A>(logger, dispatch);
     _allMiddlewares = [..._middlewares, _flowHolderMiddleware];
     _currentState = initialState;
@@ -72,8 +74,11 @@ class Store<S, A extends Action> {
   /// The initial state is injected via startWith() before distinct() to ensure
   /// the first action resulting in the same state is filtered correctly.
   ValueStream<S> _buildStateStream(S initialState) {
-    return _actionController.stream
-        .doOnData(_logger.onActionDispatched)
+    var stream = _actionController.stream;
+    if (_isLoggingEnabled) {
+      stream = stream.doOnData(_logger.onActionDispatched);
+    }
+    return stream
         .flatMap(_processAction)
         .map(_reduceAction)
         .doOnError(_handleError)
@@ -85,14 +90,18 @@ class Store<S, A extends Action> {
   /// Processes an action through middlewares.
   /// Equivalent to Kotlin's processAction function.
   Stream<A> _processAction(A action) {
-    return _processMiddlewares(action)
-        .doOnData(_logger.onMiddlewaresCompleted)
-        .onErrorResume((error, stackTrace) {
-          _handleError(error, stackTrace);
-          return _errorProcessor
-              .process(error, stackTrace)
-              .doOnData(_logger.onErrorHandled);
-        });
+    var stream = _processMiddlewares(action);
+    if (_isLoggingEnabled) {
+      stream = stream.doOnData(_logger.onMiddlewaresCompleted);
+    }
+    return stream.onErrorResume((error, stackTrace) {
+      _handleError(error, stackTrace);
+      final errorStream = _errorProcessor.process(error, stackTrace);
+      if (_isLoggingEnabled) {
+        return errorStream.doOnData(_logger.onErrorHandled);
+      }
+      return errorStream;
+    });
   }
 
   /// Processes an action through all middlewares concurrently.
@@ -106,7 +115,9 @@ class Store<S, A extends Action> {
 
     for (final middleware in _allMiddlewares) {
       currentStream = currentStream.flatMap((currentAction) {
-        _logger.onMiddlewareProcessing(middleware.name, currentAction);
+        if (_isLoggingEnabled) {
+          _logger.onMiddlewareProcessing(middleware.name, currentAction);
+        }
         return middleware.process(() => currentState, currentAction);
       });
     }
@@ -119,12 +130,12 @@ class Store<S, A extends Action> {
     final previousState = _currentState;
     final newState = _reducer(previousState, action);
     _currentState = newState;
-    _logger.onStateReduced(action, previousState, newState);
+    if (_isLoggingEnabled) _logger.onStateReduced(action, previousState, newState);
     return newState;
   }
 
   void _handleError(Object error, StackTrace stackTrace) {
-    _logger.onErrorOccurred(error, stackTrace);
+    if (_isLoggingEnabled) _logger.onErrorOccurred(error, stackTrace);
   }
 
   /// Whether the store has been closed.
@@ -145,7 +156,7 @@ class Store<S, A extends Action> {
   /// All actions (including FlowHolderAction) go through the stream pipeline.
   void dispatch(A action) {
     if (_isClosed) {
-      _logger.onDispatchAfterClose(action);
+      if (_isLoggingEnabled) _logger.onDispatchAfterClose(action);
       return;
     }
 

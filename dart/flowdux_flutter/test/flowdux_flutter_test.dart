@@ -12,6 +12,11 @@ class SetValueAction implements Action {
   SetValueAction(this.value);
 }
 
+class SetMessageAction implements Action {
+  final String message;
+  SetMessageAction(this.message);
+}
+
 // Test State
 class CounterState {
   final int count;
@@ -40,6 +45,8 @@ class CounterReducer extends ReducerBase<CounterState, Action> {
     on<IncrementAction>((state, _) => state.copyWith(count: state.count + 1));
     on<DecrementAction>((state, _) => state.copyWith(count: state.count - 1));
     on<SetValueAction>((state, action) => state.copyWith(count: action.value));
+    on<SetMessageAction>(
+        (state, action) => state.copyWith(message: action.message));
   }
 }
 
@@ -261,6 +268,120 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Count: 1'), findsOneWidget);
+    });
+  });
+
+  group('StoreSelector optimization', () {
+    testWidgets('does not rebuild when unrelated state changes', (tester) async {
+      var buildCount = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StoreProvider<CounterState, Action>(
+            store: store,
+            child: StoreSelector<CounterState, Action, int>(
+              selector: (state) => state.count,
+              builder: (context, count) {
+                buildCount++;
+                return Text('Count: $count');
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Count: 0'), findsOneWidget);
+      final initialBuildCount = buildCount;
+
+      // Dispatch an action that only changes message, not count
+      await tester.runAsync(() async {
+        store.dispatch(SetMessageAction('hello'));
+        await Future.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+
+      // Builder should NOT have been called again
+      expect(buildCount, initialBuildCount);
+      expect(find.text('Count: 0'), findsOneWidget);
+
+      // Now dispatch an action that changes count
+      await tester.runAsync(() async {
+        store.dispatch(IncrementAction());
+        await Future.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+
+      // Builder SHOULD have been called
+      expect(buildCount, initialBuildCount + 1);
+      expect(find.text('Count: 1'), findsOneWidget);
+    });
+  });
+
+  group('StoreConsumer listener', () {
+    testWidgets('listener is not called on initial build', (tester) async {
+      final listenerCalls = <int>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StoreProvider<CounterState, Action>(
+            store: store,
+            child: StoreConsumer<CounterState, Action>(
+              listener: (context, store, state) {
+                listenerCalls.add(state.count);
+              },
+              builder: (context, store, state) {
+                return Text('Count: ${state.count}');
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Listener should NOT be called on initial build
+      expect(listenerCalls, isEmpty);
+    });
+
+    testWidgets('listener is called only on state change', (tester) async {
+      final listenerCalls = <int>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StoreProvider<CounterState, Action>(
+            store: store,
+            child: StoreConsumer<CounterState, Action>(
+              listener: (context, store, state) {
+                listenerCalls.add(state.count);
+              },
+              builder: (context, store, state) {
+                return Text('Count: ${state.count}');
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      expect(listenerCalls, isEmpty);
+
+      // Dispatch a real state change
+      await tester.runAsync(() async {
+        store.dispatch(IncrementAction());
+        await Future.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+
+      expect(listenerCalls, [1]);
+
+      // Dispatch another state change
+      await tester.runAsync(() async {
+        store.dispatch(IncrementAction());
+        await Future.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+
+      expect(listenerCalls, [1, 2]);
     });
   });
 
