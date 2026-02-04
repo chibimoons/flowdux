@@ -31,7 +31,7 @@ Add the dependency to your KMP project's `build.gradle.kts`:
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("io.github.chibimoons:flowdux:1.11.0")
+            implementation("io.github.chibimoons:flowdux:1.12.0")
         }
     }
 }
@@ -45,7 +45,7 @@ If your project is not KMP, add the dependency directly:
 
 ```kotlin
 dependencies {
-    implementation("io.github.chibimoons:flowdux:1.11.0")
+    implementation("io.github.chibimoons:flowdux:1.12.0")
 }
 ```
 
@@ -58,15 +58,15 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // Shared action markers (ServerSharedAction, ClientSharedAction)
-            implementation("io.github.chibimoons:flowdux-remote-core:1.11.0")
+            implementation("io.github.chibimoons:flowdux-remote-core:1.12.0")
             // Client middleware (ClientRemoteMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-client:1.11.0")
+            implementation("io.github.chibimoons:flowdux-remote-client:1.12.0")
             // Server middleware (ServerRemoteMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-server:1.11.0")
+            implementation("io.github.chibimoons:flowdux-remote-server:1.12.0")
             // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-            implementation("io.github.chibimoons:flowdux-remote-serialization:1.11.0")
+            implementation("io.github.chibimoons:flowdux-remote-serialization:1.12.0")
             // Ktor WebSocket transport (JVM, iOS, JS — WASM not supported)
-            implementation("io.github.chibimoons:flowdux-remote-ktor:1.11.0")
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.12.0")
         }
     }
 }
