@@ -121,7 +121,7 @@ class TimingStrategyTest {
 
             val middleware = object : Middleware<TestState, TestAction> {
                 override val processors = buildProcessors {
-                    on<TestAction.Click>(throttle(100.milliseconds)) { _, action ->
+                    on<TestAction.Click>(throttle(300.milliseconds)) { _, action ->
                         executedClicks.add(action.buttonId)
                         emit(TestAction.ClickProcessed(action.buttonId))
                     }
@@ -145,13 +145,13 @@ class TimingStrategyTest {
                     awaitItem()
 
                     // Clicks within throttle window - should be ignored
-                    delay(20)
+                    delay(50)
                     store.dispatch(TestAction.Click("2"))
-                    delay(30)
+                    delay(50)
                     store.dispatch(TestAction.Click("3"))
 
                     // Click after throttle window - should execute
-                    delay(100)
+                    delay(400)
                     store.dispatch(TestAction.Click("4"))
                     awaitItem()
 
