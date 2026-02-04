@@ -1,7 +1,6 @@
 package io.flowdux.remote.server
 
 import io.flowdux.Middleware
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -16,7 +15,7 @@ class RemoteServerSessionTest {
     @Test
     fun `handleClient adds session and removes on cancellation`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val session = createRemoteServerSession(
+        val server = createRemoteServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -24,23 +23,23 @@ class RemoteServerSessionTest {
             scope = backgroundScope,
         )
 
-        assertEquals(0, session.sessionCount())
+        assertEquals(0, server.sessionCount())
 
         // Start client handler
         val clientJob = backgroundScope.launch {
-            session.handleClient("client-1", connection)
+            server.handleClient("client-1", connection)
         }
         delay(100)
 
         // Session registered
-        assertEquals(1, session.sessionCount())
-        assertTrue(session.sessionIds().contains("client-1"))
+        assertEquals(1, server.sessionCount())
+        assertTrue(server.sessionIds().contains("client-1"))
 
         // Cancel — should auto-remove
         clientJob.cancelAndJoin()
         delay(100)
 
-        assertEquals(0, session.sessionCount())
+        assertEquals(0, server.sessionCount())
     }
 
     @Test
@@ -48,7 +47,7 @@ class RemoteServerSessionTest {
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
 
-        val session = createRemoteServerSession(
+        val server = createRemoteServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -57,8 +56,8 @@ class RemoteServerSessionTest {
         )
 
         // Connect two clients
-        val job1 = backgroundScope.launch { session.handleClient("client-1", conn1) }
-        val job2 = backgroundScope.launch { session.handleClient("client-2", conn2) }
+        val job1 = backgroundScope.launch { server.handleClient("client-1", conn1) }
+        val job2 = backgroundScope.launch { server.handleClient("client-2", conn2) }
         delay(100)
 
         // Client 1 sends an action
@@ -70,7 +69,7 @@ class RemoteServerSessionTest {
         delay(100)
 
         // Both actions applied to the same state
-        assertEquals(30, session.currentState.count)
+        assertEquals(30, server.currentState.count)
 
         job1.cancel()
         job2.cancel()
@@ -81,7 +80,7 @@ class RemoteServerSessionTest {
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
 
-        val session = createRemoteServerSession(
+        val server = createRemoteServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -90,8 +89,8 @@ class RemoteServerSessionTest {
         )
 
         // Connect two clients
-        val job1 = backgroundScope.launch { session.handleClient("client-1", conn1) }
-        val job2 = backgroundScope.launch { session.handleClient("client-2", conn2) }
+        val job1 = backgroundScope.launch { server.handleClient("client-1", conn1) }
+        val job2 = backgroundScope.launch { server.handleClient("client-2", conn2) }
         delay(100)
 
         // Client 1 sends an action that updates state
@@ -117,7 +116,7 @@ class RemoteServerSessionTest {
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
 
-        val session = createRemoteServerSession(
+        val server = createRemoteServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -125,15 +124,15 @@ class RemoteServerSessionTest {
             scope = backgroundScope,
         )
 
-        val job1 = backgroundScope.launch { session.handleClient("client-1", conn1) }
-        val job2 = backgroundScope.launch { session.handleClient("client-2", conn2) }
+        val job1 = backgroundScope.launch { server.handleClient("client-1", conn1) }
+        val job2 = backgroundScope.launch { server.handleClient("client-2", conn2) }
         delay(100)
 
         // Clear any initial SyncState sent on connection
         conn1.sentActions.clear()
         conn2.sentActions.clear()
 
-        session.sendToClient("client-1", ServerAction.Add(5))
+        server.sendToClient("client-1", ServerAction.Add(5))
 
         assertEquals(1, conn1.sentActions.size)
         assertEquals(ServerAction.Add(5), conn1.sentActions[0])
@@ -148,7 +147,7 @@ class RemoteServerSessionTest {
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
 
-        val session = createRemoteServerSession(
+        val server = createRemoteServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -156,15 +155,15 @@ class RemoteServerSessionTest {
             scope = backgroundScope,
         )
 
-        val job1 = backgroundScope.launch { session.handleClient("client-1", conn1) }
-        val job2 = backgroundScope.launch { session.handleClient("client-2", conn2) }
+        val job1 = backgroundScope.launch { server.handleClient("client-1", conn1) }
+        val job2 = backgroundScope.launch { server.handleClient("client-2", conn2) }
         delay(100)
 
         // Clear any initial SyncState
         conn1.sentActions.clear()
         conn2.sentActions.clear()
 
-        session.broadcast(ServerAction.Add(7))
+        server.broadcast(ServerAction.Add(7))
 
         assertEquals(1, conn1.sentActions.size)
         assertEquals(1, conn2.sentActions.size)
@@ -177,7 +176,7 @@ class RemoteServerSessionTest {
 
     @Test
     fun `close stops the session`() = runTest {
-        val session = createRemoteServerSession(
+        val server = createRemoteServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -185,10 +184,10 @@ class RemoteServerSessionTest {
             scope = backgroundScope,
         )
 
-        assertFalse(session.state.value.count != 0) // initial state
+        assertFalse(server.state.value.count != 0) // initial state
 
-        session.close()
-        // After close, the session should not process new dispatches
+        server.close()
+        // After close, the server should not process new dispatches
         // (Store.isClosed is true internally)
     }
 
@@ -204,7 +203,7 @@ class RemoteServerSessionTest {
             }
         }.build()
 
-        val session = createRemoteServerSession(
+        val server = createRemoteServer(
             initialState = ServerState(),
             reducer = serverReducer,
             processors = processors,
@@ -213,7 +212,7 @@ class RemoteServerSessionTest {
             scope = backgroundScope,
         )
 
-        val job = backgroundScope.launch { session.handleClient("client-1", conn) }
+        val job = backgroundScope.launch { server.handleClient("client-1", conn) }
         delay(100)
 
         // Client sends ClientAdd(5) → processor emits InternalReset(10)
@@ -221,7 +220,7 @@ class RemoteServerSessionTest {
         delay(100)
 
         // InternalReset(10) reaches the reducer → state.count = 10
-        assertEquals(10, session.currentState.count)
+        assertEquals(10, server.currentState.count)
 
         job.cancel()
     }
