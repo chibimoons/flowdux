@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2
+
+- Optimize Store and FlowHolderMiddleware performance by skipping logger calls when NoOpStoreLogger is used
+
 ## 0.3.1
 
 - Update example to align with Kotlin JVM sample pattern
