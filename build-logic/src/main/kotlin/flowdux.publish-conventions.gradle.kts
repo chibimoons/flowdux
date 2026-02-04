@@ -4,7 +4,11 @@ plugins {
 
 mavenPublishing {
     publishToMavenCentral(automaticRelease = true)
-    signAllPublications()
+
+    // Only sign when signing credentials are available (skipped during dry-run)
+    if (providers.gradleProperty("signingInMemoryKey").isPresent) {
+        signAllPublications()
+    }
 
     pom {
         url.set("https://github.com/chibimoons/flowdux")
