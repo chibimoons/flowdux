@@ -23,7 +23,39 @@ A lightweight Redux-style state management library for **Kotlin Multiplatform** 
 
 ## Installation
 
-### Kotlin (JitPack)
+### Kotlin (Maven Central)
+
+Add the dependency to your `build.gradle.kts`:
+
+```kotlin
+dependencies {
+    implementation("io.github.chibimoons:flowdux:1.11.0")
+}
+```
+
+#### Remote Modules (WebSocket)
+
+For real-time client-server state sync, add the relevant modules:
+
+```kotlin
+dependencies {
+    // Shared action markers (ServerSharedAction, ClientSharedAction)
+    implementation("io.github.chibimoons:flowdux-remote-core:1.11.0")
+    // Client middleware (ClientRemoteMiddleware)
+    implementation("io.github.chibimoons:flowdux-remote-client:1.11.0")
+    // Server middleware (ServerRemoteMiddleware)
+    implementation("io.github.chibimoons:flowdux-remote-server:1.11.0")
+    // kotlinx.serialization codecs (ActionCodec, MessageCodec)
+    implementation("io.github.chibimoons:flowdux-remote-serialization:1.11.0")
+    // Ktor WebSocket transport
+    implementation("io.github.chibimoons:flowdux-remote-ktor:1.11.0")
+}
+```
+
+### Kotlin (JitPack — legacy)
+
+<details>
+<summary>JitPack is still supported but Maven Central is recommended</summary>
 
 Add JitPack repository to your `settings.gradle.kts`:
 
@@ -35,32 +67,13 @@ dependencyResolutionManagement {
 }
 ```
 
-Add the dependency to your `build.gradle.kts`:
-
 ```kotlin
 dependencies {
     implementation("com.github.chibimoons:flowdux:1.10.0")
 }
 ```
 
-#### Remote Modules (WebSocket)
-
-For real-time client-server state sync, add the relevant modules:
-
-```kotlin
-dependencies {
-    // Shared action markers (ServerSharedAction, ClientSharedAction)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-core:1.10.0")
-    // Client middleware (ClientRemoteMiddleware)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-client:1.10.0")
-    // Server middleware (ServerRemoteMiddleware)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-server:1.10.0")
-    // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-serialization:1.10.0")
-    // Ktor WebSocket transport
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-ktor:1.10.0")
-}
-```
+</details>
 
 ### Dart
 

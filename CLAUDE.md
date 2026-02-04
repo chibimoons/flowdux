@@ -34,9 +34,20 @@ Check `gh auth status` output to identify available accounts and ensure the corr
 
 ## Release Process
 
-### Kotlin (JitPack)
+### Kotlin (Maven Central — primary)
 - Git Flow: develop → release/x.x.x → main → tag
-- Tag format: `1.x.x` (no prefix, for JitPack compatibility)
+- Tag format: `1.x.x` (no prefix)
+- groupId: `io.github.chibimoons`
+- Automated via GitHub Actions (`publish-maven-central.yml`): tag push triggers publish
+- Manual dry-run: workflow_dispatch with `dry_run: true`
+- Plugin: vanniktech/gradle-maven-publish-plugin 0.36.0
+- Version: managed in `gradle.properties` (`flowdux.version`)
+- See `docs/design/MAVEN_CENTRAL_PUBLISH.md` for full guide
+
+### Kotlin (JitPack — legacy)
+- Still supported for existing consumers
+- groupId: `com.github.chibimoons`
+- `jitpack.yml` builds with `JITPACK=true` (JVM-only artifacts)
 
 ### Dart (pub.dev)
 - Tag format: `dart/x.x.x`
