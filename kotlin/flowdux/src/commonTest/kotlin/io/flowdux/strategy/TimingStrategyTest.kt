@@ -115,13 +115,14 @@ class TimingStrategyTest {
 
         @Test
         fun `throttle limits execution rate`() = runBlocking {
-            // Throttle uses real time (TimeSource.Monotonic), so we use runBlocking
+            // Throttle uses real time (TimeSource.Monotonic), so we use runBlocking.
+            // Large timing margins are needed for CI (especially iosSimulatorArm64).
             val executedClicks = mutableListOf<String>()
             val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
             val middleware = object : Middleware<TestState, TestAction> {
                 override val processors = buildProcessors {
-                    on<TestAction.Click>(throttle(300.milliseconds)) { _, action ->
+                    on<TestAction.Click>(throttle(500.milliseconds)) { _, action ->
                         executedClicks.add(action.buttonId)
                         emit(TestAction.ClickProcessed(action.buttonId))
                     }
@@ -145,13 +146,13 @@ class TimingStrategyTest {
                     awaitItem()
 
                     // Clicks within throttle window - should be ignored
-                    delay(50)
+                    delay(100)
                     store.dispatch(TestAction.Click("2"))
-                    delay(50)
+                    delay(100)
                     store.dispatch(TestAction.Click("3"))
 
                     // Click after throttle window - should execute
-                    delay(400)
+                    delay(800)
                     store.dispatch(TestAction.Click("4"))
                     awaitItem()
 
