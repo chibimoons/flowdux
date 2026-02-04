@@ -37,6 +37,7 @@ ktor-client-core-multiplatform = { module = "io.ktor:ktor-client-core", version.
 ktor-client-cio-multiplatform = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-websockets-multiplatform = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
 kotlinx-browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version.ref = "kotlinx-browser" }
 

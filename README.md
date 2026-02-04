@@ -23,9 +23,25 @@ A lightweight Redux-style state management library for **Kotlin Multiplatform** 
 
 ## Installation
 
-### Kotlin (Maven Central)
+### Kotlin Multiplatform (Maven Central)
 
-Add the dependency to your `build.gradle.kts`:
+Add the dependency to your KMP project's `build.gradle.kts`:
+
+```kotlin
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("io.github.chibimoons:flowdux:1.11.0")
+        }
+    }
+}
+```
+
+Gradle automatically resolves the correct artifact for each target (JVM, iOS, JS, WASM).
+
+#### Single-platform (JVM / Android)
+
+If your project is not KMP, add the dependency directly:
 
 ```kotlin
 dependencies {
@@ -38,17 +54,21 @@ dependencies {
 For real-time client-server state sync, add the relevant modules:
 
 ```kotlin
-dependencies {
-    // Shared action markers (ServerSharedAction, ClientSharedAction)
-    implementation("io.github.chibimoons:flowdux-remote-core:1.11.0")
-    // Client middleware (ClientRemoteMiddleware)
-    implementation("io.github.chibimoons:flowdux-remote-client:1.11.0")
-    // Server middleware (ServerRemoteMiddleware)
-    implementation("io.github.chibimoons:flowdux-remote-server:1.11.0")
-    // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-    implementation("io.github.chibimoons:flowdux-remote-serialization:1.11.0")
-    // Ktor WebSocket transport
-    implementation("io.github.chibimoons:flowdux-remote-ktor:1.11.0")
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            // Shared action markers (ServerSharedAction, ClientSharedAction)
+            implementation("io.github.chibimoons:flowdux-remote-core:1.11.0")
+            // Client middleware (ClientRemoteMiddleware)
+            implementation("io.github.chibimoons:flowdux-remote-client:1.11.0")
+            // Server middleware (ServerRemoteMiddleware)
+            implementation("io.github.chibimoons:flowdux-remote-server:1.11.0")
+            // kotlinx.serialization codecs (ActionCodec, MessageCodec)
+            implementation("io.github.chibimoons:flowdux-remote-serialization:1.11.0")
+            // Ktor WebSocket transport (JVM, iOS, JS — WASM not supported)
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.11.0")
+        }
+    }
 }
 ```
 
