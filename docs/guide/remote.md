@@ -35,17 +35,26 @@ flowchart LR
 Add the relevant modules to your `build.gradle.kts`:
 
 ```kotlin
-dependencies {
-    // Shared action markers (ServerSharedAction, ClientSharedAction)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-core:1.8.2")
-    // Client middleware (ClientRemoteMiddleware)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-client:1.8.2")
-    // Server middleware (ServerRemoteMiddleware)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-server:1.8.2")
-    // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-serialization:1.8.2")
-    // Ktor WebSocket transport
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-ktor:1.8.2")
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            // Shared action markers (ServerSharedAction, ClientSharedAction)
+            implementation("io.github.chibimoons:flowdux-remote-core:1.11.0")
+            // Client middleware (ClientRemoteMiddleware)
+            implementation("io.github.chibimoons:flowdux-remote-client:1.11.0")
+            // Server middleware (ServerRemoteMiddleware)
+            implementation("io.github.chibimoons:flowdux-remote-server:1.11.0")
+            // kotlinx.serialization codecs (ActionCodec, MessageCodec)
+            implementation("io.github.chibimoons:flowdux-remote-serialization:1.11.0")
+        }
+        // Ktor WebSocket transport (JVM + iOS only)
+        jvmMain.dependencies {
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.11.0")
+        }
+        iosMain.dependencies {
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.11.0")
+        }
+    }
 }
 ```
 

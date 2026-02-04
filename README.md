@@ -37,7 +37,7 @@ kotlin {
 }
 ```
 
-Gradle automatically resolves the correct artifact for each target (JVM, iOS, JS, Wasm).
+Gradle automatically resolves the correct artifact for each target (JVM, iOS, JS, WASM).
 
 #### Single-platform (JVM / Android)
 
@@ -65,7 +65,12 @@ kotlin {
             implementation("io.github.chibimoons:flowdux-remote-server:1.11.0")
             // kotlinx.serialization codecs (ActionCodec, MessageCodec)
             implementation("io.github.chibimoons:flowdux-remote-serialization:1.11.0")
-            // Ktor WebSocket transport
+        }
+        // Ktor WebSocket transport (JVM + iOS only)
+        jvmMain.dependencies {
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.11.0")
+        }
+        iosMain.dependencies {
             implementation("io.github.chibimoons:flowdux-remote-ktor:1.11.0")
         }
     }
