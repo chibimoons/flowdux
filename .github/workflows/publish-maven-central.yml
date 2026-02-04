@@ -36,7 +36,7 @@ jobs:
 
       - name: Run tests
         run: |
-          ./gradlew check -x jsTest -x wasmJsTest -x kotlinNpmInstall -x kotlinStoreYarnLock
+          ./gradlew check -x jsTest -x wasmJsTest -x compileTestKotlinJs -x compileTestKotlinWasmJs -x kotlinNpmInstall -x kotlinStoreYarnLock
 
       - name: Publish to Maven Local (dry run)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
