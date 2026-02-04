@@ -1,10 +1,15 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    `maven-publish`
+    id("flowdux.publish-conventions")
 }
 
-group = "io.flowdux"
-version = "1.10.0"
+mavenPublishing {
+    coordinates("io.github.chibimoons", "flowdux-remote-ktor", providers.gradleProperty("flowdux.version").get())
+    pom {
+        name.set("Flowdux Remote Ktor")
+        description.set("Ktor WebSocket implementation for Flowdux remote modules")
+    }
+}
 
 // JitPack only publishes JVM artifacts to avoid variant resolution issues for JVM/Android consumers
 val isJitPack = System.getenv("JITPACK") == "true"
@@ -49,25 +54,6 @@ kotlin {
             compileTaskProvider.configure {
                 compilerOptions {
                     jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-                }
-            }
-        }
-    }
-}
-
-publishing {
-    publications {
-        withType<MavenPublication> {
-            pom {
-                name.set("Flowdux Remote Ktor")
-                description.set("Ktor WebSocket implementation for Flowdux remote modules")
-                url.set("https://github.com/chibimoons/flowdux")
-
-                licenses {
-                    license {
-                        name.set("Apache License 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
-                    }
                 }
             }
         }
