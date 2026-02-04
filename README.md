@@ -39,7 +39,7 @@ Add the dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.github.chibimoons:flowdux:1.8.2")
+    implementation("com.github.chibimoons:flowdux:1.10.0")
 }
 ```
 
@@ -50,15 +50,15 @@ For real-time client-server state sync, add the relevant modules:
 ```kotlin
 dependencies {
     // Shared action markers (ServerSharedAction, ClientSharedAction)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-core:1.8.2")
+    implementation("com.github.chibimoons.flowdux:flowdux-remote-core:1.10.0")
     // Client middleware (ClientRemoteMiddleware)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-client:1.8.2")
+    implementation("com.github.chibimoons.flowdux:flowdux-remote-client:1.10.0")
     // Server middleware (ServerRemoteMiddleware)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-server:1.8.2")
+    implementation("com.github.chibimoons.flowdux:flowdux-remote-server:1.10.0")
     // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-serialization:1.8.2")
+    implementation("com.github.chibimoons.flowdux:flowdux-remote-serialization:1.10.0")
     // Ktor WebSocket transport
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-ktor:1.8.2")
+    implementation("com.github.chibimoons.flowdux:flowdux-remote-ktor:1.10.0")
 }
 ```
 
