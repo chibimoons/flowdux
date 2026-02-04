@@ -30,6 +30,13 @@ kotlin {
             implementation(libs.ktor.client.cio.multiplatform)
             api(project(":kotlin:flowdux-remote-server"))
         }
+        jvmTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.ktor.server.core)
+            implementation(libs.ktor.server.cio)
+            implementation(libs.ktor.server.websockets)
+        }
         if (!isJitPack) {
             iosMain.dependencies {
                 implementation(libs.ktor.client.darwin)

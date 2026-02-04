@@ -1,6 +1,7 @@
 package io.flowdux.remote.server
 
 import io.flowdux.Action
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -80,6 +81,8 @@ class RemoteServerSession<A : Action> {
         val connection = mutex.withLock { sessions[sessionId] } ?: return
         try {
             connection.send(action)
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             // Isolate send failures
         }
@@ -94,6 +97,8 @@ class RemoteServerSession<A : Action> {
         for (connection in snapshot) {
             try {
                 connection.send(action)
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 // Isolate per-client send failures
             }
@@ -113,6 +118,8 @@ class RemoteServerSession<A : Action> {
             try {
                 val sessionAction = mapper(sessionId) ?: continue
                 connection.send(sessionAction)
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 // Isolate per-client send failures
             }
