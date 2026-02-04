@@ -6,6 +6,16 @@ before_install:
 
 install:
   # JITPACK env var is automatically set by JitPack
-  # build.gradle.kts detects this and disables Gradle Module Metadata
+  # build.gradle.kts detects this and disables non-JVM targets
   # to avoid KMP variant resolution issues for JVM/Android consumers
-  - ./gradlew :kotlin:flowdux:publishToMavenLocal :kotlin:flowdux-timetravel:publishToMavenLocal -x kotlinNpmInstall -x kotlinStoreYarnLock -x jsTest -x wasmJsTest -x iosX64Test -x iosSimulatorArm64Test
+  - >-
+    ./gradlew
+    :kotlin:flowdux:publishToMavenLocal
+    :kotlin:flowdux-timetravel:publishToMavenLocal
+    :kotlin:flowdux-remote-core:publishToMavenLocal
+    :kotlin:flowdux-remote-client:publishToMavenLocal
+    :kotlin:flowdux-remote-server:publishToMavenLocal
+    :kotlin:flowdux-remote-serialization:publishToMavenLocal
+    :kotlin:flowdux-remote-ktor:publishToMavenLocal
+    -x kotlinNpmInstall -x kotlinStoreYarnLock
+    -x jsTest -x wasmJsTest -x iosX64Test -x iosSimulatorArm64Test

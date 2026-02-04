@@ -14,7 +14,8 @@ class MultiClientServerRemoteMiddlewareTest {
     @Test
     fun `addSession registers session and sessionCount increases`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>()
+        val session = RemoteServerSession<ServerAction>()
+        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(session = session)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -23,18 +24,20 @@ class MultiClientServerRemoteMiddlewareTest {
             scope = backgroundScope,
         )
 
+        session.addSession("client-1", connection)
         store.dispatchAddSession("client-1", connection)
         delay(100)
 
-        assertEquals(1, middleware.sessionCount())
-        assertTrue(middleware.sessionIds().contains("client-1"))
+        assertEquals(1, session.sessionCount())
+        assertTrue(session.sessionIds().contains("client-1"))
         store.close()
     }
 
     @Test
     fun `removeSession unregisters session`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>()
+        val session = RemoteServerSession<ServerAction>()
+        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(session = session)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -43,20 +46,22 @@ class MultiClientServerRemoteMiddlewareTest {
             scope = backgroundScope,
         )
 
+        session.addSession("client-1", connection)
         store.dispatchAddSession("client-1", connection)
         delay(100)
-        assertEquals(1, middleware.sessionCount())
+        assertEquals(1, session.sessionCount())
 
-        store.dispatchRemoveSession("client-1")
+        session.removeSession("client-1")
         delay(100)
 
-        assertEquals(0, middleware.sessionCount())
+        assertEquals(0, session.sessionCount())
         store.close()
     }
 
     @Test
     fun `multiple sessions can be registered`() = runTest {
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>()
+        val session = RemoteServerSession<ServerAction>()
+        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(session = session)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -67,12 +72,13 @@ class MultiClientServerRemoteMiddlewareTest {
 
         for (i in 1..3) {
             val conn = MockTypedServerConnection<ServerAction>()
+            session.addSession("client-$i", conn)
             store.dispatchAddSession("client-$i", conn)
         }
         delay(100)
 
-        assertEquals(3, middleware.sessionCount())
-        assertEquals(setOf("client-1", "client-2", "client-3"), middleware.sessionIds())
+        assertEquals(3, session.sessionCount())
+        assertEquals(setOf("client-1", "client-2", "client-3"), session.sessionIds())
         store.close()
     }
 
@@ -80,7 +86,8 @@ class MultiClientServerRemoteMiddlewareTest {
     fun `ClientSharedAction is broadcast to all sessions and not emitted locally`() = runTest {
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>()
+        val session = RemoteServerSession<ServerAction>()
+        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(session = session)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -89,7 +96,9 @@ class MultiClientServerRemoteMiddlewareTest {
             scope = backgroundScope,
         )
 
+        session.addSession("client-1", conn1)
         store.dispatchAddSession("client-1", conn1)
+        session.addSession("client-2", conn2)
         store.dispatchAddSession("client-2", conn2)
         delay(100)
 
@@ -118,7 +127,8 @@ class MultiClientServerRemoteMiddlewareTest {
                 throw RuntimeException("Connection failed")
             }
         }
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>()
+        val session = RemoteServerSession<ServerAction>()
+        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(session = session)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -127,7 +137,9 @@ class MultiClientServerRemoteMiddlewareTest {
             scope = backgroundScope,
         )
 
+        session.addSession("failing", failingConn)
         store.dispatchAddSession("failing", failingConn)
+        session.addSession("good", goodConn)
         store.dispatchAddSession("good", goodConn)
         delay(100)
 
@@ -145,7 +157,8 @@ class MultiClientServerRemoteMiddlewareTest {
     @Test
     fun `InternalAddSession is consumed and does not reach reducer`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>()
+        val session = RemoteServerSession<ServerAction>()
+        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(session = session)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer, // sealed when — would crash if InternalAddSession leaked
@@ -163,27 +176,9 @@ class MultiClientServerRemoteMiddlewareTest {
     }
 
     @Test
-    fun `InternalRemoveSession is consumed and does not reach reducer`() = runTest {
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>()
-        val store = createStore(
-            initialState = ServerState(),
-            reducer = serverReducer, // sealed when — would crash if InternalRemoveSession leaked
-            middlewares = listOf(middleware),
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
-
-        store.dispatchRemoveSession("nonexistent")
-        delay(100)
-
-        // State unchanged — action was consumed
-        assertEquals(0, store.state.value.count)
-        store.close()
-    }
-
-    @Test
     fun `non-SharedAction passes through unchanged`() = runTest {
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>()
+        val session = RemoteServerSession<ServerAction>()
+        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(session = session)
 
         val action = ServerAction.InternalReset(42)
         val result = middleware.process(
@@ -202,7 +197,8 @@ class MultiClientServerRemoteMiddlewareTest {
             }
         }.build()
 
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(processors)
+        val session = RemoteServerSession<ServerAction>()
+        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(processors, session)
 
         val result = middleware.process(
             getState = { ServerState() },
@@ -217,7 +213,8 @@ class MultiClientServerRemoteMiddlewareTest {
     @Test
     fun `incoming client message is dispatched through full pipeline`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>()
+        val session = RemoteServerSession<ServerAction>()
+        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(session = session)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -226,6 +223,7 @@ class MultiClientServerRemoteMiddlewareTest {
             scope = backgroundScope,
         )
 
+        session.addSession("client-1", connection)
         store.dispatchAddSession("client-1", connection)
         delay(100)
 
@@ -242,7 +240,8 @@ class MultiClientServerRemoteMiddlewareTest {
     fun `sendToClient sends to specific session only`() = runTest {
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>()
+        val session = RemoteServerSession<ServerAction>()
+        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(session = session)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -251,11 +250,13 @@ class MultiClientServerRemoteMiddlewareTest {
             scope = backgroundScope,
         )
 
+        session.addSession("client-1", conn1)
         store.dispatchAddSession("client-1", conn1)
+        session.addSession("client-2", conn2)
         store.dispatchAddSession("client-2", conn2)
         delay(100)
 
-        middleware.sendToClient("client-1", ServerAction.Add(5))
+        session.sendToClient("client-1", ServerAction.Add(5))
 
         assertEquals(1, conn1.sentActions.size)
         assertEquals(ServerAction.Add(5), conn1.sentActions[0])
@@ -265,9 +266,9 @@ class MultiClientServerRemoteMiddlewareTest {
 
     @Test
     fun `sendToClient is no-op for unknown session`() = runTest {
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>()
+        val session = RemoteServerSession<ServerAction>()
 
         // Should not throw
-        middleware.sendToClient("nonexistent", ServerAction.Add(5))
+        session.sendToClient("nonexistent", ServerAction.Add(5))
     }
 }

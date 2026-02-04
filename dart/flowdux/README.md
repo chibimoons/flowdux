@@ -19,7 +19,7 @@ A predictable state management library for Dart with execution strategies.
 
 ```yaml
 dependencies:
-  flowdux: ^0.3.1
+  flowdux: ^0.3.2
 ```
 
 ## Quick Start
@@ -351,7 +351,7 @@ For Flutter apps, use the [flowdux_flutter](https://pub.dev/packages/flowdux_flu
 
 ```yaml
 dependencies:
-  flowdux: ^0.3.1
+  flowdux: ^0.3.2
   flowdux_flutter: ^0.2.3
 ```
 

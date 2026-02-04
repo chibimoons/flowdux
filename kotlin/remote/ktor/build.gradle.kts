@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "io.flowdux"
-version = "1.0.0"
+version = "1.10.0"
 
 // JitPack only publishes JVM artifacts to avoid variant resolution issues for JVM/Android consumers
 val isJitPack = System.getenv("JITPACK") == "true"
@@ -29,6 +29,13 @@ kotlin {
         jvmMain.dependencies {
             implementation(libs.ktor.client.cio.multiplatform)
             api(project(":kotlin:flowdux-remote-server"))
+        }
+        jvmTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.ktor.server.core)
+            implementation(libs.ktor.server.cio)
+            implementation(libs.ktor.server.websockets)
         }
         if (!isJitPack) {
             iosMain.dependencies {
