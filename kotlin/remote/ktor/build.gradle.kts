@@ -22,6 +22,12 @@ kotlin {
         iosX64()
         iosArm64()
         iosSimulatorArm64()
+
+        // JavaScript
+        js(IR) {
+            browser()
+            nodejs()
+        }
     }
 
     sourceSets {
@@ -45,6 +51,9 @@ kotlin {
         if (!isJitPack) {
             iosMain.dependencies {
                 implementation(libs.ktor.client.darwin)
+            }
+            jsMain.dependencies {
+                implementation(libs.ktor.client.js)
             }
         }
     }

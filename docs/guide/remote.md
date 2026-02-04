@@ -46,12 +46,7 @@ kotlin {
             implementation("io.github.chibimoons:flowdux-remote-server:1.11.0")
             // kotlinx.serialization codecs (ActionCodec, MessageCodec)
             implementation("io.github.chibimoons:flowdux-remote-serialization:1.11.0")
-        }
-        // Ktor WebSocket transport (JVM + iOS only)
-        jvmMain.dependencies {
-            implementation("io.github.chibimoons:flowdux-remote-ktor:1.11.0")
-        }
-        iosMain.dependencies {
+            // Ktor WebSocket transport (JVM, iOS, JS — WASM not supported)
             implementation("io.github.chibimoons:flowdux-remote-ktor:1.11.0")
         }
     }
