@@ -31,6 +31,7 @@ internal class FlowHolderMiddleware<S : State, A : Action>(
 
     override val name: String = "FlowHolderMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
+    private val isLoggingEnabled = logger !is NoOpStoreLogger
 
     /**
      * Cache of wrapped processors for each FlowHolderAction type.
@@ -76,7 +77,10 @@ internal class FlowHolderMiddleware<S : State, A : Action>(
             val baseProcessor: suspend FlowCollector<A>.(S, A) -> Unit = { _, a ->
                 emitAll(
                     (a as FlowHolderAction).toFlowAction()
-                        .onEach { logger.onFlowHolderActionEmitted(it as A) }
+                        .run {
+                            if (isLoggingEnabled) onEach { logger.onFlowHolderActionEmitted(it as A) }
+                            else this
+                        }
                         .map { it as A }
                 )
             }

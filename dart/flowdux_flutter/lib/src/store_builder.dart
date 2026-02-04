@@ -10,6 +10,26 @@ import 'store_provider.dart';
 /// [StoreBuilder] wraps a [StreamBuilder] and listens to the store's state
 /// stream, rebuilding the widget tree when the state changes.
 ///
+/// **Performance tip:** When using a [selector], define it as a static method
+/// or top-level function to avoid creating new function instances on every
+/// rebuild:
+///
+/// ```dart
+/// // Good - stable reference, no unnecessary didUpdateWidget work
+/// static int _selectCount(AppState state) => state.count;
+///
+/// StoreBuilder<AppState, AppAction>(
+///   selector: _selectCount,
+///   builder: (context, state) => Text('Count: ${state.count}'),
+/// )
+///
+/// // Avoid - creates new closure on every build
+/// StoreBuilder<AppState, AppAction>(
+///   selector: (state) => state.count,
+///   builder: (context, state) => Text('Count: ${state.count}'),
+/// )
+/// ```
+///
 /// Example:
 /// ```dart
 /// StoreBuilder<AppState, AppAction>(
@@ -114,6 +134,7 @@ class _SelectorBuilderState<S, A extends Action>
       _selectedValue = widget.selector(_currentState);
       _subscribe();
     } else if (oldWidget.selector != widget.selector) {
+      _currentState = widget.store.currentState;
       final newSelectedValue = widget.selector(_currentState);
       if (newSelectedValue != _selectedValue) {
         _subscription?.cancel();
@@ -153,6 +174,25 @@ class _SelectorBuilderState<S, A extends Action>
 ///
 /// This is useful when you only need a subset of the state and want to
 /// avoid unnecessary rebuilds when other parts of the state change.
+///
+/// **Performance tip:** Define selectors as static methods or top-level
+/// functions to avoid creating new function instances on every rebuild:
+///
+/// ```dart
+/// // Good - stable reference, no unnecessary didUpdateWidget work
+/// static int _selectCount(AppState state) => state.count;
+///
+/// StoreSelector<AppState, AppAction, int>(
+///   selector: _selectCount,
+///   builder: (context, count) => Text('Count: $count'),
+/// )
+///
+/// // Avoid - creates new closure on every build
+/// StoreSelector<AppState, AppAction, int>(
+///   selector: (state) => state.count,
+///   builder: (context, count) => Text('Count: $count'),
+/// )
+/// ```
 ///
 /// Example:
 /// ```dart

@@ -17,6 +17,7 @@ import 'strategy/execution_strategy.dart';
 /// [FlowActionDelivery.dispatch] delivery mode.
 class FlowHolderMiddleware<S, A extends Action> extends Middleware<S, A> {
   final StoreLogger<S, A> _logger;
+  final bool _isLoggingEnabled;
   final void Function(A) _dispatch;
 
   /// Cached wrapped processors for FlowHolderActions, keyed by runtimeType.
@@ -25,6 +26,7 @@ class FlowHolderMiddleware<S, A extends Action> extends Middleware<S, A> {
   /// Creates a [FlowHolderMiddleware] with the specified [logger] and [dispatch].
   FlowHolderMiddleware(StoreLogger<S, A> logger, void Function(A) dispatch)
       : _logger = logger,
+        _isLoggingEnabled = logger is! NoOpStoreLogger,
         _dispatch = dispatch;
 
   @override
@@ -53,7 +55,7 @@ class FlowHolderMiddleware<S, A extends Action> extends Middleware<S, A> {
 
   /// Recursively processes nested FlowHolderActions.
   Stream<A> _processRecursively(S Function() getState, A action) {
-    _logger.onFlowHolderActionEmitted(action);
+    if (_isLoggingEnabled) _logger.onFlowHolderActionEmitted(action);
     if (action is FlowHolderAction) {
       return process(getState, action);
     }

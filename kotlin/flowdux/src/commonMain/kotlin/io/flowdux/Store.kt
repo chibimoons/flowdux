@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+private const val DEFAULT_CONCURRENCY = 16
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class Store<S : State, A : Action> internal constructor(
     initialState: S,
@@ -28,34 +30,41 @@ class Store<S : State, A : Action> internal constructor(
     private val errorProcessor: ErrorProcessor<A>,
     private val logger: StoreLogger<S, A>,
     private val scope: CoroutineScope,
+    private val concurrency: Int,
 ) {
     private val actionFlow = Channel<A>()
     private var _isClosed = false
+    private val isLoggingEnabled = logger !is NoOpStoreLogger
 
     val isClosed: Boolean get() = _isClosed
 
     private val stateFlow = actionFlow
         .receiveAsFlow()
-        .flatMapMerge { processAction(it) }
+        .flatMapMerge(concurrency) { processAction(it) }
         .map { reduceAction(state.value, it) }
         .stateIn(scope, SharingStarted.Eagerly, initialState)
 
     private fun processAction(a: A): Flow<A> = middlewares
         .fold(flowOf(a)) { flow, middleware ->
-            flow.flatMapMerge { currentAction ->
-                logger.onMiddlewareProcessing(middleware.name, currentAction)
+            flow.flatMapMerge(concurrency) { currentAction ->
+                if (isLoggingEnabled) logger.onMiddlewareProcessing(middleware.name, currentAction)
                 middleware.process(
                     getState = { currentState },
                     action = currentAction,
                 )
             }
         }
-        .onEach { logger.onMiddlewaresCompleted(it) }
+        .run {
+            if (isLoggingEnabled) onEach { logger.onMiddlewaresCompleted(it) }
+            else this
+        }
         .catch { error ->
-            logger.onErrorOccurred(error)
+            if (isLoggingEnabled) logger.onErrorOccurred(error)
             emitAll(
-                errorProcessor.process(error)
-                    .onEach { logger.onErrorHandled(it) }
+                errorProcessor.process(error).run {
+                    if (isLoggingEnabled) onEach { logger.onErrorHandled(it) }
+                    else this
+                }
             )
         }
 
@@ -65,16 +74,16 @@ class Store<S : State, A : Action> internal constructor(
 
     fun dispatch(action: A) {
         if (_isClosed) {
-            logger.onDispatchAfterClose(action)
+            if (isLoggingEnabled) logger.onDispatchAfterClose(action)
             return
         }
         scope.launch {
             try {
-                logger.onActionDispatched(action)
+                if (isLoggingEnabled) logger.onActionDispatched(action)
                 actionFlow.send(action)
             } catch (_: ClosedSendChannelException) {
                 // Race condition: close() called between isClosed check and send
-                logger.onDispatchAfterClose(action)
+                if (isLoggingEnabled) logger.onDispatchAfterClose(action)
             }
         }
     }
@@ -88,7 +97,7 @@ class Store<S : State, A : Action> internal constructor(
 
     private fun reduceAction(currentState: S, action: A): S {
         val newState = reducer.reduce(currentState, action)
-        logger.onStateReduced(action, currentState, newState)
+        if (isLoggingEnabled) logger.onStateReduced(action, currentState, newState)
         return newState
     }
 }
@@ -100,6 +109,7 @@ fun <S : State, A : Action> createStore(
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
     logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    concurrency: Int = DEFAULT_CONCURRENCY,
 ): Store<S, A> {
     lateinit var store: Store<S, A>
     val allMiddlewares = middlewares +
@@ -111,6 +121,7 @@ fun <S : State, A : Action> createStore(
         errorProcessor = errorProcessor,
         logger = logger,
         scope = scope,
+        concurrency = concurrency,
     )
     return store
 }
