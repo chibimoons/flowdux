@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Ktor-based WebSocket client implementation of [ClientConnection].
@@ -57,6 +59,7 @@ class KtorWebSocketClientConnection(
     private val outgoingChannel = Channel<String>(Channel.UNLIMITED)
 
     private var session: WebSocketSession? = null
+    private val connectMutex = Mutex()
 
     override suspend fun send(message: String) {
         if (_connectionState.value != ConnectionState.CONNECTED) {
@@ -66,8 +69,10 @@ class KtorWebSocketClientConnection(
     }
 
     override suspend fun connect() {
-        if (_connectionState.value != ConnectionState.DISCONNECTED) return
-        _connectionState.value = ConnectionState.CONNECTING
+        connectMutex.withLock {
+            if (_connectionState.value != ConnectionState.DISCONNECTED) return
+            _connectionState.value = ConnectionState.CONNECTING
+        }
 
         try {
             httpClient.webSocket(url) {

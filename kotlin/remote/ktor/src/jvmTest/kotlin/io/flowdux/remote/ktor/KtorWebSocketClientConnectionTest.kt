@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -151,6 +152,44 @@ class KtorWebSocketClientConnectionTest {
             delay(500)
 
             assertTrue(serverSessionEnded.get(), "Server session should end after client disconnect")
+        } finally {
+            server.stop(500, 1_000)
+        }
+    }
+
+    @Test
+    fun `concurrent connect calls create only one connection`() = runBlocking {
+        val connectionCount = AtomicInteger(0)
+        val server = embeddedServer(CIO, port = 0) {
+            install(WebSockets)
+            routing {
+                webSocket("/test") {
+                    connectionCount.incrementAndGet()
+                    for (frame in incoming) { /* keep alive */ }
+                }
+            }
+        }.start(wait = false)
+
+        try {
+            val port = server.resolvedConnectors().first().port
+            val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+
+            // Launch 10 coroutines that all call connect() concurrently
+            val jobs = (1..10).map {
+                launch(Dispatchers.Default) { connection.connect() }
+            }
+
+            // Wait for connection to be established
+            withTimeout(5_000) {
+                connection.connectionState.first { it == ConnectionState.CONNECTED }
+            }
+            // Allow time for any extra connections to be established
+            delay(1_000)
+
+            assertEquals(1, connectionCount.get(), "Only one WebSocket connection should be created")
+
+            connection.disconnect()
+            jobs.forEach { it.join() }
         } finally {
             server.stop(500, 1_000)
         }
