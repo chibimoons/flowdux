@@ -6,6 +6,7 @@ import kotlinx.serialization.SerializationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class SerializableActionCodecTest {
 
@@ -68,7 +69,7 @@ class SerializableActionCodecTest {
     @Test
     fun classDiscriminatorUsesTypeField() {
         val json = codec.encode(TestAction.Add(10))
-        assert(json.contains("\"type\":")) { "Expected 'type' discriminator in: $json" }
+        assertTrue(json.contains("\"type\":"), "Expected 'type' discriminator in: $json")
     }
 
     @Test
