@@ -1,0 +1,33 @@
+plugins {
+    id("com.vanniktech.maven.publish")
+}
+
+mavenPublishing {
+    publishToMavenCentral(automaticRelease = true)
+    signAllPublications()
+
+    pom {
+        url.set("https://github.com/chibimoons/flowdux")
+
+        licenses {
+            license {
+                name.set("Apache License 2.0")
+                url.set("https://www.apache.org/licenses/LICENSE-2.0")
+            }
+        }
+
+        developers {
+            developer {
+                id.set("chibimoons")
+                name.set("chibimoons")
+                url.set("https://github.com/chibimoons")
+            }
+        }
+
+        scm {
+            url.set("https://github.com/chibimoons/flowdux")
+            connection.set("scm:git:git://github.com/chibimoons/flowdux.git")
+            developerConnection.set("scm:git:ssh://git@github.com/chibimoons/flowdux.git")
+        }
+    }
+}
