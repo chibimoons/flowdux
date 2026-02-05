@@ -279,6 +279,5 @@ Load Balancer
 
 ## 다음 단계
 
-- [Per-Client Store 패턴](./per-client-store.md) — 유저별 서버 상태 관리
-- [Central Store 패턴](./central-store.md) — 글로벌 이벤트 브로드캐스트
+- [Server Architecture Patterns](../design/server-architecture-patterns.md) — Central Store, Per-Client Store 패턴
 - [샘플 앱 실행](./samples.md) — multi-client 샘플 실행 방법
