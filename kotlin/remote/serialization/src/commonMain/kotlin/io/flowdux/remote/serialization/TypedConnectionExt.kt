@@ -67,11 +67,12 @@ inline fun <reified A : Action> ServerConnection.typedJson(
  * val connection = ktConnection.typedJson<SharedAction>() as TypedClientConnection<AppAction>
  *
  * // After (type-safe upcast)
- * val connection = ktConnection.typedJson<SharedAction>().upcast<AppAction>()
+ * val connection = ktConnection.typedJson<SharedAction>().upcast<SharedAction, AppAction>()
  * ```
  *
+ * @param Sub The narrow action type this connection is typed with
  * @param Super The broader action type that [Sub] extends
- * @throws ClassCastException if [send] is called with an action that is not a [Sub] instance
+ * @throws IllegalArgumentException if [send] is called with an action that is not a [Sub] instance
  */
 inline fun <reified Sub : Super, reified Super : Action> TypedClientConnection<Sub>.upcast(): TypedClientConnection<Super> =
     UpcastTypedClientConnection(this, Sub::class)
@@ -92,11 +93,12 @@ inline fun <reified Sub : Super, reified Super : Action> TypedClientConnection<S
  * val connection = ktConnection.typedJson<SharedAction>() as TypedServerConnection<AppAction>
  *
  * // After (type-safe upcast)
- * val connection = ktConnection.typedJson<SharedAction>().upcast<AppAction>()
+ * val connection = ktConnection.typedJson<SharedAction>().upcast<SharedAction, AppAction>()
  * ```
  *
+ * @param Sub The narrow action type this connection is typed with
  * @param Super The broader action type that [Sub] extends
- * @throws ClassCastException if [send] is called with an action that is not a [Sub] instance
+ * @throws IllegalArgumentException if [send] is called with an action that is not a [Sub] instance
  */
 inline fun <reified Sub : Super, reified Super : Action> TypedServerConnection<Sub>.upcast(): TypedServerConnection<Super> =
     UpcastTypedServerConnection(this, Sub::class)
