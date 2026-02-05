@@ -62,14 +62,19 @@ fun main(args: Array<String>) = runBlocking {
     var collectorJob: Job? = null
 
     suspend fun connectToRoom(roomId: String): Store<ClientChatState, ChatAction> {
-        // Cleanup previous connection
-        collectorJob?.cancel()
-        store?.let {
-            it.dispatch(SharedChatAction.LeaveRoom(username))
+        // Cleanup previous connection in correct order:
+        // 1. Dispatch cleanup actions while store is still active
+        // 2. Wait for actions to be processed
+        // 3. Cancel observer
+        // 4. Close store
+        store?.let { oldStore ->
+            oldStore.dispatch(SharedChatAction.LeaveRoom(username))
             delay(100)
-            it.dispatch(ClientChatAction.Disconnect)
-            it.close()
-        }
+            oldStore.dispatch(ClientChatAction.Disconnect)
+            delay(50) // Wait for disconnect to be processed
+            collectorJob?.cancel()
+            oldStore.close()
+        } ?: collectorJob?.cancel()
 
         println("\n  Connecting to room: $roomId...")
 
@@ -138,7 +143,8 @@ fun main(args: Array<String>) = runBlocking {
                 }
 
                 trimmed.startsWith("/join ", ignoreCase = true) -> {
-                    val newRoom = trimmed.removePrefix("/join ").trim()
+                    // Extract room name by position (handles any case of /join, /JOIN, /Join, etc.)
+                    val newRoom = trimmed.substring("/join ".length).trim()
                     if (newRoom.isNotEmpty() && newRoom != currentRoom) {
                         store = connectToRoom(newRoom)
                     } else if (newRoom == currentRoom) {

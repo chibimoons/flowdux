@@ -22,7 +22,7 @@ class RoomManager(
 ) {
     private val rooms = ConcurrentHashMap<String, RemoteServer<ServerChatState, ChatAction>>()
 
-    /** Get all active room IDs */
+    /** Get all active room IDs (snapshot) */
     fun getRoomIds(): Set<String> = rooms.keys.toSet()
 
     /** Get room count */
@@ -37,6 +37,7 @@ class RoomManager(
                 reducer = serverChatReducer,
                 processors = chatProcessors(),
                 stateMapper = { state ->
+                    println("[Room $id] State changed: users=${state.users}, messages=${state.messages.size}")
                     SharedChatAction.SyncState(
                         ChatState(
                             messages = state.messages,
@@ -53,36 +54,67 @@ class RoomManager(
     /** Get room by ID */
     fun getRoom(roomId: String): RemoteServer<ServerChatState, ChatAction>? = rooms[roomId]
 
-    /** Destroy a room */
-    fun destroyRoom(roomId: String) {
+    /**
+     * Destroy a room only if it's empty (no active sessions).
+     *
+     * Note: There's a small race window between checking sessionCount and removal,
+     * but this is acceptable for cleanup purposes - a newly connected client would
+     * simply create a new room via getOrCreateRoom.
+     *
+     * @return true if room was destroyed, false if room has sessions or doesn't exist
+     */
+    suspend fun destroyRoomIfEmpty(roomId: String): Boolean {
+        val room = rooms[roomId] ?: return false
+
+        // Check if empty - if a client connects after this check,
+        // they'll get a new room via getOrCreateRoom (acceptable behavior)
+        if (room.sessionCount() > 0) {
+            return false
+        }
+
+        // Try to remove - only succeeds if room is still the same instance
+        val removed = rooms.remove(roomId, room)
+        if (removed) {
+            println("[RoomManager] Destroying empty room: $roomId")
+            room.close()
+        }
+        return removed
+    }
+
+    /** Force destroy a room regardless of session count */
+    fun forceDestroyRoom(roomId: String) {
         rooms.remove(roomId)?.let { room ->
-            println("[RoomManager] Destroying room: $roomId")
+            println("[RoomManager] Force destroying room: $roomId")
             room.close()
         }
     }
 
     /** Clean up empty rooms */
     suspend fun cleanupEmptyRooms() {
-        val emptyRooms = rooms.entries.filter { (_, room) ->
-            room.sessionCount() == 0
-        }.map { it.key }
+        val destroyedRooms = mutableListOf<String>()
 
-        emptyRooms.forEach { roomId ->
-            destroyRoom(roomId)
+        // Take snapshot of keys to avoid concurrent modification
+        rooms.keys.toList().forEach { roomId ->
+            if (destroyRoomIfEmpty(roomId)) {
+                destroyedRooms.add(roomId)
+            }
         }
 
-        if (emptyRooms.isNotEmpty()) {
-            println("[RoomManager] Cleaned up ${emptyRooms.size} empty rooms: $emptyRooms")
+        if (destroyedRooms.isNotEmpty()) {
+            println("[RoomManager] Cleaned up ${destroyedRooms.size} empty rooms: $destroyedRooms")
         }
     }
 
-    /** Print status of all rooms */
+    /** Print status of all rooms (snapshot-based) */
     suspend fun printStatus() {
+        // Take snapshot to avoid concurrent modification during iteration
+        val snapshot = rooms.toMap()
+
         println("\n=== Room Status ===")
-        if (rooms.isEmpty()) {
+        if (snapshot.isEmpty()) {
             println("No active rooms")
         } else {
-            rooms.forEach { (roomId, room) ->
+            snapshot.forEach { (roomId, room) ->
                 val state = room.currentState
                 println("  [$roomId] users=${state.users}, messages=${state.messages.size}")
             }

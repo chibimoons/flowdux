@@ -97,10 +97,9 @@ fun main() {
                 } finally {
                     println("[Server] [$roomId] Client $sessionId disconnected")
 
-                    // Auto-cleanup: destroy room when last client leaves
-                    if (room.sessionCount() == 0) {
-                        roomManager.destroyRoom(roomId)
-                    }
+                    // Auto-cleanup: destroy room atomically if it's empty
+                    // This avoids race condition with new clients connecting
+                    roomManager.destroyRoomIfEmpty(roomId)
                 }
             }
         }
