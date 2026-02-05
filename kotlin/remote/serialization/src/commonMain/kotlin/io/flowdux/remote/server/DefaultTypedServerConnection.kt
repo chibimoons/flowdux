@@ -3,6 +3,7 @@ package io.flowdux.remote.server
 import io.flowdux.Action
 import io.flowdux.remote.ActionCodec
 import io.flowdux.remote.MessageCodec
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.mapNotNull
 
@@ -20,6 +21,8 @@ internal class DefaultTypedServerConnection<A : Action>(
         try {
             val actionJson = messageCodec.decodeActionFromClient(raw)
             actionCodec.decode(actionJson)
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             null // Skip malformed messages
         }
