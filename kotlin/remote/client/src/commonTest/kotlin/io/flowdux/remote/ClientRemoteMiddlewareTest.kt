@@ -2,10 +2,15 @@ package io.flowdux.remote
 
 import app.cash.turbine.test
 import io.flowdux.createStore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.Test
 
@@ -183,6 +188,94 @@ class ClientRemoteMiddlewareTest {
             }
             assertEquals(30, lastState.count)
             assertEquals("done", lastState.message)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `internal scope is cancelled on disconnect when no scope provided`() = runTest {
+        val cancellationSignal = CompletableDeferred<Boolean>()
+        val connection = CancellationTrackingMockConnection<TestAction>(cancellationSignal)
+
+        // Do NOT provide a scope - internal scope should be created and cancelled
+        val middleware = TestClientRemoteMiddleware(
+            connection = connection,
+            scope = null,
+        )
+
+        val store = createStore(
+            initialState = TestState(),
+            reducer = testReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = testErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        store.state.test {
+            assertEquals(TestState(), awaitItem())
+
+            // Connect - starts the internal scope's coroutine
+            store.dispatch(TestAction.Connect)
+            delay(100)
+
+            // Verify connection is active (coroutine is running)
+            assertFalse(cancellationSignal.isCompleted)
+
+            // Disconnect - should cancel the internal scope
+            store.dispatch(TestAction.Disconnect)
+
+            // Wait for cancellation signal
+            val wasCancelled = withTimeoutOrNull(1000) {
+                cancellationSignal.await()
+            }
+
+            assertNotNull(wasCancelled, "Internal scope should be cancelled on disconnect")
+            assertTrue(wasCancelled, "Internal scope coroutine should have been cancelled")
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `external scope is NOT cancelled on disconnect when scope provided`() = runTest {
+        val cancellationSignal = CompletableDeferred<Boolean>()
+        val connection = CancellationTrackingMockConnection<TestAction>(cancellationSignal)
+
+        // Provide an external scope - should NOT be cancelled on disconnect
+        val middleware = TestClientRemoteMiddleware(
+            connection = connection,
+            scope = backgroundScope,
+        )
+
+        val store = createStore(
+            initialState = TestState(),
+            reducer = testReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = testErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        store.state.test {
+            assertEquals(TestState(), awaitItem())
+
+            // Connect - starts a coroutine in the provided scope
+            store.dispatch(TestAction.Connect)
+            delay(100)
+
+            // Verify connection is active
+            assertFalse(cancellationSignal.isCompleted)
+
+            // Disconnect - should NOT cancel the external scope
+            store.dispatch(TestAction.Disconnect)
+
+            // Give it time to potentially cancel (but it shouldn't)
+            val wasCancelled = withTimeoutOrNull(500) {
+                cancellationSignal.await()
+            }
+
+            // The external scope should NOT be cancelled by disconnect
+            assertNull(wasCancelled, "External scope should NOT be cancelled on disconnect")
 
             cancelAndIgnoreRemainingEvents()
         }

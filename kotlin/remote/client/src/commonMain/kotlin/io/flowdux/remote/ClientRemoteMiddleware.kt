@@ -10,7 +10,9 @@ import io.flowdux.State
 import io.flowdux.concurrent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -23,12 +25,12 @@ import kotlinx.coroutines.launch
  *
  * Data flow:
  * ```
- * dispatch(ServerSharedAction) → middleware intercepts → connection.send(action)
- *                              → NOT emitted locally
+ * dispatch(ServerSharedAction) -> middleware intercepts -> connection.send(action)
+ *                              -> NOT emitted locally
  *
- * startConnection() → emits ServerListenerAction (FlowHolderAction)
- *   → FlowHolderMiddleware resolves → listens for server messages
- *   → server actions dispatched through full middleware pipeline
+ * startConnection() -> emits ServerListenerAction (FlowHolderAction)
+ *   -> FlowHolderMiddleware resolves -> listens for server messages
+ *   -> server actions dispatched through full middleware pipeline
  * ```
  *
  * Non-[ServerSharedAction] actions pass through unmodified, unless a processor is registered.
@@ -45,12 +47,17 @@ import kotlinx.coroutines.launch
  * ```
  *
  * @param connection The [TypedClientConnection] for communicating with the server.
- * @param scope Coroutine scope for background tasks.
+ * @param scope Coroutine scope for background tasks. If not provided, an internal scope is created
+ *              and will be cancelled on [stopConnection]. If provided, the caller is responsible
+ *              for managing the scope's lifecycle.
  */
 open class ClientRemoteMiddleware<S : State, A : Action>(
     private val connection: TypedClientConnection<A>,
-    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    scope: CoroutineScope? = null,
 ) : Middleware<S, A> {
+
+    private val internalJob: Job? = if (scope == null) SupervisorJob() else null
+    private val actualScope: CoroutineScope = scope ?: CoroutineScope(internalJob!! + Dispatchers.Default)
 
     override val name: String = "ClientRemoteMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
@@ -64,17 +71,20 @@ open class ClientRemoteMiddleware<S : State, A : Action>(
      */
     @Suppress("UNCHECKED_CAST")
     protected suspend fun FlowCollector<A>.startConnection() {
-        scope.launch { connection.connect() }
+        actualScope.launch { connection.connect() }
         emit(ServerListenerAction() as A)
     }
 
     /**
-     * Stop the remote connection.
+     * Stop the remote connection and cancel the internal scope if one was created.
      *
      * Call this from within a processor to disconnect from the server.
+     * If an internal scope was created (no scope parameter provided to constructor),
+     * it will be cancelled to prevent resource leaks.
      */
     protected suspend fun stopConnection() {
         connection.disconnect()
+        internalJob?.cancel()
     }
 
     override fun process(getState: () -> S, action: A): Flow<A> = flow {

@@ -5,7 +5,10 @@ import io.flowdux.ActionProcessorMap
 import io.flowdux.ErrorProcessor
 import io.flowdux.Reducer
 import io.flowdux.State
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +28,7 @@ sealed interface TestAction : Action {
     data class ServerSetMessage(val message: String) : TestAction, ServerSharedAction
     object LocalIncrement : TestAction
     object Connect : TestAction
+    object Disconnect : TestAction
 }
 
 val testReducer = Reducer<TestState, TestAction> { state, action ->
@@ -35,6 +39,7 @@ val testReducer = Reducer<TestState, TestAction> { state, action ->
         is TestAction.ServerSetMessage -> state.copy(message = action.message)
         is TestAction.LocalIncrement -> state.copy(count = state.count + 1)
         is TestAction.Connect -> state
+        is TestAction.Disconnect -> state
     }
 }
 
@@ -46,7 +51,7 @@ val testErrorProcessor = object : ErrorProcessor<TestAction> {
 
 class TestClientRemoteMiddleware(
     connection: TypedClientConnection<TestAction>,
-    scope: CoroutineScope,
+    scope: CoroutineScope? = null,
 ) : ClientRemoteMiddleware<TestState, TestAction>(
     connection = connection,
     scope = scope,
@@ -54,6 +59,9 @@ class TestClientRemoteMiddleware(
     override val processors: ActionProcessorMap<TestState, TestAction> = buildProcessors {
         on<TestAction.Connect> { _, _ ->
             startConnection()
+        }
+        on<TestAction.Disconnect> { _, _ ->
+            stopConnection()
         }
     }
 }
@@ -93,5 +101,51 @@ class MockTypedClientConnection<A : Action>(
     /** Simulate connection state change. */
     fun setConnectionState(state: ConnectionState) {
         _connectionState.value = state
+    }
+}
+
+// -- Mock TypedClientConnection that tracks cancellation --
+
+/**
+ * A mock connection that signals when its connect() coroutine is cancelled.
+ * Used to verify that the internal scope is properly cancelled on disconnect.
+ */
+class CancellationTrackingMockConnection<A : Action>(
+    private val cancellationSignal: CompletableDeferred<Boolean>,
+    private val autoConnect: Boolean = true,
+) : TypedClientConnection<A> {
+    private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
+    override val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
+
+    private val incomingChannel = Channel<A>(Channel.BUFFERED)
+    override val incoming: Flow<A> = incomingChannel.receiveAsFlow()
+
+    val sentActions = mutableListOf<A>()
+
+    override suspend fun send(action: A) {
+        sentActions.add(action)
+    }
+
+    override suspend fun connect() {
+        if (autoConnect) {
+            _connectionState.value = ConnectionState.CONNECTED
+        }
+        try {
+            // Keep the coroutine alive until cancelled
+            awaitCancellation()
+        } catch (e: CancellationException) {
+            // Signal that the coroutine was cancelled
+            cancellationSignal.complete(true)
+            throw e
+        }
+    }
+
+    override suspend fun disconnect() {
+        _connectionState.value = ConnectionState.DISCONNECTED
+    }
+
+    /** Simulate receiving a typed action from the server. */
+    suspend fun simulateServerAction(action: A) {
+        incomingChannel.send(action)
     }
 }
