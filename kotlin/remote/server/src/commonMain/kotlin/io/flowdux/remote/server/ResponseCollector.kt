@@ -55,9 +55,14 @@ class ResponseCollector<S : State, A : Action> : NoOpStoreLogger<S, A>() {
     /**
      * Suspends until at least one reduction has occurred since the last call.
      *
-     * If a reduction already occurred before this call, returns immediately.
-     * If multiple reductions occur while suspended, only one signal is consumed
-     * (subsequent reductions will trigger the next [awaitNextReduction] call).
+     * **CONFLATED semantics:** The underlying signal channel is conflated, meaning:
+     * - If a reduction already occurred before this call, returns immediately
+     * - If multiple reductions occur while suspended, they coalesce into a single signal
+     * - After returning, subsequent reductions will signal the next [awaitNextReduction] call
+     *
+     * This design eliminates race conditions but means you cannot rely on a 1:1 mapping
+     * between [awaitNextReduction] calls and individual reductions. Use [drainPending]
+     * to retrieve all actions that were reduced.
      */
     suspend fun awaitNextReduction() {
         reductionSignal.receive()
@@ -76,5 +81,16 @@ class ResponseCollector<S : State, A : Action> : NoOpStoreLogger<S, A>() {
             result.add(action)
         }
         return result
+    }
+
+    /**
+     * Closes the collector, releasing underlying channel resources.
+     *
+     * After calling this method, [awaitNextReduction] will throw [kotlinx.coroutines.channels.ClosedReceiveChannelException]
+     * and [drainPending] will return any remaining pending actions until exhausted.
+     */
+    fun close() {
+        pending.close()
+        reductionSignal.close()
     }
 }

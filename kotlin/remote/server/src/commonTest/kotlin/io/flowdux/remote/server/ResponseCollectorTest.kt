@@ -177,7 +177,7 @@ class ResponseCollectorTest {
         }
 
         // If we reach here without timeout, the test passes
-        assertEquals(50, store.currentState.count.let { it * 2 / (0 + 49) }) // sum of 0..49 is 1225
+        assertEquals(1225, store.currentState.count) // sum of 0..49 is 1225
     }
 
     /**
