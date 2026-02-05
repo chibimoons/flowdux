@@ -78,6 +78,13 @@ project(":kotlin:sample-remote-multi:server").projectDir = file("kotlin/samples/
 include(":kotlin:sample-remote-multi:client")
 project(":kotlin:sample-remote-multi:client").projectDir = file("kotlin/samples/flowdux-remote/multi-client/client")
 
+include(":kotlin:sample-remote-multiroom:server")
+project(":kotlin:sample-remote-multiroom").projectDir = file("kotlin/samples/flowdux-remote/multi-room")
+project(":kotlin:sample-remote-multiroom:server").projectDir = file("kotlin/samples/flowdux-remote/multi-room/server")
+
+include(":kotlin:sample-remote-multiroom:client")
+project(":kotlin:sample-remote-multiroom:client").projectDir = file("kotlin/samples/flowdux-remote/multi-room/client")
+
 // ── Benchmark ──
 include(":kotlin:flowdux-benchmark")
 project(":kotlin:flowdux-benchmark").projectDir = file("kotlin/benchmark")
