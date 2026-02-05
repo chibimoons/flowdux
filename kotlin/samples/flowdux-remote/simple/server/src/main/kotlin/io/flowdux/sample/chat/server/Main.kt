@@ -4,7 +4,7 @@ import io.flowdux.Store
 import io.flowdux.createStore
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.serialization.typedJson
-import io.flowdux.remote.server.TypedServerConnection
+import io.flowdux.remote.serialization.upcast
 import io.flowdux.remote.server.serve
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatState
@@ -37,10 +37,10 @@ fun main() {
     }.start(wait = true)
 }
 
-@Suppress("UNCHECKED_CAST")
 private fun createChatStore(session: DefaultWebSocketServerSession): Store<ServerChatState, ChatAction> {
     val typedConnection = KtorWebSocketServerConnection(session)
-        .typedJson<SharedChatAction>() as TypedServerConnection<ChatAction>
+        .typedJson<SharedChatAction>()
+        .upcast<SharedChatAction, ChatAction>()
     return createStore(
         initialState = ServerChatState(),
         reducer = serverChatReducer,
