@@ -11,9 +11,18 @@
 
 ### 작업 규칙
 
-1. **PR 리뷰 대응 후 반드시 PR에 코멘트 남기기**
-   - 리뷰 코멘트 수정 완료 시 해당 PR에 "Review Comments Addressed" 코멘트 작성
-   - 어떤 코멘트를 어떻게 대응했는지 명시
+1. **PR 리뷰 대응 후 반드시 코멘트 남기기**
+   - **개별 리뷰 코멘트에 reply**: 각 리뷰 코멘트에 어떻게 대응했는지 개별 답변
+     ```bash
+     gh api repos/chibimoons/flowdux/pulls/{pr_number}/comments \
+       -X POST \
+       -F body="Fixed in commit \`abc123\`. [설명]" \
+       -F in_reply_to={comment_id}
+     ```
+   - **PR 전체 요약 코멘트**: "Review Comments Addressed" 코멘트로 전체 대응 현황 정리
+     ```bash
+     gh pr comment {pr_number} --repo chibimoons/flowdux --body "## Review Comments Addressed ✅ ..."
+     ```
 
 2. **브랜치 네이밍**
    - 버그 수정: `fix/{issue-number}-{short-description}`
