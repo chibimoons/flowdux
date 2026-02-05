@@ -72,6 +72,18 @@ Check `gh auth status` output to identify available accounts and ensure the corr
 - `dart/` - Dart/Flutter implementation
   - `flowdux/` - Core library (published to pub.dev)
 
+## Branch Strategy
+
+- **기본 타겟 브랜치**: `develop`
+- release 브랜치 외 모든 작업(feature, fix, docs 등)은 `develop`으로 PR 생성
+- release 브랜치만 `main`으로 머지
+
+```
+feature/xxx  ─┐
+fix/xxx      ─┼─► develop ─► release/x.x.x ─► main ─► tag
+docs/xxx     ─┘
+```
+
 ## Release Process
 
 ### Kotlin (Maven Central — primary)
