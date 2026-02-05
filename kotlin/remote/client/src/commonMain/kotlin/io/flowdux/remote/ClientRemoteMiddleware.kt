@@ -12,7 +12,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -47,17 +46,16 @@ import kotlinx.coroutines.launch
  * ```
  *
  * @param connection The [TypedClientConnection] for communicating with the server.
- * @param scope Coroutine scope for background tasks. If not provided, an internal scope is created
- *              and will be cancelled on [stopConnection]. If provided, the caller is responsible
- *              for managing the scope's lifecycle.
+ * @param scope Coroutine scope for background tasks. If not provided, an internal scope is created.
+ *              The scope is reusable across multiple connect/disconnect cycles.
  */
 open class ClientRemoteMiddleware<S : State, A : Action>(
     private val connection: TypedClientConnection<A>,
     scope: CoroutineScope? = null,
 ) : Middleware<S, A> {
 
-    private val internalJob: Job? = if (scope == null) SupervisorJob() else null
-    private val actualScope: CoroutineScope = scope ?: CoroutineScope(internalJob!! + Dispatchers.Default)
+    private val actualScope: CoroutineScope = scope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var connectionJob: Job? = null
 
     override val name: String = "ClientRemoteMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
@@ -68,23 +66,28 @@ open class ClientRemoteMiddleware<S : State, A : Action>(
      * Call this from within a processor to start listening for server messages.
      * The emitted FlowHolderAction uses [FlowActionDelivery.Dispatch] delivery,
      * so server actions are dispatched through the full middleware pipeline.
+     *
+     * If a previous connection job is still running, it will be cancelled before
+     * starting a new connection.
      */
     @Suppress("UNCHECKED_CAST")
     protected suspend fun FlowCollector<A>.startConnection() {
-        actualScope.launch { connection.connect() }
+        connectionJob?.cancel()
+        connectionJob = actualScope.launch { connection.connect() }
         emit(ServerListenerAction() as A)
     }
 
     /**
-     * Stop the remote connection and cancel the internal scope if one was created.
+     * Stop the remote connection and cancel the connection job.
      *
      * Call this from within a processor to disconnect from the server.
-     * If an internal scope was created (no scope parameter provided to constructor),
-     * it will be cancelled to prevent resource leaks.
+     * Only the connection job is cancelled, not the entire scope, allowing
+     * reconnection via subsequent [startConnection] calls.
      */
     protected suspend fun stopConnection() {
         connection.disconnect()
-        internalJob?.cancel()
+        connectionJob?.cancel()
+        connectionJob = null
     }
 
     override fun process(getState: () -> S, action: A): Flow<A> = flow {

@@ -10,7 +10,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.Test
 
@@ -194,14 +193,13 @@ class ClientRemoteMiddlewareTest {
     }
 
     @Test
-    fun `internal scope is cancelled on disconnect when no scope provided`() = runTest {
+    fun `connection job is cancelled on disconnect`() = runTest {
         val cancellationSignal = CompletableDeferred<Boolean>()
         val connection = CancellationTrackingMockConnection<TestAction>(cancellationSignal)
 
-        // Do NOT provide a scope - internal scope should be created and cancelled
         val middleware = TestClientRemoteMiddleware(
             connection = connection,
-            scope = null,
+            scope = backgroundScope,
         )
 
         val store = createStore(
@@ -215,14 +213,14 @@ class ClientRemoteMiddlewareTest {
         store.state.test {
             assertEquals(TestState(), awaitItem())
 
-            // Connect - starts the internal scope's coroutine
+            // Connect - starts the connection job
             store.dispatch(TestAction.Connect)
             delay(100)
 
             // Verify connection is active (coroutine is running)
             assertFalse(cancellationSignal.isCompleted)
 
-            // Disconnect - should cancel the internal scope
+            // Disconnect - should cancel the connection job
             store.dispatch(TestAction.Disconnect)
 
             // Wait for cancellation signal
@@ -230,19 +228,16 @@ class ClientRemoteMiddlewareTest {
                 cancellationSignal.await()
             }
 
-            assertNotNull(wasCancelled, "Internal scope should be cancelled on disconnect")
-            assertTrue(wasCancelled, "Internal scope coroutine should have been cancelled")
+            assertNotNull(wasCancelled, "Connection job should be cancelled on disconnect")
+            assertTrue(wasCancelled, "Connection job coroutine should have been cancelled")
 
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `external scope is NOT cancelled on disconnect when scope provided`() = runTest {
-        val cancellationSignal = CompletableDeferred<Boolean>()
-        val connection = CancellationTrackingMockConnection<TestAction>(cancellationSignal)
-
-        // Provide an external scope - should NOT be cancelled on disconnect
+    fun `reconnect works after disconnect`() = runTest {
+        val connection = MockTypedClientConnection<TestAction>()
         val middleware = TestClientRemoteMiddleware(
             connection = connection,
             scope = backgroundScope,
@@ -259,23 +254,34 @@ class ClientRemoteMiddlewareTest {
         store.state.test {
             assertEquals(TestState(), awaitItem())
 
-            // Connect - starts a coroutine in the provided scope
+            // 1. First connect
             store.dispatch(TestAction.Connect)
             delay(100)
+            assertEquals(ConnectionState.CONNECTED, connection.connectionState.value)
 
-            // Verify connection is active
-            assertFalse(cancellationSignal.isCompleted)
+            // Verify connection works - send action to server
+            store.dispatch(TestAction.ServerAdd(10))
+            delay(100)
+            assertEquals(1, connection.sentActions.size)
 
-            // Disconnect - should NOT cancel the external scope
+            // 2. Disconnect
             store.dispatch(TestAction.Disconnect)
+            delay(100)
+            assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
 
-            // Give it time to potentially cancel (but it shouldn't)
-            val wasCancelled = withTimeoutOrNull(500) {
-                cancellationSignal.await()
-            }
+            // 3. Reconnect
+            store.dispatch(TestAction.Connect)
+            delay(100)
+            assertEquals(ConnectionState.CONNECTED, connection.connectionState.value)
 
-            // The external scope should NOT be cancelled by disconnect
-            assertNull(wasCancelled, "External scope should NOT be cancelled on disconnect")
+            // 4. Verify connection still works after reconnect
+            store.dispatch(TestAction.ServerAdd(20))
+            delay(100)
+            assertEquals(2, connection.sentActions.size)
+
+            // Verify server messages can still be received after reconnect
+            connection.simulateServerAction(TestAction.Add(100))
+            assertEquals(TestState(count = 100), awaitItem())
 
             cancelAndIgnoreRemainingEvents()
         }

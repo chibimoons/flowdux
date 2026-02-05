@@ -108,7 +108,7 @@ class MockTypedClientConnection<A : Action>(
 
 /**
  * A mock connection that signals when its connect() coroutine is cancelled.
- * Used to verify that the internal scope is properly cancelled on disconnect.
+ * Used to verify that the connection job is properly cancelled on disconnect.
  */
 class CancellationTrackingMockConnection<A : Action>(
     private val cancellationSignal: CompletableDeferred<Boolean>,
