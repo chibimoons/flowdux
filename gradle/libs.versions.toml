@@ -1,4 +1,5 @@
 [versions]
+mavenPublish = "0.36.0"
 kotlin = "2.2.10"
 coroutines = "1.10.2"
 datetime = "0.5.0"
@@ -36,6 +37,7 @@ ktor-client-core-multiplatform = { module = "io.ktor:ktor-client-core", version.
 ktor-client-cio-multiplatform = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-websockets-multiplatform = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
+ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
 kotlinx-browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version.ref = "kotlinx-browser" }
 
@@ -47,3 +49,4 @@ androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidLibrary = { id = "com.android.library", version.ref = "agp" }
 kotlinCompose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+mavenPublish = { id = "com.vanniktech.maven.publish", version.ref = "mavenPublish" }

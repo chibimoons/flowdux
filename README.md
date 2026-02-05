@@ -23,7 +23,59 @@ A lightweight Redux-style state management library for **Kotlin Multiplatform** 
 
 ## Installation
 
-### Kotlin (JitPack)
+### Kotlin Multiplatform (Maven Central)
+
+Add the dependency to your KMP project's `build.gradle.kts`:
+
+```kotlin
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("io.github.chibimoons:flowdux:1.12.0")
+        }
+    }
+}
+```
+
+Gradle automatically resolves the correct artifact for each target (JVM, iOS, JS, WASM).
+
+#### Single-platform (JVM / Android)
+
+If your project is not KMP, add the dependency directly:
+
+```kotlin
+dependencies {
+    implementation("io.github.chibimoons:flowdux:1.12.0")
+}
+```
+
+#### Remote Modules (WebSocket)
+
+For real-time client-server state sync, add the relevant modules:
+
+```kotlin
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            // Shared action markers (ServerSharedAction, ClientSharedAction)
+            implementation("io.github.chibimoons:flowdux-remote-core:1.12.0")
+            // Client middleware (ClientRemoteMiddleware)
+            implementation("io.github.chibimoons:flowdux-remote-client:1.12.0")
+            // Server middleware (ServerRemoteMiddleware)
+            implementation("io.github.chibimoons:flowdux-remote-server:1.12.0")
+            // kotlinx.serialization codecs (ActionCodec, MessageCodec)
+            implementation("io.github.chibimoons:flowdux-remote-serialization:1.12.0")
+            // Ktor WebSocket transport (JVM, iOS, JS — WASM not supported)
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.12.0")
+        }
+    }
+}
+```
+
+### Kotlin (JitPack — legacy)
+
+<details>
+<summary>JitPack is still supported but Maven Central is recommended</summary>
 
 Add JitPack repository to your `settings.gradle.kts`:
 
@@ -35,32 +87,13 @@ dependencyResolutionManagement {
 }
 ```
 
-Add the dependency to your `build.gradle.kts`:
-
 ```kotlin
 dependencies {
     implementation("com.github.chibimoons:flowdux:1.10.0")
 }
 ```
 
-#### Remote Modules (WebSocket)
-
-For real-time client-server state sync, add the relevant modules:
-
-```kotlin
-dependencies {
-    // Shared action markers (ServerSharedAction, ClientSharedAction)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-core:1.10.0")
-    // Client middleware (ClientRemoteMiddleware)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-client:1.10.0")
-    // Server middleware (ServerRemoteMiddleware)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-server:1.10.0")
-    // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-serialization:1.10.0")
-    // Ktor WebSocket transport
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-ktor:1.10.0")
-}
-```
+</details>
 
 ### Dart
 
@@ -186,9 +219,42 @@ if (!store.isClosed) {
 | [Architecture](docs/guide/architecture.md) | Store pipeline, middleware chain, action flow |
 | [Execution Strategies](docs/guide/execution-strategies.md) | takeLatest, debounce, throttle, retry, groups, chaining |
 | [Remote (WebSocket)](docs/guide/remote.md) | Client-server state sync, shared actions, setup guide |
+| [Room Store Pattern](docs/guide/room-store.md) | Multi-room management, session-aware broadcasting |
 | [Time Travel](docs/guide/timetravel.md) | Undo/redo, state history, branching |
 | [Sample Apps](docs/guide/samples.md) | How to run each sample |
 | [Dart/Flutter](dart/flowdux/README.md) | Dart API, Flutter widgets, stream integration |
+
+## Version Compatibility
+
+### Kotlin Version
+
+FlowDux 1.12.0 is built with **Kotlin 2.2.10**. For best compatibility, use the same Kotlin version in your project:
+
+```kotlin
+plugins {
+    kotlin("multiplatform") version "2.2.10"
+    kotlin("plugin.serialization") version "2.2.10"  // if using remote modules
+}
+```
+
+Using a different Kotlin version may cause compilation errors, especially on iOS and JS targets.
+
+### kotlinx.serialization
+
+When using `flowdux-remote` modules with `kotlinx.serialization`, use version **1.7.3** or compatible:
+
+```kotlin
+implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+```
+
+### flowdux-remote-ktor Platform Support
+
+| Platform | Status |
+|----------|--------|
+| JVM | ✅ |
+| iOS | ✅ |
+| JS | ✅ |
+| WASM | ❌ (Ktor client not available) |
 
 ## Platform Support
 

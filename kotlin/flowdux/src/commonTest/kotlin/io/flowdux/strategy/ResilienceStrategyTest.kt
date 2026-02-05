@@ -372,6 +372,7 @@ class ResilienceStrategyTest {
 
     @Test
     fun `retryWithBackoff works with real dispatcher`() = runBlocking {
+        // Large timing margins are needed for CI (especially iosSimulatorArm64).
         val attemptTimes = mutableListOf<Long>()
         var attempt = 0
         val startMark = kotlin.time.TimeSource.Monotonic.markNow()
@@ -381,7 +382,7 @@ class ResilienceStrategyTest {
             override val processors = buildProcessors {
                 on<TestAction.Fetch>(retryWithBackoff(
                     maxAttempts = 3,
-                    initialDelay = 50.milliseconds,
+                    initialDelay = 200.milliseconds,
                     factor = 2.0
                 )) { _, action ->
                     attemptTimes.add(startMark.elapsedNow().inWholeMilliseconds)
@@ -417,14 +418,14 @@ class ResilienceStrategyTest {
 
                 // Verify exponential backoff timing with generous tolerance
                 // First attempt: immediate (0ms)
-                // Second attempt: after ~50ms delay
-                // Third attempt: after ~100ms delay (50ms * 2)
+                // Second attempt: after ~200ms delay
+                // Third attempt: after ~400ms delay (200ms * 2)
                 val delay1to2 = attemptTimes[1] - attemptTimes[0]
                 val delay2to3 = attemptTimes[2] - attemptTimes[1]
 
                 // Allow generous timing tolerance for real dispatcher
-                assertTrue(delay1to2 >= 30, "First delay should be at least 30ms but was $delay1to2")
-                assertTrue(delay2to3 >= 60, "Second delay should be at least 60ms but was $delay2to3")
+                assertTrue(delay1to2 >= 100, "First delay should be at least 100ms but was $delay1to2")
+                assertTrue(delay2to3 >= 200, "Second delay should be at least 200ms but was $delay2to3")
                 assertTrue(delay2to3 > delay1to2, "Second delay should be longer than first (exponential backoff)")
 
                 cancelAndIgnoreRemainingEvents()

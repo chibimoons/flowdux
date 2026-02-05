@@ -1,11 +1,16 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.kotlinSerialization)
-    `maven-publish`
+    id("flowdux.publish-conventions")
 }
 
-group = "io.flowdux"
-version = "1.10.0"
+mavenPublishing {
+    coordinates("io.github.chibimoons", "flowdux-remote-serialization", providers.gradleProperty("flowdux.version").get())
+    pom {
+        name.set("Flowdux Remote Serialization")
+        description.set("kotlinx.serialization-based ActionCodec for Flowdux remote state management")
+    }
+}
 
 // JitPack only publishes JVM artifacts to avoid variant resolution issues for JVM/Android consumers
 val isJitPack = System.getenv("JITPACK") == "true"
@@ -51,25 +56,6 @@ kotlin {
             compileTaskProvider.configure {
                 compilerOptions {
                     jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-                }
-            }
-        }
-    }
-}
-
-publishing {
-    publications {
-        withType<MavenPublication> {
-            pom {
-                name.set("Flowdux Remote Serialization")
-                description.set("kotlinx.serialization-based ActionCodec for Flowdux remote state management")
-                url.set("https://github.com/chibimoons/flowdux")
-
-                licenses {
-                    license {
-                        name.set("Apache License 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
-                    }
                 }
             }
         }
