@@ -219,6 +219,7 @@ if (!store.isClosed) {
 | [Architecture](docs/guide/architecture.md) | Store pipeline, middleware chain, action flow |
 | [Execution Strategies](docs/guide/execution-strategies.md) | takeLatest, debounce, throttle, retry, groups, chaining |
 | [Remote (WebSocket)](docs/guide/remote.md) | Client-server state sync, shared actions, setup guide |
+| [Room Store Pattern](docs/guide/room-store.md) | Multi-room management, session-aware broadcasting |
 | [Time Travel](docs/guide/timetravel.md) | Undo/redo, state history, branching |
 | [Sample Apps](docs/guide/samples.md) | How to run each sample |
 | [Dart/Flutter](dart/flowdux/README.md) | Dart API, Flutter widgets, stream integration |

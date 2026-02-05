@@ -186,4 +186,9 @@ store.dispatch(ClientChatAction.Connect)
 store.dispatch(SharedChatAction.SendMessage("Hello!"))
 ```
 
-See `kotlin/samples/remote-chat` for the complete working example.
+See `kotlin/samples/flowdux-remote` for complete working examples.
+
+## Next Steps
+
+- [Room Store Pattern](./room-store.md) — Multi-room management, session-aware broadcasting
+- [Server Architecture Patterns](../design/server-architecture-patterns.md) — Central Store, Room Store, Per-Client Store patterns
