@@ -32,8 +32,8 @@ class KtorWebSocketServerConnection(
             session.outgoing.send(Frame.Text(message))
         } catch (_: ClosedSendChannelException) {
             // Session already closed; ignore silently
-        } catch (_: CancellationException) {
-            // Channel was cancelled (session closed); ignore silently
+        } catch (e: CancellationException) {
+            throw e // Propagate coroutine cancellation
         }
     }
 }
