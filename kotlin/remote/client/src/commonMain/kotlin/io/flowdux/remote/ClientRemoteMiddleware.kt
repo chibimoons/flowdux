@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 
 /**
@@ -63,6 +64,10 @@ open class ClientRemoteMiddleware<S : State, A : Action>(
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     private val errorChannel = Channel<A>(Channel.BUFFERED)
+
+    init {
+        scope.coroutineContext.job.invokeOnCompletion { errorChannel.close() }
+    }
 
     /**
      * Start the remote connection and emit a server listener [FlowHolderAction].

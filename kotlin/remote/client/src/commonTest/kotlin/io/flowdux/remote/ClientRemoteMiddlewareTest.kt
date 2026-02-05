@@ -188,4 +188,35 @@ class ClientRemoteMiddlewareTest {
         }
     }
 
+    @Test
+    fun `onConnectionError callback dispatches error action when connection fails`() = runTest {
+        val connection = MockTypedClientConnection<TestAction>(
+            connectException = RuntimeException("Connection failed"),
+        )
+        val middleware = TestClientRemoteMiddleware(
+            connection = connection,
+            scope = backgroundScope,
+            onConnectionError = { e -> TestAction.ConnectionError(e.message ?: "Unknown error") },
+        )
+
+        val store = createStore(
+            initialState = TestState(),
+            reducer = testReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = testErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        store.state.test {
+            assertEquals(TestState(), awaitItem()) // initial state
+
+            store.dispatch(TestAction.Connect)
+
+            // The error action should be dispatched through the store
+            val errorState = awaitItem()
+            assertEquals("Connection failed", errorState.message)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
