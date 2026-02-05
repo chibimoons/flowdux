@@ -4,6 +4,8 @@ import io.flowdux.remote.server.ServerConnection
 import io.ktor.websocket.Frame
 import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.readText
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
@@ -26,6 +28,12 @@ class KtorWebSocketServerConnection(
         .map { it.readText() }
 
     override suspend fun send(message: String) {
-        session.outgoing.send(Frame.Text(message))
+        try {
+            session.outgoing.send(Frame.Text(message))
+        } catch (_: ClosedSendChannelException) {
+            // Session already closed; ignore silently
+        } catch (e: CancellationException) {
+            throw e // Propagate coroutine cancellation
+        }
     }
 }
