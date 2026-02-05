@@ -20,9 +20,18 @@ internal class DefaultTypedClientConnection<A : Action>(
 
     @Suppress("UNCHECKED_CAST")
     override val incoming: Flow<A> = connection.incoming.transform { raw ->
-        val response = messageCodec.decodeServerMessage(raw)
+        val response = try {
+            messageCodec.decodeServerMessage(raw)
+        } catch (_: Exception) {
+            return@transform // Skip malformed server messages
+        }
         for (actionJson in response.actions) {
-            emit(actionCodec.decode(actionJson))
+            val action = try {
+                actionCodec.decode(actionJson)
+            } catch (_: Exception) {
+                continue // Skip malformed actions
+            }
+            emit(action)
         }
     }
 
