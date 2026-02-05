@@ -20,8 +20,9 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Client-side middleware that intercepts [ServerSharedAction]s and sends them to the server,
@@ -50,9 +51,19 @@ import kotlinx.coroutines.launch
  * }
  * ```
  *
+ * **Threading:** The [startConnection] and [stopConnection] methods use internal synchronization
+ * to handle concurrent calls safely. However, for best practices, consider using an execution
+ * strategy like `takeLatest()` on Connect/Disconnect actions to prevent redundant operations.
+ *
+ * **Connection Lifecycle:** The [ServerListenerAction] is emitted immediately when [startConnection]
+ * is called, before the connection is fully established. This allows the listener to be ready to
+ * receive messages as soon as the connection completes. The connection implementation should handle
+ * this by buffering or suspending until connected.
+ *
  * @param connection The [TypedClientConnection] for communicating with the server.
  * @param scope Coroutine scope for background tasks. If not provided, an internal scope is created.
- *              The scope is reusable across multiple connect/disconnect cycles.
+ *              The scope must have a [Job] in its context for proper cleanup. The scope is reusable
+ *              across multiple connect/disconnect cycles.
  * @param onConnectionError Optional callback to convert connection errors to actions.
  *        When provided, connection failures will be dispatched through the store.
  */
@@ -63,11 +74,13 @@ open class ClientRemoteMiddleware<S : State, A : Action>(
 ) : Middleware<S, A> {
 
     private val actualScope: CoroutineScope = scope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val connectionMutex = Mutex()
     private var connectionJob: Job? = null
+    private var listenerEmitted: Boolean = false
     private val errorChannel = Channel<A>(Channel.BUFFERED)
 
     init {
-        actualScope.coroutineContext.job.invokeOnCompletion { errorChannel.close() }
+        actualScope.coroutineContext[Job]?.invokeOnCompletion { errorChannel.close() }
     }
 
     override val name: String = "ClientRemoteMiddleware"
@@ -83,20 +96,29 @@ open class ClientRemoteMiddleware<S : State, A : Action>(
      * If a previous connection job is still running, it will be cancelled before
      * starting a new connection. Connection errors are dispatched through the store
      * if [onConnectionError] callback is provided.
+     *
+     * **Note:** The [ServerListenerAction] is only emitted on the first call. Subsequent calls
+     * will restart the connection but reuse the existing listener to prevent duplicate message
+     * processing. The listener continues to receive from `connection.incoming` across reconnects.
      */
     @Suppress("UNCHECKED_CAST")
     protected suspend fun FlowCollector<A>.startConnection() {
-        connectionJob?.cancel()
-        connectionJob = actualScope.launch {
-            try {
-                connection.connect()
-            } catch (e: CancellationException) {
-                throw e // Propagate cancellation
-            } catch (e: Exception) {
-                onConnectionError?.invoke(e)?.let { errorChannel.send(it) }
+        connectionMutex.withLock {
+            connectionJob?.cancel()
+            connectionJob = actualScope.launch {
+                try {
+                    connection.connect()
+                } catch (e: CancellationException) {
+                    throw e // Propagate cancellation
+                } catch (e: Exception) {
+                    onConnectionError?.invoke(e)?.let { errorChannel.send(it) }
+                }
+            }
+            if (!listenerEmitted) {
+                listenerEmitted = true
+                emit(ServerListenerAction() as A)
             }
         }
-        emit(ServerListenerAction() as A)
     }
 
     /**
@@ -107,9 +129,11 @@ open class ClientRemoteMiddleware<S : State, A : Action>(
      * reconnection via subsequent [startConnection] calls.
      */
     protected suspend fun stopConnection() {
-        connection.disconnect()
-        connectionJob?.cancel()
-        connectionJob = null
+        connectionMutex.withLock {
+            connection.disconnect()
+            connectionJob?.cancel()
+            connectionJob = null
+        }
     }
 
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
