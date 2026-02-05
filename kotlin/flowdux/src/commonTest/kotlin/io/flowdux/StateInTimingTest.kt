@@ -3,6 +3,7 @@ package io.flowdux
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -28,14 +29,14 @@ import kotlin.test.assertEquals
 class StateInTimingTest {
 
     /**
-     * Test 1: Lost Update Detection (Deterministic Test)
+     * Test 1: Lost Update Detection (Empirical Test)
      *
      * Dispatches N increments with random delays to maximize concurrency via flatMapMerge.
      * If `stateIn` updates synchronously, final count should equal N.
      * If there are stale reads, final count will be less than N.
      */
     @Test
-    fun `state_value is always up-to-date before next reduce - no lost updates`() = runBlocking {
+    fun `state value is always up-to-date before next reduce - no lost updates`() = runBlocking {
         val actionCount = 100
         val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
@@ -76,6 +77,7 @@ class StateInTimingTest {
             )
         } finally {
             store.close()
+            storeScope.cancel()
         }
     }
 
@@ -99,9 +101,8 @@ class StateInTimingTest {
                 previousState: CounterState,
                 newState: CounterState,
             ) {
-                synchronized(readLog) {
-                    readLog.add(previousState.count to newState.count)
-                }
+                // No synchronization needed - map operator in Store's Flow pipeline runs sequentially
+                readLog.add(previousState.count to newState.count)
             }
         }
 
@@ -139,11 +140,9 @@ class StateInTimingTest {
                 "Expected $actionCount reductions but got ${readLog.size}"
             )
 
-            // Sort by oldState to handle out-of-order logging
-            val sortedLog = readLog.sortedBy { it.first }
-
-            // Verify sequential progression: (0,1), (1,2), (2,3), ...
-            sortedLog.forEachIndexed { index, (old, new) ->
+            // Verify sequential progression in logging order: (0,1), (1,2), (2,3), ...
+            // If stateIn updates synchronously, log should already be sequential without sorting
+            readLog.forEachIndexed { index, (old, new) ->
                 assertEquals(
                     index,
                     old,
@@ -157,6 +156,7 @@ class StateInTimingTest {
             }
         } finally {
             store.close()
+            storeScope.cancel()
         }
     }
 
@@ -207,6 +207,7 @@ class StateInTimingTest {
                 )
             } finally {
                 store.close()
+                storeScope.cancel()
             }
         }
     }
