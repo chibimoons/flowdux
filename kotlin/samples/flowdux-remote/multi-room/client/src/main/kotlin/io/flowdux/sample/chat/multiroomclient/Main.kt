@@ -165,13 +165,17 @@ fun main(args: Array<String>) = runBlocking {
         }
     }
 
-    // Cleanup
+    // Cleanup - same order as connectToRoom:
+    // 1. Dispatch cleanup actions while store is active
+    // 2. Wait for actions to process
+    // 3. Cancel collector
+    // 4. Close store
     println("\n  Leaving room...")
     store?.dispatch(SharedChatAction.LeaveRoom(username))
-    delay(300)
-
-    collectorJob?.cancel()
+    delay(100)
     store?.dispatch(ClientChatAction.Disconnect)
+    delay(50)
+    collectorJob?.cancel()
     store?.close()
 
     println("  Bye!")
