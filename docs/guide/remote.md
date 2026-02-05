@@ -53,21 +53,81 @@ kotlin {
 }
 ```
 
-## 1. Define Shared Actions
+## Version Compatibility
 
-Actions shared between client and server use direction markers:
+FlowDux remote modules require matching Kotlin and serialization versions:
+
+| Dependency | Version |
+|------------|---------|
+| Kotlin | 2.2.10 |
+| kotlinx-serialization-json | 1.7.3 |
 
 ```kotlin
-@Serializable
-sealed interface SharedChatAction : ChatAction {
-    // Client → Server
-    @Serializable data class SendMessage(val text: String) : SharedChatAction, ServerSharedAction
-    @Serializable data class JoinRoom(val user: String) : SharedChatAction, ServerSharedAction
+plugins {
+    kotlin("multiplatform") version "2.2.10"
+    kotlin("plugin.serialization") version "2.2.10"
+}
 
-    // Server → Client
-    @Serializable data class SyncState(val state: ChatState) : SharedChatAction, ClientSharedAction
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+        }
+    }
 }
 ```
+
+**Important:** Using different Kotlin versions between your project and FlowDux may cause compilation errors on JS/iOS targets due to metadata incompatibility.
+
+## 1. Define Shared Actions
+
+Actions shared between client and server use direction markers.
+
+### Recommended Pattern
+
+Define a `@Serializable sealed interface` for your shared actions, with each variant implementing the appropriate direction marker:
+
+```kotlin
+import io.flowdux.Action
+import io.flowdux.remote.ServerSharedAction
+import io.flowdux.remote.ClientSharedAction
+import kotlinx.serialization.Serializable
+
+// Base action interface for your domain
+sealed interface ChatAction : Action
+
+// Shared actions with serialization support
+@Serializable
+sealed interface SharedChatAction : ChatAction {
+    // Client → Server: implement ServerSharedAction
+    @Serializable
+    data class SendMessage(val text: String) : SharedChatAction, ServerSharedAction
+
+    @Serializable
+    data class JoinRoom(val user: String) : SharedChatAction, ServerSharedAction
+
+    // Server → Client: implement ClientSharedAction
+    @Serializable
+    data class MessageReceived(val from: String, val text: String) : SharedChatAction, ClientSharedAction
+
+    @Serializable
+    data class SyncState(val state: ChatState) : SharedChatAction, ClientSharedAction
+}
+
+// Local-only actions (not sent over network)
+sealed interface LocalChatAction : ChatAction {
+    data object Connect : LocalChatAction
+    data object Disconnect : LocalChatAction
+    data class SetError(val message: String) : LocalChatAction
+}
+```
+
+### Key Points
+
+1. **`@Serializable` on sealed interface** — Required for polymorphic serialization
+2. **`@Serializable` on each variant** — Each data class needs its own annotation
+3. **Direction markers** — `ServerSharedAction` for client→server, `ClientSharedAction` for server→client
+4. **Local actions** — Actions not shared don't need serialization or markers
 
 ## 2. Server Setup
 
