@@ -8,13 +8,17 @@ import io.flowdux.FlowHolderAction
 import io.flowdux.Middleware
 import io.flowdux.State
 import io.flowdux.concurrent
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -46,14 +50,19 @@ import kotlinx.coroutines.launch
  *
  * @param connection The [TypedClientConnection] for communicating with the server.
  * @param scope Coroutine scope for background tasks.
+ * @param onConnectionError Optional callback to convert connection errors to actions.
+ *        When provided, connection failures will be dispatched through the store.
  */
 open class ClientRemoteMiddleware<S : State, A : Action>(
     private val connection: TypedClientConnection<A>,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    private val onConnectionError: ((Throwable) -> A)? = null,
 ) : Middleware<S, A> {
 
     override val name: String = "ClientRemoteMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
+
+    private val errorChannel = Channel<A>(Channel.BUFFERED)
 
     /**
      * Start the remote connection and emit a server listener [FlowHolderAction].
@@ -64,7 +73,15 @@ open class ClientRemoteMiddleware<S : State, A : Action>(
      */
     @Suppress("UNCHECKED_CAST")
     protected suspend fun FlowCollector<A>.startConnection() {
-        scope.launch { connection.connect() }
+        scope.launch {
+            try {
+                connection.connect()
+            } catch (e: CancellationException) {
+                throw e // Don't catch cancellation
+            } catch (e: Exception) {
+                onConnectionError?.invoke(e)?.let { errorChannel.send(it) }
+            }
+        }
         emit(ServerListenerAction() as A)
     }
 
@@ -99,6 +116,9 @@ open class ClientRemoteMiddleware<S : State, A : Action>(
         override val delivery: FlowActionDelivery get() = FlowActionDelivery.Dispatch
         override val strategy: ExecutionStrategy get() = concurrent()
 
-        override fun toFlowAction(): Flow<Action> = connection.incoming.map { it }
+        override fun toFlowAction(): Flow<Action> = merge(
+            connection.incoming.map { it },
+            errorChannel.receiveAsFlow(),
+        )
     }
 }
