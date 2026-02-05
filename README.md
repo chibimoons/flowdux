@@ -223,6 +223,38 @@ if (!store.isClosed) {
 | [Sample Apps](docs/guide/samples.md) | How to run each sample |
 | [Dart/Flutter](dart/flowdux/README.md) | Dart API, Flutter widgets, stream integration |
 
+## Version Compatibility
+
+### Kotlin Version
+
+FlowDux 1.12.0 is built with **Kotlin 2.2.10**. For best compatibility, use the same Kotlin version in your project:
+
+```kotlin
+plugins {
+    kotlin("multiplatform") version "2.2.10"
+    kotlin("plugin.serialization") version "2.2.10"  // if using remote modules
+}
+```
+
+Using a different Kotlin version may cause compilation errors, especially on iOS and JS targets.
+
+### kotlinx.serialization
+
+When using `flowdux-remote` modules with `kotlinx.serialization`, use version **1.7.3** or compatible:
+
+```kotlin
+implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+```
+
+### flowdux-remote-ktor Platform Support
+
+| Platform | Status |
+|----------|--------|
+| JVM | ✅ |
+| iOS | ✅ |
+| JS | ✅ |
+| WASM | ❌ (Ktor client not available) |
+
 ## Platform Support
 
 ### Kotlin Multiplatform
