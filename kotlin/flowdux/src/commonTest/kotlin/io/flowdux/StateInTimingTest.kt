@@ -3,7 +3,6 @@ package io.flowdux
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -76,8 +75,8 @@ class StateInTimingTest {
                     "This indicates lost updates due to stale state reads."
             )
         } finally {
+            // store.close() internally cancels the scope, so no need for storeScope.cancel()
             store.close()
-            storeScope.cancel()
         }
     }
 
@@ -156,7 +155,6 @@ class StateInTimingTest {
             }
         } finally {
             store.close()
-            storeScope.cancel()
         }
     }
 
@@ -207,7 +205,6 @@ class StateInTimingTest {
                 )
             } finally {
                 store.close()
-                storeScope.cancel()
             }
         }
     }
