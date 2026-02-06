@@ -268,6 +268,9 @@ class JsonAuthMessageCodec(
 
     override fun decodeAuthResult(raw: String): AuthResult<String> {
         val obj = json.parseToJsonElement(raw).jsonObject
+        require(obj["type"]?.jsonPrimitive?.content == "auth_result") {
+            "Expected auth_result message, got: $raw"
+        }
         val success = obj["success"]?.jsonPrimitive?.boolean
             ?: error("Missing 'success' in auth_result")
         return if (success) {
@@ -347,7 +350,7 @@ class DefaultServerAuthHandshake(
         // 3. 결과 전송
         when (result) {
             is AuthResult.Success -> {
-                val contextJson = serializeAuthContext(result.context)
+                val contextJson = contextSerializer(result.context)
                 connection.send(authCodec.encodeAuthSuccess(contextJson))
             }
             is AuthResult.Failure -> {
@@ -356,6 +359,20 @@ class DefaultServerAuthHandshake(
         }
 
         return result
+    }
+
+    /**
+     * AuthContext를 JSON 문자열로 직렬화한다.
+     * 기본 구현은 sessionId만 포함. 커스텀 컨텍스트는 별도 serializer 주입 필요.
+     */
+    private fun <CTX : AuthContext> contextSerializer(context: CTX): String {
+        // 기본 구현: AuthContext 인터페이스의 sessionId만 직렬화
+        // 실제 사용 시 KSerializer<CTX>를 주입받거나,
+        // kotlinx.serialization의 @Serializable을 활용
+        return buildJsonObject {
+            put("sessionId", context.sessionId)
+            // 커스텀 필드는 서브클래스에서 오버라이드하여 추가
+        }.toString()
     }
 }
 ```
@@ -366,42 +383,57 @@ class DefaultServerAuthHandshake(
 
 `ClientRemoteMiddleware`의 `startConnection()`에서 인증 단계를 끼워 넣는다.
 
-**방법 A: AuthenticatedClientRemoteMiddleware (서브클래스)**
+**방법 A: AuthenticatedClientRemoteMiddleware (새 미들웨어 구현)**
+
+> ⚠️ **주의**: 현재 `ClientRemoteMiddleware`는 `private val connection: TypedClientConnection`으로
+> 런타임 교체 API가 없다. 이 접근은 **새 미들웨어를 별도 구현**하거나, 기존 미들웨어 API를
+> 확장해야 한다. 방법 B(데코레이터)가 기존 코드 변경 없이 적용 가능하므로 권장된다.
 
 ```kotlin
+/**
+ * 인증을 지원하는 새 미들웨어 구현.
+ * ClientRemoteMiddleware를 상속하지 않고 독립적으로 구현한다.
+ */
 class AuthenticatedClientRemoteMiddleware<S : State, A : Action>(
     private val rawConnection: ClientConnection,
     private val typedConnectionFactory: (ClientConnection) -> TypedClientConnection<A>,
     private val authHandshake: ClientAuthHandshake,
     private val authProvider: ClientAuthProvider,
-    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-) : ClientRemoteMiddleware<S, A>(
-    // 초기에는 dummy connection, startConnection에서 실제 연결
-    connection = LazyTypedClientConnection(),
-    scope = scope,
-) {
-    override val processors = buildProcessors {
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+) : Middleware<S, A> {
+
+    override val name = "AuthenticatedClientRemoteMiddleware"
+
+    // 인증 성공 후 생성되는 TypedConnection
+    private var typedConnection: TypedClientConnection<A>? = null
+
+    override val processors = Middleware.ActionProcessorBuilder<S, A>().apply {
         on<ConnectAction> { _, _ ->
             // 1. Transport 연결
             scope.launch { rawConnection.connect() }
 
+            // 연결 상태 대기
+            rawConnection.connectionState.first { it == ConnectionState.CONNECTED }
+
             // 2. 인증 핸드셰이크
             when (val result = authHandshake.authenticate(rawConnection, authProvider)) {
                 is AuthResult.Success -> {
-                    // 3. 인증 성공 → TypedConnection 생성 → 리스너 시작
-                    val typed = typedConnectionFactory(rawConnection)
-                    updateConnection(typed)
-                    emit(AuthSucceeded(result.context))
-                    emit(ServerListenerAction())
+                    // 3. 인증 성공 → TypedConnection 생성
+                    typedConnection = typedConnectionFactory(rawConnection)
+                    @Suppress("UNCHECKED_CAST")
+                    emit(AuthSucceeded(result.context) as A)
+                    @Suppress("UNCHECKED_CAST")
+                    emit(ServerListenerAction() as A)
                 }
                 is AuthResult.Failure -> {
                     // 4. 인증 실패 → 연결 종료
                     rawConnection.disconnect()
-                    emit(AuthFailed(result.reason))
+                    @Suppress("UNCHECKED_CAST")
+                    emit(AuthFailed(result.reason) as A)
                 }
             }
         }
-    }
+    }.build()
 }
 ```
 
@@ -425,10 +457,15 @@ class AuthenticatedClientConnection(
 
     override val connectionState: StateFlow<ConnectionState> = delegate.connectionState
 
-    // incoming에서 인증 응답 메시지를 필터링
-    // 첫 번째 메시지는 auth_result이므로 소비하고, 이후 메시지만 전달
-    override val incoming: Flow<String> = delegate.incoming
-        .drop(1)  // auth_result 메시지 스킵 (이미 authenticate()에서 소비)
+    // incoming: Channel 기반 Flow에서는 authenticate()의 first()가 이미
+    // auth_result를 소비하므로, delegate.incoming을 그대로 노출해도 된다.
+    // drop(1)을 사용하면 정상 메시지가 추가로 누락될 수 있으므로 주의.
+    //
+    // 안전한 구현: 내부 coroutine이 delegate.incoming을 단일 소비자로 수집하면서
+    // 인증 메시지와 일반 메시지를 분리하여 별도 Channel로 포워딩
+    private val _incomingChannel = Channel<String>(Channel.UNLIMITED)
+
+    override val incoming: Flow<String> = _incomingChannel.receiveAsFlow()
 
     override suspend fun send(message: String) = delegate.send(message)
 
@@ -928,24 +965,46 @@ data class UserAuthenticated(
 인증(Authentication) 이후의 권한(Authorization)은 미들웨어에서 처리한다.
 
 ```kotlin
+/**
+ * 권한 검사 미들웨어.
+ *
+ * ⚠️ 보안 주의: action.senderId 등 클라이언트가 보낸 필드를 인증/권한 검사에
+ * 사용해서는 안 된다. 클라이언트는 senderId를 임의로 조작하여 다른 사용자로
+ * 위장할 수 있다. 반드시 서버가 유지하는 AuthContext(세션/커넥션에 바인딩)를
+ * 사용해야 한다.
+ *
+ * @param getCurrentSessionContext 현재 세션/커넥션에 바인딩된 AuthContext를 반환.
+ *        이 함수는 ServerRemoteMiddleware가 액션을 수신할 때 주입한 세션 정보를
+ *        기반으로 컨텍스트를 조회해야 한다. 클라이언트가 보낸 값이 아닌,
+ *        서버가 인증 시점에 저장한 신뢰할 수 있는 값을 사용한다.
+ */
 class AuthorizationMiddleware<S : State, A : Action>(
-    private val getAuthContext: (S) -> Map<String, UserAuthContext>,
+    private val getCurrentSessionContext: () -> UserAuthContext?,
+    private val hasPermission: (UserAuthContext, A) -> Boolean,
 ) : Middleware<S, A> {
 
-    override fun process(getState: () -> S, action: A): Flow<A> = flow {
-        if (action is ServerSharedAction && action is HasSender) {
-            val ctx = getAuthContext(getState())[action.senderId]
+    override val name = "AuthorizationMiddleware"
+
+    override val processors = Middleware.ActionProcessorBuilder<S, A>().apply {
+        // ServerSharedAction에 대해 권한 검사 수행
+    }.build()
+
+    override fun intercept(getState: () -> S, action: A): A? {
+        if (action is ServerSharedAction) {
+            // 서버가 유지하는 AuthContext에서 현재 사용자 정보를 조회한다.
+            // 절대로 action.senderId 등 클라이언트 제공 값을 사용하지 않는다.
+            val ctx = getCurrentSessionContext()
             if (ctx == null) {
                 // 인증되지 않은 사용자의 액션 → 차단
-                return@flow
+                return null
             }
             if (!hasPermission(ctx, action)) {
-                // 권한 없음 → 차단 또는 에러 액션 emit
-                emit(PermissionDenied(action.senderId, action::class.simpleName) as A)
-                return@flow
+                // 권한 없음 → 차단
+                // 필요 시 PermissionDenied 액션을 emit하려면 processors에서 처리
+                return null
             }
         }
-        emit(action)
+        return action
     }
 }
 ```
