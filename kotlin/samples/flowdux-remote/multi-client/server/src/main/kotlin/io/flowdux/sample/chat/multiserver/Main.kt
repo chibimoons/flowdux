@@ -55,6 +55,9 @@ fun main() {
         install(WebSockets)
 
         routing {
+            // NOTE: These admin endpoints are intentionally unprotected for demo purposes.
+            // In production, add authentication (e.g., API key, JWT, or admin session).
+
             // Admin endpoint for system announcements
             post("/announce") {
                 val message = call.receiveText()
