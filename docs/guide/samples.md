@@ -1,12 +1,36 @@
 # Sample Apps
 
-## Run JVM Console Sample
+FlowDux 샘플 앱 가이드입니다. 각 샘플은 특정 기능이나 패턴을 보여줍니다.
+
+## Sample Overview
+
+| Sample | 패턴/기능 | 플랫폼 | 설명 |
+|--------|----------|--------|------|
+| [jvm](#jvm-console-sample) | 기본 Store, Middleware, ExecutionStrategy | JVM | FlowDux 핵심 기능 데모 |
+| [android](#android-sample) | Android 통합 | Android | ViewModel + Compose 연동 |
+| [kmm](#kmm-sample) | Kotlin Multiplatform | Android/iOS | 공유 비즈니스 로직 |
+| [web](#web-javascript-sample) | JS 타겟 | Browser | Kotlin/JS 웹 앱 |
+| [wasm](#webassembly-wasm-sample) | WASM 타겟 | Browser | Kotlin/WASM 웹 앱 |
+| [remote-simple](#remote-simple-sample) | 1:1 WebSocket | JVM | 단일 클라이언트-서버 |
+| [remote-multi](#remote-multi-client-sample) | Room Store (단일 방) | JVM | N 클라이언트 = 1 Store |
+| [remote-multiroom](#remote-multi-room-sample) | Room Store (다중 방) | JVM | 독립된 여러 방 관리 |
+
+---
+
+## JVM Console Sample
+
+**학습 포인트:** Store 생성, Action dispatch, Middleware, ExecutionStrategy
+
+FlowDux의 핵심 기능을 콘솔에서 확인합니다:
+- 기본 Counter (Increment, Decrement, Add)
+- FlowHolderAction (Flow를 반환하는 Action)
+- ExecutionStrategy (takeLatest, debounce, takeLeading, group)
 
 ```bash
 ./gradlew :kotlin:sample-jvm:run
 ```
 
-Output:
+**출력 예시:**
 ```
 === Flowdux Sample: Counter ===
 
@@ -14,138 +38,214 @@ State: count = 0
 > Dispatching Increment
 State: count = 1
 ...
-> Dispatching ObserveCount - FlowHolderAction
-  (Repository Flow emits: cache -> api)
-State: count = 10 [cache]
-State: count = 42 [api]
-...
 
-==================================================
 === Execution Strategy Examples ===
-==================================================
 
 > takeLatest: Rapid search (only latest completes)
   Dispatching Search('a'), Search('ab'), Search('abc') rapidly...
-    [takeLatest] Searching for: a
-    [takeLatest] Searching for: ab
-    [takeLatest] Searching for: abc
-    [takeLatest] Search completed: abc
   Result: Only 'abc' search completed!
 
 > debounce: Wait 200ms after last input
-  Dispatching FetchData rapidly...
-    [debounce] Fetching data: 3
   Result: Only last FetchData executed after 200ms quiet period!
-
-> takeLeading: Prevent double form submission
-  Dispatching SubmitForm 3 times rapidly...
-    [takeLeading] Processing form submission...
-    [takeLeading] Form submitted!
-  Result: Only first submission processed, others ignored!
-
-> Strategy Group: LoadUser and RefreshUser share takeLatest
-  Dispatching LoadUser, then RefreshUser (cancels LoadUser)...
-    [group] Loading user: 123
-    [group] Refreshing user...
-    [group] User refreshed!
-  Result: LoadUser was canceled, only RefreshUser completed!
 ```
 
-## Run Remote Chat Sample (WebSocket)
+---
 
-Start the server:
-```bash
-./gradlew :kotlin:sample-remote-simple:server:run
-```
+## Android Sample
 
-In a separate terminal, start the client:
-```bash
-./gradlew :kotlin:sample-remote-simple:client:run
-```
+**학습 포인트:** ViewModel 통합, Jetpack Compose, Android lifecycle
 
-Output:
-```
-=== Flowdux Remote Chat Demo ===
-
-[System] Alice joined the room
-[Alice] Hello everyone!
-[System] Bob joined the room
-[Bob] Hi Alice!
-
---- Final State ---
-Users online: [Alice, Bob]
-Message history:
-  [Alice] Hello everyone!
-  [Bob] Hi Alice!
-
-=== Demo Complete ===
-```
-
-## Run Multi-Client Remote Chat Sample (WebSocket)
-
-Start the server:
-```bash
-./gradlew :kotlin:sample-remote-multi:server:run
-```
-
-In a separate terminal, start the client:
-```bash
-./gradlew :kotlin:sample-remote-multi:client:run
-```
-
-## Build Android Sample
+Android 앱에서 FlowDux를 사용하는 방법을 보여줍니다.
 
 ```bash
 ./gradlew :kotlin:sample-android:assembleDebug
 ```
 
-APK location: `kotlin/samples/flowdux/android/build/outputs/apk/debug/sample-android-debug.apk`
+**APK 위치:** `kotlin/samples/flowdux/android/build/outputs/apk/debug/sample-android-debug.apk`
 
-## Build KMM Sample (Android)
+---
+
+## KMM Sample
+
+**학습 포인트:** 공유 비즈니스 로직, 플랫폼별 UI, expect/actual
+
+Kotlin Multiplatform으로 Android와 iOS에서 동일한 Store를 사용합니다.
+
+```
+kotlin/samples/flowdux/kmm/
+├── shared/           # 공유 Kotlin 코드 (commonMain)
+│   └── CounterStore  # 공유 비즈니스 로직
+├── androidApp/       # Android UI (Compose)
+└── iosApp/           # iOS UI (SwiftUI)
+```
+
+### Android
 
 ```bash
 ./gradlew :kotlin:sample-kmm:androidApp:assembleDebug
 ```
 
-APK location: `kotlin/samples/flowdux/kmm/androidApp/build/outputs/apk/debug/androidApp-debug.apk`
-
-## Build KMM Sample (iOS)
-
-**Prerequisites:** Xcode 15+ with command line tools
+### iOS
 
 ```bash
-# Build shared framework
+# Shared framework 빌드
 ./gradlew :kotlin:sample-kmm:shared:linkDebugFrameworkIosSimulatorArm64
 
-# Build iOS app
+# iOS 앱 빌드
 xcodebuild -project kotlin/samples/flowdux/kmm/iosApp/iosApp.xcodeproj \
   -target iosApp -sdk iphonesimulator -arch arm64 build
 ```
 
-App location: `kotlin/samples/flowdux/kmm/iosApp/build/Debug-iphonesimulator/iosApp.app`
+---
 
-## KMM Sample Structure
+## Web (JavaScript) Sample
 
-```
-kotlin/samples/flowdux/kmm/
-├── shared/           # Shared Kotlin code (commonMain)
-│   └── CounterStore  # Shared business logic
-├── androidApp/       # Android UI (Compose)
-└── iosApp/           # iOS UI (SwiftUI) - see iosApp/README.md
-```
+**학습 포인트:** Kotlin/JS, 브라우저 DOM 연동
 
-## Run Web (JavaScript) Sample
+브라우저에서 실행되는 Counter 앱입니다.
 
 ```bash
 ./gradlew :kotlin:sample-web:jsBrowserDevelopmentRun
 ```
 
-Opens browser at `http://localhost:8080` with an interactive Counter app.
+`http://localhost:8080`에서 확인할 수 있습니다.
 
-## Run WebAssembly (WASM) Sample
+---
+
+## WebAssembly (WASM) Sample
+
+**학습 포인트:** Kotlin/WASM, 최신 브라우저 타겟
+
+WASM으로 컴파일된 Counter 앱입니다.
 
 ```bash
 ./gradlew :kotlin:sample-wasm:wasmJsBrowserDevelopmentRun
 ```
 
-Opens browser at `http://localhost:8080` with an interactive Counter app (WASM version).
+`http://localhost:8080`에서 확인할 수 있습니다.
+
+---
+
+## Remote Simple Sample
+
+**학습 포인트:** WebSocket 기본, 1:1 통신, SharedAction
+
+가장 단순한 클라이언트-서버 구조입니다. 클라이언트가 연결할 때마다 새 Store가 생성됩니다.
+
+```
+┌────────┐         ┌────────┐
+│ Client │ ──WS──► │ Server │
+│ Store  │         │ Store  │  (1:1 관계)
+└────────┘         └────────┘
+```
+
+### 서버 시작
+
+```bash
+./gradlew :kotlin:sample-remote-simple:server:run
+```
+
+### 클라이언트 실행
+
+```bash
+./gradlew :kotlin:sample-remote-simple:client:run
+```
+
+---
+
+## Remote Multi-Client Sample
+
+**학습 포인트:** Room Store 패턴 (기본), 다중 클라이언트, 상태 브로드캐스트
+
+여러 클라이언트가 **하나의 Store**를 공유합니다. 채팅방처럼 모든 참가자가 같은 상태를 봅니다.
+
+```
+┌────────┐
+│Client 1│─┐
+└────────┘ │      ┌────────┐
+┌────────┐ ├─WS─► │ Server │  (N:1 관계)
+│Client 2│─┤      │ Store  │
+└────────┘ │      └────────┘
+┌────────┐ │
+│Client 3│─┘
+└────────┘
+```
+
+### 서버 시작
+
+```bash
+./gradlew :kotlin:sample-remote-multi:server:run
+```
+
+### 클라이언트 실행 (여러 터미널에서)
+
+```bash
+./gradlew :kotlin:sample-remote-multi:client:run
+# 또는 이름 지정: ./gradlew :kotlin:sample-remote-multi:client:run --args="Alice"
+```
+
+---
+
+## Remote Multi-Room Sample
+
+**학습 포인트:** Room Store 패턴 (다중 방), RoomManager, 동적 방 생성/삭제
+
+여러 **독립된 방**을 관리합니다. 각 방은 자체 Store를 가지며, 방 간 메시지는 격리됩니다.
+
+```
+┌─────────────────────────────────────────────────┐
+│                   Server                         │
+│  ┌─────────────────────────────────────────┐    │
+│  │            RoomManager                   │    │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐   │    │
+│  │  │ Room A  │ │ Room B  │ │ Room C  │   │    │
+│  │  │ (Store) │ │ (Store) │ │ (Store) │   │    │
+│  │  └────┬────┘ └────┬────┘ └────┬────┘   │    │
+│  └───────┼───────────┼───────────┼────────┘    │
+└──────────┼───────────┼───────────┼─────────────┘
+           │           │           │
+      ┌────┴────┐ ┌────┴────┐ ┌────┴────┐
+      │ C1, C2  │ │ C3, C4  │ │   C5    │
+      └─────────┘ └─────────┘ └─────────┘
+```
+
+### 서버 시작
+
+```bash
+./gradlew :kotlin:sample-remote-multiroom:server:run
+```
+
+### 클라이언트 실행
+
+```bash
+./gradlew :kotlin:sample-remote-multiroom:client:run
+# 또는: ./gradlew :kotlin:sample-remote-multiroom:client:run --args="Alice general"
+```
+
+### 클라이언트 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `/join <room>` | 다른 방으로 이동 |
+| `/rooms` | 추천 방 목록 |
+| `/users` | 현재 방의 유저 목록 |
+| `/history` | 메시지 히스토리 |
+| `/quit` | 종료 |
+
+### 데모 시나리오
+
+1. 터미널 3개 열기
+2. 서버 시작
+3. Client 1: `Alice`로 `general` 방 입장
+4. Client 2: `Bob`으로 `general` 방 입장 → Alice와 Bob이 서로 보임
+5. Client 3: `Charlie`로 `random` 방 입장 → 혼자 보임
+6. Client 2: `/join random` → Bob이 random으로 이동, Charlie와 대화 가능
+7. `general` 방에는 Alice만 남음
+
+---
+
+## 관련 문서
+
+- [Remote (WebSocket)](./remote.md) — 클라이언트-서버 설정 가이드
+- [Room Store Pattern](./room-store.md) — 다중 방 관리 패턴 상세
+- [Server Architecture Patterns](../design/server-architecture-patterns.md) — 아키텍처 패턴 설계 문서
