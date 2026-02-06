@@ -127,26 +127,44 @@ val typedConnection = clientConnection.typedJson<SharedChatAction>()
 | 사용자 식별 | `call.principal<JWTPrincipal>()` |
 | 멀티플랫폼 | JVM, iOS (Ktor Client Auth는 KMP 지원) |
 
-**주의사항:** WebSocket 프로토콜 특성상 일부 환경에서는 Authorization 헤더를 직접 설정할 수 없다. 이 경우 query parameter로 토큰을 전달하는 fallback이 필요하다.
+**주의사항:** WebSocket 프로토콜 특성상 일부 환경에서는 Authorization 헤더를 직접 설정할 수 없다. 이 경우에도 **JWT를 query parameter로 직접 전달해서는 안 되며**, 별도의 **단기(one-time) WebSocket 인증 코드**를 사용하는 것이 좋다.
+
+> ⚠️ **보안 경고**: JWT를 query parameter(`?token=...`)로 전달하면 서버 액세스 로그, 프록시 로그, 브라우저 히스토리, Referer 헤더 등에 토큰이 노출될 수 있다. 공격자가 이 로그에 접근하면 토큰을 탈취하여 사용자를 가장할 수 있다.
 
 ```kotlin
-// Query parameter fallback (클라이언트)
+// 권장: One-time WebSocket 인증 코드 방식
+
+// 1. 클라이언트: 기존 HTTP API로 단기 인증 코드 발급 요청
+val wsAuthCode: String = httpClient.post("/api/ws-auth-code") {
+    header("Authorization", "Bearer $jwtToken")  // JWT는 HTTP 헤더로만 전달
+}.body()
+
+// 2. 클라이언트: WebSocket 연결 시 one-time 코드 사용
 val clientConnection = KtorWebSocketClientConnection(
-    url = "ws://localhost:8080/chat?token=$jwtToken",
+    url = "ws://localhost:8080/chat?code=$wsAuthCode",  // JWT가 아닌 단기 코드
     httpClient = httpClient
 )
 
-// Query parameter fallback (서버)
+// 3. 서버: One-time 코드 검증 (JWT는 여전히 HTTP 헤더/쿠키로만 처리)
 install(Authentication) {
-    jwt("auth-jwt") {
-        authHeader { call ->
-            call.request.queryParameters["token"]?.let {
-                parseAuthorizationHeader("Bearer $it")
-            } ?: call.request.parseAuthorizationHeaderOrNull()
+    // WebSocket용 one-time code 인증
+    provider("ws-code") {
+        pipeline.intercept(AuthenticationPipeline.RequestAuthentication) {
+            val code = call.request.queryParameters["code"]
+            if (code.isNullOrBlank()) return@intercept
+
+            // wsAuthCodeService: 코드 검증 후 즉시 폐기 (1회성)
+            // TTL은 30초~1분 정도로 짧게 설정
+            val principal = wsAuthCodeService.consumeAndInvalidate(code)
+            if (principal != null) {
+                call.principal(principal)
+            }
         }
-        // ... verifier, validate 동일
     }
 }
+
+// 운영 환경에서는 access 로그에서 'code' query parameter를
+// 마스킹하거나 로깅하지 않도록 설정해야 한다.
 ```
 
 ---
@@ -160,10 +178,18 @@ install(Authentication) {
 ```kotlin
 data class UserSession(val userId: String, val name: String)
 
+// ⚠️ 중요: 세션 쿠키에 반드시 서명 또는 암호화를 적용해야 한다.
+// 서명 없이는 클라이언트가 쿠키 값을 임의로 조작하여 다른 사용자로 가장할 수 있다.
+val secretSignKey = hex("YOUR_SECRET_SIGN_KEY_HEX_32BYTES_MIN")  // 최소 32바이트
+
 install(Sessions) {
     cookie<UserSession>("USER_SESSION") {
         cookie.path = "/"
         cookie.maxAgeInSeconds = 3600
+        cookie.httpOnly = true  // JavaScript에서 접근 불가
+        cookie.secure = true    // HTTPS에서만 전송 (프로덕션)
+        transform(SessionTransportTransformerMessageAuthentication(secretSignKey))
+        // 또는 암호화: transform(SessionTransportTransformerEncrypt(encryptKey, signKey))
     }
 }
 
@@ -314,11 +340,28 @@ class AuthenticatedServerConnection<A : Action>(
     val userId: String get() = _userId ?: error("Not authenticated")
 
     // 첫 메시지를 인증 토큰으로 처리하고, 이후 메시지부터 정상 Flow로 전달
+    // 주의: Flow는 한 번만 collect 가능하므로, first() 후 emitAll()은 동작하지 않는다.
+    // 아래처럼 단일 collect 내에서 첫 메시지와 나머지를 구분해야 한다.
     override val incoming: Flow<A> = flow {
-        val firstMessage = connection.incoming.first()
-        // ... 인증 처리
-        // 나머지 메시지 emit
-        emitAll(connection.incoming)
+        var isFirst = true
+        connection.incoming.collect { message ->
+            if (isFirst) {
+                isFirst = false
+                // 첫 메시지를 인증 토큰으로 처리
+                val authRequest = message as? AuthRequest
+                    ?: error("First message must be AuthRequest")
+                val result = authenticate(authRequest.token)
+                if (result.success) {
+                    _userId = result.userId
+                    // 인증 성공 응답 전송 (별도 send 메서드 필요)
+                } else {
+                    error("Authentication failed")
+                }
+            } else {
+                // 인증 이후의 메시지만 downstream으로 전달
+                emit(message)
+            }
+        }
     }
 }
 ```
@@ -351,33 +394,43 @@ webSocket("/chat") {
 인증 전용 미들웨어를 만들어 액션 파이프라인에서 인증을 처리한다.
 
 ```kotlin
-class AuthMiddleware<S : State, A : Action>(
+// FlowDux의 Middleware 인터페이스는 processors 프로퍼티를 요구한다.
+// ActionProcessorBuilder를 사용하여 타입 안전한 액션 처리를 구현한다.
+class AuthMiddleware<S, A>(
     private val verifyToken: suspend (String) -> AuthResult?,
-) : Middleware<S, A> {
+) : Middleware<S, A> where S : State, S : Authenticatable, A : Action {
 
     override val name = "AuthMiddleware"
 
-    override fun process(getState: () -> S, action: A): Flow<A> = flow {
-        when (action) {
-            is AuthAction.Login -> {
-                val result = verifyToken(action.token)
-                if (result != null) {
-                    emit(AuthAction.Authenticated(result.userId) as A)
-                } else {
-                    emit(AuthAction.AuthFailed("Invalid token") as A)
-                }
-            }
-            // 인증 전 상태에서 다른 액션 차단
-            else -> {
-                val state = getState()
-                if (state is Authenticatable && !state.isAuthenticated) {
-                    emit(AuthAction.AuthRequired() as A)
-                    return@flow
-                }
-                emit(action)
+    // ActionProcessorBuilder 패턴 사용
+    override val processors = Middleware.ActionProcessorBuilder<S, A>().apply {
+        // 로그인 액션 처리
+        on<AuthAction.Login> { state, action ->
+            val result = verifyToken(action.token)
+            if (result != null) {
+                @Suppress("UNCHECKED_CAST")
+                emit(AuthAction.Authenticated(result.userId) as A)
+            } else {
+                @Suppress("UNCHECKED_CAST")
+                emit(AuthAction.AuthFailed("Invalid token") as A)
             }
         }
+    }.build()
+
+    // 인증 전 상태에서 다른 액션 차단 (processors에서 처리되지 않은 액션)
+    override fun intercept(getState: () -> S, action: A): A? {
+        val state = getState()
+        if (!state.isAuthenticated && action !is AuthAction.Login) {
+            // 인증되지 않은 상태에서 로그인 외 액션 차단
+            return null  // 또는 AuthAction.AuthRequired를 반환
+        }
+        return action
     }
+}
+
+// State가 구현해야 하는 인터페이스
+interface Authenticatable {
+    val isAuthenticated: Boolean
 }
 ```
 
