@@ -9,4 +9,5 @@ data class ClientChatState(
     val users: Set<String> = emptySet(),
     val lastEvent: ChatEvent? = null,
     val currentUser: String = "",
+    val systemAnnouncement: String? = null,
 ) : State

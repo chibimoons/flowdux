@@ -33,8 +33,17 @@ fun main(args: Array<String>) = runBlocking {
     val store = createChatStore()
 
     // Observe events
+    var lastAnnouncement: String? = null
     val collectorJob = launch {
         store.state.collect { state ->
+            // Show system announcements
+            if (state.systemAnnouncement != null && state.systemAnnouncement != lastAnnouncement) {
+                lastAnnouncement = state.systemAnnouncement
+                println()
+                println("  *** SYSTEM: ${state.systemAnnouncement} ***")
+                println()
+            }
+
             when (val event = state.lastEvent) {
                 is ChatEvent.UserJoined ->
                     println("  * ${event.user} joined (online: ${state.users})")
