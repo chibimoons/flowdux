@@ -9,7 +9,7 @@ agp = "9.0.0"
 compose-bom = "2024.02.00"
 activity-compose = "1.8.2"
 lifecycle = "2.7.0"
-ktor = "2.3.7"
+ktor = "3.0.3"
 kotlinx-serialization-json = "1.7.3"
 kotlinx-browser = "0.3"
 
