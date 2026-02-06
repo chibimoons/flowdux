@@ -28,6 +28,26 @@ import kotlin.test.assertEquals
 class StateInTimingTest {
 
     /**
+     * Creates a middleware that adds random delay to Increment actions.
+     * This forces concurrent execution through flatMapMerge to test race conditions.
+     */
+    private fun createRandomDelayMiddleware(
+        maxDelayMs: Long = 20,
+    ): Middleware<CounterState, CounterAction> = object : Middleware<CounterState, CounterAction> {
+        override val processors: ActionProcessorMap<CounterState, CounterAction> = emptyMap()
+
+        override fun process(
+            getState: () -> CounterState,
+            action: CounterAction,
+        ): Flow<CounterAction> = flow {
+            if (action is CounterAction.Increment) {
+                delay(Random.nextLong(1, maxDelayMs))
+            }
+            emit(action)
+        }
+    }
+
+    /**
      * Test 1: Lost Update Detection (Empirical Test)
      *
      * Dispatches N increments with random delays to maximize concurrency via flatMapMerge.
@@ -39,25 +59,10 @@ class StateInTimingTest {
         val actionCount = 100
         val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
-        // Middleware with random delay to force concurrent execution through flatMapMerge
-        val randomDelayMiddleware = object : Middleware<CounterState, CounterAction> {
-            override val processors: ActionProcessorMap<CounterState, CounterAction> = emptyMap()
-
-            override fun process(
-                getState: () -> CounterState,
-                action: CounterAction,
-            ): Flow<CounterAction> = flow {
-                if (action is CounterAction.Increment) {
-                    delay(Random.nextLong(1, 20)) // Random delay to maximize concurrency
-                }
-                emit(action)
-            }
-        }
-
         val store = createStore(
             initialState = CounterState(count = 0),
             reducer = counterReducer,
-            middlewares = listOf(randomDelayMiddleware),
+            middlewares = listOf(createRandomDelayMiddleware(maxDelayMs = 20)),
             errorProcessor = testErrorProcessor,
             scope = storeScope,
         )
@@ -105,25 +110,10 @@ class StateInTimingTest {
             }
         }
 
-        // Middleware with random delay
-        val randomDelayMiddleware = object : Middleware<CounterState, CounterAction> {
-            override val processors: ActionProcessorMap<CounterState, CounterAction> = emptyMap()
-
-            override fun process(
-                getState: () -> CounterState,
-                action: CounterAction,
-            ): Flow<CounterAction> = flow {
-                if (action is CounterAction.Increment) {
-                    delay(Random.nextLong(1, 10))
-                }
-                emit(action)
-            }
-        }
-
         val store = createStore(
             initialState = CounterState(count = 0),
             reducer = counterReducer,
-            middlewares = listOf(randomDelayMiddleware),
+            middlewares = listOf(createRandomDelayMiddleware(maxDelayMs = 10)),
             errorProcessor = testErrorProcessor,
             logger = capturingLogger,
             scope = storeScope,
@@ -172,24 +162,10 @@ class StateInTimingTest {
         repeat(trials) { trial ->
             val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
-            val randomDelayMiddleware = object : Middleware<CounterState, CounterAction> {
-                override val processors: ActionProcessorMap<CounterState, CounterAction> = emptyMap()
-
-                override fun process(
-                    getState: () -> CounterState,
-                    action: CounterAction,
-                ): Flow<CounterAction> = flow {
-                    if (action is CounterAction.Increment) {
-                        delay(Random.nextLong(1, 15))
-                    }
-                    emit(action)
-                }
-            }
-
             val store = createStore(
                 initialState = CounterState(count = 0),
                 reducer = counterReducer,
-                middlewares = listOf(randomDelayMiddleware),
+                middlewares = listOf(createRandomDelayMiddleware(maxDelayMs = 15)),
                 errorProcessor = testErrorProcessor,
                 scope = storeScope,
             )
