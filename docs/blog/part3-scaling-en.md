@@ -2,13 +2,13 @@
 
 *Rooms, state views, tick batching, and horizontal scaling for the Action/State model*
 
-*This is Part 3 of a 3-part series. [← Part 1: What if You Never Had to Design a REST API Again?](#) | [← Part 2: Building a Real-Time Chat Without REST](#)*
+*This is Part 3 of a 3-part series. [← Part 1: What if You Never Had to Design a REST API Again?](./part1-concept-en.md) | [← Part 2: Building a Real-Time Chat Without REST](./part2-practice-en.md)*
 
 > **Note:** This series is a *concept proposal*. It explores the Action/State model as an alternative communication pattern — not a universal replacement for REST. We're sharing an idea and inviting discussion.
 
 ---
 
-In [Part 1](#), we proposed replacing REST endpoints with **Actions** and **State**. In [Part 2](#), we built a real-time chat application to prove it works. One shared contract, one communication channel, real-time by default.
+In [Part 1](./part1-concept-en.md), we proposed replacing REST endpoints with **Actions** and **State**. In [Part 2](./part2-practice-en.md), we built a real-time chat application to prove it works. One shared contract, one communication channel, real-time by default.
 
 But that was a single chat room with all users sharing the same state. Real applications are messier:
 

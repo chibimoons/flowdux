@@ -2,13 +2,13 @@
 
 *개념에서 동작하는 코드로 — 엔드포인트 대신 액션과 상태로 채팅 앱 설계하기*
 
-*3부작 시리즈의 Part 2입니다. [← Part 1: REST API를 설계하지 않아도 된다면?](#) | [Part 3: Action/State 스케일링 →](#)*
+*3부작 시리즈의 Part 2입니다. [← Part 1: REST API를 설계하지 않아도 된다면?](./part1-concept-ko.md) | [Part 3: Action/State 스케일링 →](./part3-scaling-ko.md)*
 
 > **안내:** 이 시리즈는 *개념 제안*입니다. REST의 보편적 대체가 아닌, 대안 통신 패턴으로서 Action/State 모델을 탐구합니다. 아이디어를 공유하고 토론을 이끌어내는 것이 목적입니다.
 
 ---
 
-[Part 1](#)에서 급진적인 단순화를 제안했습니다: REST 엔드포인트를 설계하는 대신, **Action**(사용자가 하는 것)과 **State**(결과로 바뀌는 것)만 설계하자. 실시간 동기화는 공짜로 따라오고, API 계약 전체가 단일 `sealed interface`에 들어가며, URL·HTTP 메서드·상태 코드·DTO라는 설계 결정 카테고리 전체를 건너뛸 수 있다고 했습니다.
+[Part 1](./part1-concept-ko.md)에서 급진적인 단순화를 제안했습니다: REST 엔드포인트를 설계하는 대신, **Action**(사용자가 하는 것)과 **State**(결과로 바뀌는 것)만 설계하자. 실시간 동기화는 공짜로 따라오고, API 계약 전체가 단일 `sealed interface`에 들어가며, URL·HTTP 메서드·상태 코드·DTO라는 설계 결정 카테고리 전체를 건너뛸 수 있다고 했습니다.
 
 대담한 주장이었습니다. 실제로 만들어서 증명해 봅시다.
 
@@ -494,7 +494,7 @@ on<ActionError> { state, action ->
 
 ## flowdux-remote에 대하여
 
-이 글의 모든 코드는 Action/State 패턴의 참조 구현으로 만든 Kotlin 라이브러리 [flowdux-remote](https://github.com/user/flowdux)를 사용합니다. 제공하는 것:
+이 글의 모든 코드는 Action/State 패턴의 참조 구현으로 만든 Kotlin 라이브러리 [flowdux-remote](https://github.com/chibimoons/flowdux)를 사용합니다. 제공하는 것:
 
 - `ServerRemoteMiddleware` / `ClientRemoteMiddleware` — 직렬화와 WebSocket 전송 처리
 - `serve {}` — 상태 변경 관찰 및 클라이언트에 푸시
@@ -520,6 +520,5 @@ REST 엔드포인트 하나 없이 동작하는 채팅 앱을 만들었습니다
 
 ---
 
-*3부작 시리즈의 Part 2입니다. [← Part 1: REST API를 설계하지 않아도 된다면?](#) | [Part 3: Action/State 스케일링 →](#)*
+*3부작 시리즈의 Part 2입니다. [← Part 1: REST API를 설계하지 않아도 된다면?](./part1-concept-ko.md) | [Part 3: Action/State 스케일링 →](./part3-scaling-ko.md)*
 
-*Part 3은 [Medium에서 팔로우](#)해 주세요.*

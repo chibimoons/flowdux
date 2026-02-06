@@ -1136,8 +1136,8 @@ sealed interface ContentBlock {
 | KMM Android | `samples/flowdux/kmm/androidApp/` | Compose | O |
 | Web (JS) | `samples/flowdux/web/` | DOM 직접 조작 | X |
 | WASM | `samples/flowdux/wasm/` | DOM 직접 조작 | X |
-| Remote Web Chat | `samples/flowdux-remote/web/` | DOM 직접 조작 | X |
 | JVM | `samples/flowdux/jvm/` | CLI (콘솔) | X |
+| Remote Multi-Room | `samples/flowdux-remote/multi-room/` | CLI (콘솔) | X |
 
 버전 카탈로그(`gradle/libs.versions.toml`) 상태:
 - `kotlinCompose` 플러그인 선언됨: `org.jetbrains.kotlin.plugin.compose` (Kotlin 2.2.10)

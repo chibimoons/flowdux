@@ -2,7 +2,7 @@
 
 *Rethinking client-server communication with the Action/State model*
 
-*This is Part 1 of a 3-part series. [Part 2: Building a Real-Time Chat Without REST →](#) | [Part 3: Scaling Action/State →](#)*
+*This is Part 1 of a 3-part series. [Part 2: Building a Real-Time Chat Without REST →](./part2-practice-en.md) | [Part 3: Scaling Action/State →](./part3-scaling-en.md)*
 
 > **Note:** This series is a *concept proposal*. It introduces the Action/State model as an alternative pattern for client-server communication — not as a replacement for REST in every scenario. The goal is to share an architectural idea and invite discussion, not to prescribe a one-size-fits-all solution.
 
@@ -218,7 +218,7 @@ This is not a universal replacement for REST. It's an alternative paradigm that 
 
 ## A Reference Implementation
 
-We've built a library called [flowdux-remote](https://github.com/user/flowdux) that implements this pattern in Kotlin. It provides:
+We've built a library called [flowdux-remote](https://github.com/chibimoons/flowdux) that implements this pattern in Kotlin. It provides:
 
 - **Type-safe wire contracts** via `sealed interface` with directional markers (`ServerSharedAction` / `ClientSharedAction`)
 - **Automatic state synchronization** — the server calls `serve {}` and state changes are pushed to clients
@@ -262,4 +262,4 @@ In **Part 3**, we'll push the pattern to its limits: multiple rooms, player-spec
 
 *If this idea resonates — or if you think it's completely wrong — I'd love to hear from you. The best patterns emerge from honest debate.*
 
-*[Follow me on Medium](#) for Parts 2 and 3.*
+*Continue to [Part 2](./part2-practice-en.md) and [Part 3](./part3-scaling-en.md).*

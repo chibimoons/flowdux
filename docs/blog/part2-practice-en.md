@@ -2,13 +2,13 @@
 
 *From concept to working code — designing a chat app with actions and state instead of endpoints*
 
-*This is Part 2 of a 3-part series. [← Part 1: What if You Never Had to Design a REST API Again?](#) | [Part 3: Scaling Action/State →](#)*
+*This is Part 2 of a 3-part series. [← Part 1: What if You Never Had to Design a REST API Again?](./part1-concept-en.md) | [Part 3: Scaling Action/State →](./part3-scaling-en.md)*
 
 > **Note:** This series is a *concept proposal*. It explores the Action/State model as an alternative communication pattern — not a universal replacement for REST. We're sharing an idea and inviting discussion.
 
 ---
 
-In [Part 1](#), we proposed a radical simplification: instead of designing REST endpoints, design **Actions** (what users do) and **State** (what changes as a result). Real-time sync comes for free, the entire API contract fits in a single `sealed interface`, and you skip a whole category of design decisions — URLs, HTTP methods, status codes, DTOs.
+In [Part 1](./part1-concept-en.md), we proposed a radical simplification: instead of designing REST endpoints, design **Actions** (what users do) and **State** (what changes as a result). Real-time sync comes for free, the entire API contract fits in a single `sealed interface`, and you skip a whole category of design decisions — URLs, HTTP methods, status codes, DTOs.
 
 Bold claim. Let's prove it by building something real.
 
@@ -494,7 +494,7 @@ No status codes to memorize. No error response format to design separately. Erro
 
 ## A Note on flowdux-remote
 
-All the code in this post uses [flowdux-remote](https://github.com/user/flowdux), a Kotlin library we built as a reference implementation of the Action/State pattern. It provides:
+All the code in this post uses [flowdux-remote](https://github.com/chibimoons/flowdux), a Kotlin library we built as a reference implementation of the Action/State pattern. It provides:
 
 - `ServerRemoteMiddleware` / `ClientRemoteMiddleware` — handle serialization and WebSocket transport
 - `serve {}` — observe state changes and push to clients
@@ -520,6 +520,5 @@ In **Part 3**, we'll tackle all of these. We'll scale the Action/State model fro
 
 ---
 
-*This is Part 2 of a 3-part series. [← Part 1: What if You Never Had to Design a REST API Again?](#) | [Part 3: Scaling Action/State →](#)*
+*This is Part 2 of a 3-part series. [← Part 1: What if You Never Had to Design a REST API Again?](./part1-concept-en.md) | [Part 3: Scaling Action/State →](./part3-scaling-en.md)*
 
-*[Follow me on Medium](#) for Part 3.*

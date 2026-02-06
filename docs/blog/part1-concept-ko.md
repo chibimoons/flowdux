@@ -2,7 +2,7 @@
 
 *Action/State 모델로 클라이언트-서버 통신을 다시 생각하다*
 
-*3부작 시리즈의 Part 1입니다. [Part 2: REST 없이 실시간 채팅 만들기 →](#) | [Part 3: Action/State 스케일링 →](#)*
+*3부작 시리즈의 Part 1입니다. [Part 2: REST 없이 실시간 채팅 만들기 →](./part2-practice-ko.md) | [Part 3: Action/State 스케일링 →](./part3-scaling-ko.md)*
 
 > **안내:** 이 시리즈는 *개념 제안*입니다. 클라이언트-서버 통신의 대안 패턴으로서 Action/State 모델을 소개합니다 — 모든 상황에서 REST를 대체하자는 주장이 아닙니다. 아키텍처 아이디어를 공유하고 토론을 이끌어내는 것이 목적입니다.
 
@@ -218,7 +218,7 @@ data class ActionFailed(
 
 ## 참조 구현
 
-우리는 이 패턴을 Kotlin으로 구현한 [flowdux-remote](https://github.com/user/flowdux)라는 라이브러리를 만들었습니다. 제공하는 것:
+우리는 이 패턴을 Kotlin으로 구현한 [flowdux-remote](https://github.com/chibimoons/flowdux)라는 라이브러리를 만들었습니다. 제공하는 것:
 
 - **타입 안전한 와이어 계약** — `sealed interface`와 방향 마커(`ServerSharedAction` / `ClientSharedAction`)
 - **자동 상태 동기화** — 서버에서 `serve {}`를 호출하면 상태 변경이 클라이언트에 푸시
@@ -262,4 +262,4 @@ REST는 자원 지향적입니다: *명사*(users, messages, rooms)를 모델링
 
 *이 아이디어가 공감되든, 완전히 틀렸다고 생각하든 — 의견을 듣고 싶습니다. 최고의 패턴은 솔직한 토론에서 나옵니다.*
 
-*Part 2, 3은 [Medium에서 팔로우](#)해 주세요.*
+*Part 2, 3은 [Part 2](./part2-practice-ko.md)와 [Part 3](./part3-scaling-ko.md)에서 확인해 주세요.*
