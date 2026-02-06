@@ -8,9 +8,12 @@ import io.flowdux.remote.server.createRemoteServer
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatState
 import io.flowdux.sample.chat.SharedChatAction
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
@@ -52,6 +55,26 @@ fun main() {
         install(WebSockets)
 
         routing {
+            // NOTE: These admin endpoints are intentionally unprotected for demo purposes.
+            // In production, add authentication (e.g., API key, JWT, or admin session).
+
+            // Admin endpoint for system announcements
+            post("/announce") {
+                val message = call.receiveText()
+                session.broadcast(SharedChatAction.SystemAnnouncement(message))
+                println("[Server] Announcement: $message")
+                call.respond(HttpStatusCode.OK, "Announcement sent")
+            }
+
+            // Admin endpoint for maintenance mode
+            post("/maintenance/{enabled}") {
+                val enabled = call.parameters["enabled"]?.toBoolean() ?: false
+                val message = if (enabled) "Server entering maintenance mode" else "Server maintenance complete"
+                session.broadcast(SharedChatAction.SystemAnnouncement(message))
+                println("[Server] Maintenance mode: $enabled")
+                call.respond(HttpStatusCode.OK, "Maintenance mode: $enabled")
+            }
+
             webSocket("/chat") {
                 val sessionId = UUID.randomUUID().toString()
                 println("[Server] Client connected: $sessionId")

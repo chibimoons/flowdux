@@ -18,6 +18,7 @@ sealed interface SharedChatAction : ChatAction {
 
     // Server → Client
     @Serializable data class SyncState(val state: ChatState) : SharedChatAction, ClientSharedAction
+    @Serializable data class SystemAnnouncement(val message: String) : SharedChatAction, ClientSharedAction
 }
 
 // -- State --

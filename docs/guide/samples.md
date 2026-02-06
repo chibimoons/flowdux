@@ -184,6 +184,26 @@ WASM으로 컴파일된 Counter 앱입니다.
 # 또는 이름 지정: ./gradlew :kotlin:sample-remote-multi:client:run --args="Alice"
 ```
 
+### 시스템 공지 (System Announcements)
+
+서버에서 연결된 모든 클라이언트에게 시스템 공지를 보낼 수 있습니다:
+
+```bash
+# 공지 보내기
+curl -X POST http://localhost:8080/announce -d "서버 점검 예정"
+
+# 점검 모드 전환
+curl -X POST http://localhost:8080/maintenance/true
+curl -X POST http://localhost:8080/maintenance/false
+```
+
+클라이언트에서 확인:
+```
+  *** SYSTEM: 서버 점검 예정 ***
+```
+
+이 기능은 `RemoteServer.broadcast()`를 사용하여 구현됩니다. 자세한 내용은 [Remote 가이드](./remote.md#2-server-setup)를 참조하세요.
+
 ---
 
 ## Remote Multi-Room Sample
