@@ -202,7 +202,7 @@ curl -X POST http://localhost:8080/maintenance/false
   *** SYSTEM: 서버 점검 예정 ***
 ```
 
-이 기능은 `RemoteServer.broadcast()`를 사용하여 구현됩니다. 자세한 내용은 [Remote 가이드](./remote.md#multi-client-server)를 참조하세요.
+이 기능은 `RemoteServer.broadcast()`를 사용하여 구현됩니다. 자세한 내용은 [Remote 가이드](./remote.md#2-server-setup)를 참조하세요.
 
 ---
 
