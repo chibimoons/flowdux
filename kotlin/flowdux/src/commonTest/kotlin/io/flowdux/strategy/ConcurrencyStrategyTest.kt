@@ -519,6 +519,7 @@ class ConcurrencyStrategyTest {
 
         @Test
         fun `takeLatest cancels previous execution with real dispatcher`() = runBlocking {
+            // Large timing margins are needed for CI (especially iosSimulatorArm64).
             val executionOrder = mutableListOf<String>()
             val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
@@ -526,7 +527,7 @@ class ConcurrencyStrategyTest {
                 override val processors = buildProcessors {
                     on<TestAction.Fetch>(takeLatest()) { _, action ->
                         executionOrder.add("start-${action.id}")
-                        delay(100)
+                        delay(500)
                         executionOrder.add("end-${action.id}")
                         emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
                     }
@@ -547,7 +548,7 @@ class ConcurrencyStrategyTest {
 
                     // Dispatch first action
                     store.dispatch(TestAction.Fetch("1"))
-                    delay(30) // Let it start but not complete
+                    delay(200) // Let it start but not complete
 
                     // Dispatch second action - should cancel first
                     store.dispatch(TestAction.Fetch("2"))
@@ -557,7 +558,7 @@ class ConcurrencyStrategyTest {
                     assertEquals(listOf("result-2"), result.values)
 
                     // Give some time for any pending operations
-                    delay(50)
+                    delay(300)
 
                     // Verify first was started but canceled
                     assertTrue(executionOrder.contains("start-1"))

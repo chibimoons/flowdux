@@ -236,12 +236,13 @@ class StrategyGroupTest {
 
     @Test
     fun `group with throttle limits rate across different action types`() = runBlocking {
+        // Large timing margins are needed for CI (especially iosSimulatorArm64).
         val executionOrder = mutableListOf<String>()
         val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
         val middleware = object : Middleware<TestState, TestAction> {
             override val processors = buildProcessors {
-                group(throttle(100.milliseconds)) {
+                group(throttle(500.milliseconds)) {
                     on<TestAction.Fetch> { _, action ->
                         executionOrder.add("fetch-${action.id}")
                         emit(TestAction.FetchSuccess(action.id, action.id))
@@ -271,11 +272,11 @@ class StrategyGroupTest {
                 awaitItem()
 
                 // Second action (different type) within throttle window - should be ignored
-                delay(30)
+                delay(100)
                 store.dispatch(TestAction.Search("query"))
 
                 // Third action after throttle window - should execute
-                delay(100)
+                delay(800)
                 store.dispatch(TestAction.Search("query2"))
                 awaitItem()
 

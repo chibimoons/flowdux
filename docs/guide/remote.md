@@ -35,35 +35,119 @@ flowchart LR
 Add the relevant modules to your `build.gradle.kts`:
 
 ```kotlin
-dependencies {
-    // Shared action markers (ServerSharedAction, ClientSharedAction)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-core:1.8.2")
-    // Client middleware (ClientRemoteMiddleware)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-client:1.8.2")
-    // Server middleware (ServerRemoteMiddleware)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-server:1.8.2")
-    // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-serialization:1.8.2")
-    // Ktor WebSocket transport
-    implementation("com.github.chibimoons.flowdux:flowdux-remote-ktor:1.8.2")
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            // Shared action markers (ServerSharedAction, ClientSharedAction)
+            implementation("io.github.chibimoons:flowdux-remote-core:1.12.0")
+            // Client middleware (ClientRemoteMiddleware)
+            implementation("io.github.chibimoons:flowdux-remote-client:1.12.0")
+            // Server middleware (ServerRemoteMiddleware)
+            implementation("io.github.chibimoons:flowdux-remote-server:1.12.0")
+            // kotlinx.serialization codecs (ActionCodec, MessageCodec)
+            implementation("io.github.chibimoons:flowdux-remote-serialization:1.12.0")
+            // Ktor WebSocket transport (JVM, iOS, JS — WASM not supported)
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.12.0")
+        }
+    }
 }
 ```
+
+## Version Compatibility
+
+FlowDux remote modules require matching Kotlin and serialization versions:
+
+| Dependency | Version |
+|------------|---------|
+| Kotlin | 2.2.10 |
+| kotlinx-serialization-json | 1.7.3 |
+
+```kotlin
+plugins {
+    kotlin("multiplatform") version "2.2.10"
+    kotlin("plugin.serialization") version "2.2.10"
+}
+
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+        }
+    }
+}
+```
+
+**Important:** Using different Kotlin versions between your project and FlowDux may cause compilation errors on JS/iOS targets due to metadata incompatibility.
 
 ## 1. Define Shared Actions
 
-Actions shared between client and server use direction markers:
+Actions shared between client and server use direction markers.
+
+### Recommended Pattern
+
+Define a `@Serializable sealed interface` for your shared actions, with each variant implementing the appropriate direction marker:
 
 ```kotlin
+import io.flowdux.Action
+import io.flowdux.State
+import io.flowdux.remote.ServerSharedAction
+import io.flowdux.remote.ClientSharedAction
+import kotlinx.serialization.Serializable
+
+// Base action interface for your domain (non-sealed allows extension)
+interface ChatAction : Action
+
+// Shared actions with serialization support
 @Serializable
 sealed interface SharedChatAction : ChatAction {
-    // Client → Server
-    @Serializable data class SendMessage(val text: String) : SharedChatAction, ServerSharedAction
-    @Serializable data class JoinRoom(val user: String) : SharedChatAction, ServerSharedAction
+    // Client → Server: implement ServerSharedAction
+    @Serializable
+    data class SendMessage(val user: String, val text: String) : SharedChatAction, ServerSharedAction
 
-    // Server → Client
-    @Serializable data class SyncState(val state: ChatState) : SharedChatAction, ClientSharedAction
+    @Serializable
+    data class JoinRoom(val user: String) : SharedChatAction, ServerSharedAction
+
+    @Serializable
+    data class LeaveRoom(val user: String) : SharedChatAction, ServerSharedAction
+
+    // Server → Client: implement ClientSharedAction
+    @Serializable
+    data class SyncState(val state: ChatState) : SharedChatAction, ClientSharedAction
+}
+
+// State with nested event type (events delivered via SyncState, not as separate actions)
+@Serializable
+data class ChatState(
+    val messages: List<ChatMessage> = emptyList(),
+    val users: Set<String> = emptySet(),
+    val lastEvent: ChatEvent? = null,
+) : State
+
+@Serializable
+data class ChatMessage(val user: String, val text: String)
+
+@Serializable
+sealed interface ChatEvent {
+    @Serializable data class UserJoined(val user: String) : ChatEvent
+    @Serializable data class UserLeft(val user: String) : ChatEvent
+    @Serializable data class MessageReceived(val user: String, val text: String) : ChatEvent
+}
+
+// Local-only actions (not sent over network)
+sealed interface LocalChatAction : ChatAction {
+    data object Connect : LocalChatAction
+    data object Disconnect : LocalChatAction
+    data class SetError(val message: String) : LocalChatAction
 }
 ```
+
+### Key Points
+
+1. **`@Serializable` on sealed interface** — Required for polymorphic serialization
+2. **`@Serializable` on each variant** — Each data class needs its own annotation
+3. **Direction markers** — `ServerSharedAction` for client→server, `ClientSharedAction` for server→client
+4. **State sync pattern** — Events like `MessageReceived` are delivered inside `ChatState` via `SyncState`, not as separate shared actions
+5. **Local actions** — Actions not shared don't need serialization or markers
 
 ## 2. Server Setup
 
@@ -102,4 +186,9 @@ store.dispatch(ClientChatAction.Connect)
 store.dispatch(SharedChatAction.SendMessage("Hello!"))
 ```
 
-See `kotlin/samples/remote-chat` for the complete working example.
+See `kotlin/samples/flowdux-remote` for complete working examples.
+
+## Next Steps
+
+- [Room Store Pattern](./room-store.md) — Multi-room management, session-aware broadcasting
+- [Server Architecture Patterns](../design/server-architecture-patterns.md) — Central Store, Room Store, Per-Client Store patterns

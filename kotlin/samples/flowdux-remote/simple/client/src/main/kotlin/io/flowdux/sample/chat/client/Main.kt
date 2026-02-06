@@ -2,9 +2,9 @@ package io.flowdux.sample.chat.client
 
 import io.flowdux.Store
 import io.flowdux.createStore
-import io.flowdux.remote.TypedClientConnection
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.serialization.typedJson
+import io.flowdux.remote.serialization.upcast
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatEvent
 import io.flowdux.sample.chat.SharedChatAction
@@ -77,13 +77,12 @@ fun main() = runBlocking {
     println("=== Demo Complete ===")
 }
 
-@Suppress("UNCHECKED_CAST")
 private fun createChatStore(): Store<ClientChatState, ChatAction> {
     val connection = KtorWebSocketClientConnection.create(
         host = "localhost",
         port = 8080,
         path = "/chat",
-    ).typedJson<SharedChatAction>() as TypedClientConnection<ChatAction>
+    ).typedJson<SharedChatAction>().upcast<SharedChatAction, ChatAction>()
     return createStore(
         initialState = ClientChatState(),
         reducer = clientChatReducer,
