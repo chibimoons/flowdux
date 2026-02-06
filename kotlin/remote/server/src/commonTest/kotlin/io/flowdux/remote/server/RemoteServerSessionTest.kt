@@ -224,4 +224,116 @@ class RemoteServerSessionTest {
 
         job.cancel()
     }
+
+    // -- Parallel Broadcast Tests --
+
+    @Test
+    fun `parallel broadcast sends action to all clients`() = runTest {
+        val conn1 = MockTypedServerConnection<ServerAction>()
+        val conn2 = MockTypedServerConnection<ServerAction>()
+        val conn3 = MockTypedServerConnection<ServerAction>()
+
+        val server = createRemoteServer(
+            initialState = ServerState(),
+            reducer = serverReducer,
+            stateMapper = { ServerAction.SyncState(it) },
+            broadcastConfig = BroadcastConfig(concurrency = 4),
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        val job1 = backgroundScope.launch { server.handleClient("client-1", conn1) }
+        val job2 = backgroundScope.launch { server.handleClient("client-2", conn2) }
+        val job3 = backgroundScope.launch { server.handleClient("client-3", conn3) }
+        delay(100)
+
+        // Clear any initial SyncState
+        conn1.sentActions.clear()
+        conn2.sentActions.clear()
+        conn3.sentActions.clear()
+
+        server.broadcast(ServerAction.Add(42))
+
+        assertEquals(1, conn1.sentActions.size)
+        assertEquals(1, conn2.sentActions.size)
+        assertEquals(1, conn3.sentActions.size)
+        assertEquals(ServerAction.Add(42), conn1.sentActions[0])
+        assertEquals(ServerAction.Add(42), conn2.sentActions[0])
+        assertEquals(ServerAction.Add(42), conn3.sentActions[0])
+
+        job1.cancel()
+        job2.cancel()
+        job3.cancel()
+    }
+
+    @Test
+    fun `parallel broadcast with custom session registry`() = runTest {
+        val conn1 = MockTypedServerConnection<ServerAction>()
+        val conn2 = MockTypedServerConnection<ServerAction>()
+
+        val customRegistry = InMemorySessionRegistry<ServerAction>()
+
+        val server = createRemoteServer(
+            initialState = ServerState(),
+            reducer = serverReducer,
+            stateMapper = { ServerAction.SyncState(it) },
+            sessionRegistry = customRegistry,
+            broadcastConfig = BroadcastConfig(concurrency = 16),
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        val job1 = backgroundScope.launch { server.handleClient("client-1", conn1) }
+        val job2 = backgroundScope.launch { server.handleClient("client-2", conn2) }
+        delay(100)
+
+        // Verify sessions are in our custom registry
+        assertEquals(2, customRegistry.sessionCount())
+        assertTrue(customRegistry.sessionIds().contains("client-1"))
+        assertTrue(customRegistry.sessionIds().contains("client-2"))
+
+        // Clear any initial SyncState
+        conn1.sentActions.clear()
+        conn2.sentActions.clear()
+
+        server.broadcast(ServerAction.Add(99))
+
+        assertEquals(1, conn1.sentActions.size)
+        assertEquals(1, conn2.sentActions.size)
+        assertEquals(ServerAction.Add(99), conn1.sentActions[0])
+        assertEquals(ServerAction.Add(99), conn2.sentActions[0])
+
+        job1.cancel()
+        job2.cancel()
+    }
+
+    @Test
+    fun `BroadcastConfig validates concurrency`() {
+        // Valid configs
+        BroadcastConfig(concurrency = 1)
+        BroadcastConfig(concurrency = 16)
+        BroadcastConfig(concurrency = 100)
+
+        // Invalid config should throw
+        try {
+            BroadcastConfig(concurrency = 0)
+            error("Expected IllegalArgumentException")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message?.contains("concurrency") == true)
+        }
+
+        try {
+            BroadcastConfig(concurrency = -1)
+            error("Expected IllegalArgumentException")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message?.contains("concurrency") == true)
+        }
+    }
+
+    @Test
+    fun `BroadcastConfig companion presets are valid`() {
+        assertEquals(1, BroadcastConfig.Sequential.concurrency)
+        assertEquals(16, BroadcastConfig.Default.concurrency)
+        assertEquals(64, BroadcastConfig.HighThroughput.concurrency)
+    }
 }

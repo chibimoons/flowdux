@@ -18,11 +18,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
- * Combines a [Store], [RemoteServerSession], and state broadcasting into a single object.
+ * Combines a [Store], [SessionRegistry], [SessionBroadcaster], and state broadcasting into a single object.
  *
  * Created by [createRemoteServer] or [createSessionAwareRemoteServer].
  *
- * Example:
+ * Example (default - sequential broadcast):
  * ```kotlin
  * val server = createRemoteServer(
  *     initialState = ServerChatState(),
@@ -30,23 +30,75 @@ import kotlinx.coroutines.launch
  *     stateMapper = { state -> SyncState(state.toChatState()) },
  *     scope = applicationScope,
  * )
+ * ```
  *
- * // In WebSocket handler:
+ * Example (parallel broadcast for high throughput):
+ * ```kotlin
+ * val server = createRemoteServer(
+ *     initialState = ServerChatState(),
+ *     reducer = serverChatReducer,
+ *     stateMapper = { state -> SyncState(state.toChatState()) },
+ *     broadcastConfig = BroadcastConfig(concurrency = 32),
+ *     scope = applicationScope,
+ * )
+ * ```
+ *
+ * Example (custom session registry for distributed deployments):
+ * ```kotlin
+ * val server = createRemoteServer(
+ *     initialState = ServerChatState(),
+ *     reducer = serverChatReducer,
+ *     stateMapper = { state -> SyncState(state.toChatState()) },
+ *     sessionRegistry = RedisSessionRegistry(redis, codec),
+ *     broadcastConfig = BroadcastConfig(concurrency = 64),
+ *     scope = applicationScope,
+ * )
+ * ```
+ *
+ * In WebSocket handler:
+ * ```kotlin
  * webSocket("/chat") {
  *     val connection = KtorWebSocketServerConnection(this)
  *         .typedJson<SharedChatAction>() as TypedServerConnection<ChatAction>
  *     server.handleClient(sessionId, connection)
  * }
+ * ```
  *
- * // Shutdown:
+ * Shutdown:
+ * ```kotlin
  * server.close()
  * ```
  */
 class RemoteServer<S : State, A : Action> internal constructor(
-    val session: RemoteServerSession<A>,
+    /**
+     * The session registry managing client connections.
+     */
+    val sessionRegistry: SessionRegistry<A>,
+    /**
+     * The broadcaster for sending actions to clients.
+     */
+    val broadcaster: SessionBroadcaster<A>,
+    /**
+     * The underlying store.
+     */
     val store: Store<S, A>,
     private val serveJob: Job,
 ) {
+    /**
+     * Legacy access to session management.
+     * @deprecated Use [sessionRegistry] and [broadcaster] instead.
+     */
+    @Deprecated(
+        message = "Use sessionRegistry and broadcaster instead",
+        replaceWith = ReplaceWith("sessionRegistry"),
+        level = DeprecationLevel.WARNING,
+    )
+    val session: RemoteServerSession<A>
+        get() = when (val registry = sessionRegistry) {
+            is RemoteServerSession -> registry
+            else -> error("sessionRegistry is not a RemoteServerSession. Use sessionRegistry directly.")
+        }
+
     /** Current server state as a reactive flow. */
     val state: StateFlow<S> get() = store.state
 
@@ -54,16 +106,16 @@ class RemoteServer<S : State, A : Action> internal constructor(
     val currentState: S get() = store.currentState
 
     /** Snapshot of currently connected session IDs. */
-    suspend fun sessionIds(): Set<String> = session.sessionIds()
+    suspend fun sessionIds(): Set<String> = sessionRegistry.sessionIds()
 
     /** Number of currently connected sessions. */
-    suspend fun sessionCount(): Int = session.sessionCount()
+    suspend fun sessionCount(): Int = sessionRegistry.sessionCount()
 
     /**
      * Handle a client connection.
      *
      * Dispatches [InternalAddSession] to start listening for incoming messages,
-     * registers the session in [RemoteServerSession], suspends until cancelled,
+     * registers the session in [SessionRegistry], suspends until cancelled,
      * then cleans up the session.
      *
      * @param sessionId Unique identifier for this client session.
@@ -75,7 +127,12 @@ class RemoteServer<S : State, A : Action> internal constructor(
         connection: TypedServerConnection<A>,
     ) {
         store.dispatch(InternalAddSession(sessionId, connection) as A)
-        session.handleClient(sessionId, connection)
+        sessionRegistry.addSession(sessionId, connection)
+        try {
+            kotlinx.coroutines.awaitCancellation()
+        } finally {
+            sessionRegistry.removeSession(sessionId)
+        }
     }
 
     /**
@@ -83,14 +140,16 @@ class RemoteServer<S : State, A : Action> internal constructor(
      * No-op if the session does not exist.
      */
     suspend fun sendToClient(sessionId: String, action: A) {
-        session.sendToClient(sessionId, action)
+        broadcaster.sendToClient(sessionId, action)
     }
 
     /**
      * Send an action to all connected clients.
+     *
+     * Uses parallel sending if configured with [BroadcastConfig.concurrency] > 1.
      */
     suspend fun broadcast(action: A) {
-        session.broadcast(action)
+        broadcaster.broadcast(action)
     }
 
     /**
@@ -105,13 +164,15 @@ class RemoteServer<S : State, A : Action> internal constructor(
 /**
  * Create a [RemoteServer] that manages a single [Store] serving multiple clients.
  *
- * Internally creates the session registry, middleware, store, and state broadcasting coroutine.
+ * Internally creates the session registry, broadcaster, middleware, store, and state broadcasting coroutine.
  *
  * @param initialState Initial state for the store.
  * @param reducer Reducer for processing actions.
  * @param processors Action processors for server-side action handling.
  * @param stateMapper Maps server state to an action (typically a [ClientSharedAction][io.flowdux.remote.ClientSharedAction])
  *   that will be broadcast to all clients on state change.
+ * @param sessionRegistry Session registry for storing client connections. Defaults to [InMemorySessionRegistry].
+ * @param broadcastConfig Configuration for broadcast behavior. Defaults to sequential.
  * @param errorProcessor Error processor for the store.
  * @param logger Logger for the store.
  * @param scope Coroutine scope for the store and state broadcasting.
@@ -121,12 +182,14 @@ fun <S : State, A : Action> createRemoteServer(
     reducer: Reducer<S, A>,
     processors: ActionProcessorMap<S, A> = emptyMap(),
     stateMapper: (S) -> A,
+    sessionRegistry: SessionRegistry<A> = InMemorySessionRegistry(),
+    broadcastConfig: BroadcastConfig = BroadcastConfig.Sequential,
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
     logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ): RemoteServer<S, A> {
-    val session = RemoteServerSession<A>()
-    val middleware = MultiClientServerRemoteMiddleware<S, A>(processors, session)
+    val broadcaster = SessionBroadcaster(sessionRegistry, broadcastConfig)
+    val middleware = MultiClientServerRemoteMiddleware<S, A>(processors, broadcaster)
 
     val store = createStore(
         initialState = initialState,
@@ -142,7 +205,8 @@ fun <S : State, A : Action> createRemoteServer(
     }
 
     return RemoteServer(
-        session = session,
+        sessionRegistry = sessionRegistry,
+        broadcaster = broadcaster,
         store = store,
         serveJob = serveJob,
     )
@@ -163,6 +227,8 @@ fun <S : State, A : Action> createRemoteServer(
  * @param processors Action processors for server-side action handling.
  * @param sessionStateMapper Maps server state and session ID to an action for that session,
  *   or `null` to skip sending to that session.
+ * @param sessionRegistry Session registry for storing client connections. Defaults to [InMemorySessionRegistry].
+ * @param broadcastConfig Configuration for broadcast behavior. Defaults to sequential.
  * @param errorProcessor Error processor for the store.
  * @param logger Logger for the store.
  * @param scope Coroutine scope for the store and state broadcasting.
@@ -172,12 +238,14 @@ fun <S : State, A : Action> createSessionAwareRemoteServer(
     reducer: Reducer<S, A>,
     processors: ActionProcessorMap<S, A> = emptyMap(),
     sessionStateMapper: (S, String) -> A?,
+    sessionRegistry: SessionRegistry<A> = InMemorySessionRegistry(),
+    broadcastConfig: BroadcastConfig = BroadcastConfig.Sequential,
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
     logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ): RemoteServer<S, A> {
-    val session = RemoteServerSession<A>()
-    val middleware = MultiClientServerRemoteMiddleware<S, A>(processors, session)
+    val broadcaster = SessionBroadcaster(sessionRegistry, broadcastConfig)
+    val middleware = MultiClientServerRemoteMiddleware<S, A>(processors, broadcaster)
 
     val store = createStore(
         initialState = initialState,
@@ -190,14 +258,15 @@ fun <S : State, A : Action> createSessionAwareRemoteServer(
 
     val serveJob = scope.launch {
         store.state.collect { state ->
-            session.sendPerSession { sessionId ->
+            broadcaster.sendPerSession { sessionId ->
                 sessionStateMapper(state, sessionId)
             }
         }
     }
 
     return RemoteServer(
-        session = session,
+        sessionRegistry = sessionRegistry,
+        broadcaster = broadcaster,
         store = store,
         serveJob = serveJob,
     )

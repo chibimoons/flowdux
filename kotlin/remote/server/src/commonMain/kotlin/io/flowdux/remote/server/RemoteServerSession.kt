@@ -1,10 +1,7 @@
 package io.flowdux.remote.server
 
 import io.flowdux.Action
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
  * Manages client session connections for a remote server.
@@ -14,40 +11,64 @@ import kotlinx.coroutines.sync.withLock
  * - Sending actions to specific clients or broadcasting to all
  * - Tracking connected session IDs
  *
+ * Implements [SessionRegistry] for session storage, delegating to an internal
+ * [InMemorySessionRegistry] by default. Uses [SessionBroadcaster] for sending
+ * actions, supporting both sequential and parallel broadcast modes.
+ *
  * Does NOT own the Store or middleware — those are wired externally
  * (see [createRemoteServer]).
  *
  * Example:
  * ```kotlin
+ * // Default: sequential broadcast
  * val session = RemoteServerSession<ChatAction>()
+ *
+ * // With parallel broadcast for high throughput
+ * val session = RemoteServerSession<ChatAction>(
+ *     broadcastConfig = BroadcastConfig(concurrency = 32)
+ * )
+ *
  * val middleware = MultiClientServerRemoteMiddleware(processors, session)
  * val store = createStore(middlewares = listOf(middleware), ...)
  * ```
+ *
+ * @param registry The session registry to use for storage. Defaults to [InMemorySessionRegistry].
+ * @param broadcastConfig Configuration for broadcast behavior. Defaults to sequential.
  */
-class RemoteServerSession<A : Action> {
+class RemoteServerSession<A : Action>(
+    private val registry: SessionRegistry<A> = InMemorySessionRegistry(),
+    broadcastConfig: BroadcastConfig = BroadcastConfig.Sequential,
+) : SessionRegistry<A> {
 
-    private val sessions = mutableMapOf<String, TypedServerConnection<A>>()
-    private val mutex = Mutex()
-
-    /** Snapshot of currently connected session IDs. */
-    suspend fun sessionIds(): Set<String> = mutex.withLock { sessions.keys.toSet() }
-
-    /** Number of currently connected sessions. */
-    suspend fun sessionCount(): Int = mutex.withLock { sessions.size }
+    private val broadcaster = SessionBroadcaster(registry, broadcastConfig)
 
     /**
-     * Register a client session.
+     * Secondary constructor for backward compatibility.
+     * Uses [InMemorySessionRegistry] and sequential broadcast.
      */
-    suspend fun addSession(sessionId: String, connection: TypedServerConnection<A>) {
-        mutex.withLock { sessions[sessionId] = connection }
+    constructor() : this(InMemorySessionRegistry(), BroadcastConfig.Sequential)
+
+    // -- SessionRegistry delegation --
+
+    override suspend fun sessionIds(): Set<String> = registry.sessionIds()
+
+    override suspend fun sessionCount(): Int = registry.sessionCount()
+
+    override suspend fun addSession(sessionId: String, connection: TypedServerConnection<A>) {
+        registry.addSession(sessionId, connection)
     }
 
-    /**
-     * Unregister a client session.
-     */
-    suspend fun removeSession(sessionId: String) {
-        mutex.withLock { sessions.remove(sessionId) }
+    override suspend fun removeSession(sessionId: String) {
+        registry.removeSession(sessionId)
     }
+
+    override suspend fun getSession(sessionId: String): TypedServerConnection<A>? =
+        registry.getSession(sessionId)
+
+    override suspend fun getSessions(): Map<String, TypedServerConnection<A>> =
+        registry.getSessions()
+
+    // -- Client handling --
 
     /**
      * Handle a client connection lifecycle.
@@ -73,36 +94,24 @@ class RemoteServerSession<A : Action> {
         }
     }
 
+    // -- Broadcasting (delegated to SessionBroadcaster) --
+
     /**
      * Send an action to a specific client by session ID.
      * No-op if the session does not exist.
      */
     suspend fun sendToClient(sessionId: String, action: A) {
-        val connection = mutex.withLock { sessions[sessionId] } ?: return
-        try {
-            connection.send(action)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            // Isolate send failures
-        }
+        broadcaster.sendToClient(sessionId, action)
     }
 
     /**
      * Send an action to all connected clients.
+     *
+     * Uses parallel sending if configured with [BroadcastConfig.concurrency] > 1.
      * Errors on individual connections are caught and do not affect others.
      */
     suspend fun broadcast(action: A) {
-        val snapshot = mutex.withLock { sessions.values.toList() }
-        for (connection in snapshot) {
-            try {
-                connection.send(action)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // Isolate per-client send failures
-            }
-        }
+        broadcaster.broadcast(action)
     }
 
     /**
@@ -110,19 +119,11 @@ class RemoteServerSession<A : Action> {
      *
      * For each session, calls [mapper] to produce the action for that session.
      * If [mapper] returns `null`, the session is skipped.
+     *
+     * Uses parallel sending if configured with [BroadcastConfig.concurrency] > 1.
      * Errors on individual connections are caught and do not affect others.
      */
     internal suspend fun sendPerSession(mapper: (sessionId: String) -> A?) {
-        val snapshot = mutex.withLock { sessions.toMap() }
-        for ((sessionId, connection) in snapshot) {
-            try {
-                val sessionAction = mapper(sessionId) ?: continue
-                connection.send(sessionAction)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                // Isolate per-client send failures
-            }
-        }
+        broadcaster.sendPerSession(mapper)
     }
 }

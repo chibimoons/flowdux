@@ -190,5 +190,7 @@ See `kotlin/samples/flowdux-remote` for complete working examples.
 
 ## Next Steps
 
+- [Scaling Architecture](./scaling.md) — Parallel broadcast, 100k+ connections
 - [Room Store Pattern](./room-store.md) — Multi-room management, session-aware broadcasting
+- [Per-Client Store Pattern](./per-client-store.md) — Private state per client (poker hands, portfolios)
 - [Server Architecture Patterns](../design/server-architecture-patterns.md) — Central Store, Room Store, Per-Client Store patterns
