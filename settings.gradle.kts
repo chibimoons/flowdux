@@ -89,6 +89,16 @@ include(":kotlin:sample-remote-scaling:server")
 project(":kotlin:sample-remote-scaling").projectDir = file("kotlin/samples/flowdux-remote/scaling")
 project(":kotlin:sample-remote-scaling:server").projectDir = file("kotlin/samples/flowdux-remote/scaling/server")
 
+include(":kotlin:sample-remote-poker:shared")
+project(":kotlin:sample-remote-poker").projectDir = file("kotlin/samples/flowdux-remote/poker")
+project(":kotlin:sample-remote-poker:shared").projectDir = file("kotlin/samples/flowdux-remote/poker/shared")
+
+include(":kotlin:sample-remote-poker:server")
+project(":kotlin:sample-remote-poker:server").projectDir = file("kotlin/samples/flowdux-remote/poker/server")
+
+include(":kotlin:sample-remote-poker:client")
+project(":kotlin:sample-remote-poker:client").projectDir = file("kotlin/samples/flowdux-remote/poker/client")
+
 // ── Benchmark ──
 include(":kotlin:flowdux-benchmark")
 project(":kotlin:flowdux-benchmark").projectDir = file("kotlin/benchmark")
