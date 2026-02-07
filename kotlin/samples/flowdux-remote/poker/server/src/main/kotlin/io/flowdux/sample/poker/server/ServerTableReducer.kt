@@ -5,10 +5,11 @@ import io.flowdux.buildReducer
 import io.flowdux.sample.poker.Card
 import io.flowdux.sample.poker.GamePhase
 import io.flowdux.sample.poker.PokerAction
+import io.flowdux.sample.poker.SharedPokerAction
 import io.flowdux.sample.poker.TableEvent
 
 val serverTableReducer: Reducer<ServerTableState, PokerAction> = buildReducer {
-    on<ServerPokerAction.PlayerJoined> { state, action ->
+    on<SharedPokerAction.JoinTable> { state, action ->
         val newPlayer = ServerPlayerInfo(
             id = action.playerId,
             name = action.playerId,
@@ -58,7 +59,7 @@ val serverTableReducer: Reducer<ServerTableState, PokerAction> = buildReducer {
         )
     }
 
-    on<ServerPokerAction.PlayerBet> { state, action ->
+    on<SharedPokerAction.PlaceBet> { state, action ->
         val player = state.players[action.playerId] ?: return@on state
         val betAmount = action.amount.coerceAtMost(player.chips)
         val isAllIn = betAmount >= player.chips
@@ -80,7 +81,7 @@ val serverTableReducer: Reducer<ServerTableState, PokerAction> = buildReducer {
         )
     }
 
-    on<ServerPokerAction.PlayerFolded> { state, action ->
+    on<SharedPokerAction.Fold> { state, action ->
         val player = state.players[action.playerId] ?: return@on state
         val updatedPlayer = player.copy(folded = true)
 
@@ -91,14 +92,14 @@ val serverTableReducer: Reducer<ServerTableState, PokerAction> = buildReducer {
         )
     }
 
-    on<ServerPokerAction.PlayerChecked> { state, action ->
+    on<SharedPokerAction.Check> { state, action ->
         state.copy(
             currentTurnIndex = (state.currentTurnIndex + 1) % state.activePlayerIds.size.coerceAtLeast(1),
             lastEvent = TableEvent.PlayerChecked(action.playerId),
         )
     }
 
-    on<ServerPokerAction.PlayerCalled> { state, action ->
+    on<SharedPokerAction.Call> { state, action ->
         val player = state.players[action.playerId] ?: return@on state
         val callAmount = (state.minimumBet - player.currentBet).coerceAtMost(player.chips)
         val isAllIn = callAmount >= player.chips

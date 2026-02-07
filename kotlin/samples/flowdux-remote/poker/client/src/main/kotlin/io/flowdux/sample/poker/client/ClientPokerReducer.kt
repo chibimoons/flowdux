@@ -23,9 +23,4 @@ val clientPokerReducer: Reducer<ClientPokerState, PokerAction> = buildReducer {
     on<SharedPokerAction.SyncHand> { state, action ->
         state.copy(myHand = action.cards)
     }
-
-    // Set player ID
-    on<ClientPokerAction.SetPlayerId> { state, action ->
-        state.copy(playerId = action.playerId)
-    }
 }

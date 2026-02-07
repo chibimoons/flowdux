@@ -11,12 +11,12 @@ interface PokerAction : Action
 /** Actions that cross the wire between client and server. */
 @Serializable
 sealed interface SharedPokerAction : PokerAction {
-    // Client → Server
+    // Client → Server (player actions include playerId for validation)
     @Serializable data class JoinTable(val playerId: String) : SharedPokerAction, ServerSharedAction
-    @Serializable data class PlaceBet(val amount: Int) : SharedPokerAction, ServerSharedAction
-    @Serializable data object Fold : SharedPokerAction, ServerSharedAction
-    @Serializable data object Check : SharedPokerAction, ServerSharedAction
-    @Serializable data object Call : SharedPokerAction, ServerSharedAction
+    @Serializable data class PlaceBet(val playerId: String, val amount: Int) : SharedPokerAction, ServerSharedAction
+    @Serializable data class Fold(val playerId: String) : SharedPokerAction, ServerSharedAction
+    @Serializable data class Check(val playerId: String) : SharedPokerAction, ServerSharedAction
+    @Serializable data class Call(val playerId: String) : SharedPokerAction, ServerSharedAction
 
     // Server → Client (public information - via Room Store)
     @Serializable data class SyncTableState(val state: PublicTableState) : SharedPokerAction, ClientSharedAction

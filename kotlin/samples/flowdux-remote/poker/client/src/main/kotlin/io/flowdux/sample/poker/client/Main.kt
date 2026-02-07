@@ -65,7 +65,6 @@ fun main(args: Array<String>) = runBlocking {
     }
 
     // Connect and join
-    store.dispatch(ClientPokerAction.SetPlayerId(playerId))
     store.dispatch(ClientPokerAction.Connect)
     delay(500)
     store.dispatch(SharedPokerAction.JoinTable(playerId))
@@ -85,21 +84,21 @@ fun main(args: Array<String>) = runBlocking {
             input == "status" -> printStatus(store)
             input == "fold" -> {
                 if (store.currentState.isMyTurn) {
-                    store.dispatch(SharedPokerAction.Fold)
+                    store.dispatch(SharedPokerAction.Fold(playerId))
                 } else {
                     println("  Not your turn!")
                 }
             }
             input == "check" -> {
                 if (store.currentState.isMyTurn) {
-                    store.dispatch(SharedPokerAction.Check)
+                    store.dispatch(SharedPokerAction.Check(playerId))
                 } else {
                     println("  Not your turn!")
                 }
             }
             input == "call" -> {
                 if (store.currentState.isMyTurn) {
-                    store.dispatch(SharedPokerAction.Call)
+                    store.dispatch(SharedPokerAction.Call(playerId))
                 } else {
                     println("  Not your turn!")
                 }
@@ -107,7 +106,7 @@ fun main(args: Array<String>) = runBlocking {
             input.startsWith("bet ") -> {
                 val amount = input.removePrefix("bet ").toIntOrNull()
                 if (amount != null && store.currentState.isMyTurn) {
-                    store.dispatch(SharedPokerAction.PlaceBet(amount))
+                    store.dispatch(SharedPokerAction.PlaceBet(playerId, amount))
                 } else if (!store.currentState.isMyTurn) {
                     println("  Not your turn!")
                 } else {
@@ -164,7 +163,7 @@ private fun createPokerStore(playerId: String): Store<ClientPokerState, PokerAct
     ).typedJson<SharedPokerAction>().upcast<SharedPokerAction, PokerAction>()
 
     return createStore(
-        initialState = ClientPokerState(),
+        initialState = ClientPokerState(playerId = playerId),
         reducer = clientPokerReducer,
         middlewares = listOf(PokerRemoteMiddleware(connection)),
     )

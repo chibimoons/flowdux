@@ -418,4 +418,5 @@ curl -X POST http://localhost:8080/winner
 - [Scaling Architecture](./scaling.md) — 병렬 브로드캐스트, 대규모 연결
 - [Room Store Pattern](./room-store.md) — 다중 방 관리 패턴 상세
 - [Per-Client Store Pattern](./per-client-store.md) — 비공개 상태 관리 패턴
+- [FlowDux Remote vs Raw WebSocket](./flowdux-remote-vs-raw.md) — Use Case별 비교 및 선택 가이드
 - [Server Architecture Patterns](../design/server-architecture-patterns.md) — 아키텍처 패턴 설계 문서

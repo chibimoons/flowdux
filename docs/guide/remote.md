@@ -194,3 +194,4 @@ See `kotlin/samples/flowdux-remote` for complete working examples.
 - [Room Store Pattern](./room-store.md) — Multi-room management, session-aware broadcasting
 - [Per-Client Store Pattern](./per-client-store.md) — Private state per client (poker hands, portfolios)
 - [Server Architecture Patterns](../design/server-architecture-patterns.md) — Central Store, Room Store, Per-Client Store patterns
+- [FlowDux Remote vs Raw WebSocket](./flowdux-remote-vs-raw.md) — Use case comparison and when to use each approach

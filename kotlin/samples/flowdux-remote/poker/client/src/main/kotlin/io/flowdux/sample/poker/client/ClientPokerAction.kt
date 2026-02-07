@@ -6,5 +6,4 @@ import io.flowdux.sample.poker.PokerAction
 sealed interface ClientPokerAction : PokerAction {
     data object Connect : ClientPokerAction
     data object Disconnect : ClientPokerAction
-    data class SetPlayerId(val playerId: String) : ClientPokerAction
 }
