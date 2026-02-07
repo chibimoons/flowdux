@@ -163,6 +163,12 @@ webSocket("/poker/{playerId}") {
 }
 ```
 
+> **Security Note**: The example above uses `playerId` from the URL path parameter for simplicity.
+> In production, you should use server-controlled, authenticated identities instead of
+> client-provided values. Otherwise, a malicious client could impersonate another player
+> by connecting with their ID. See [WebSocket Authentication](./websocket-authentication.md)
+> for proper authentication patterns.
+
 ## Data Flow
 
 ```

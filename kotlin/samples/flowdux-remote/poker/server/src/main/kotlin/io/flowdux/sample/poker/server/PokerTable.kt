@@ -1,6 +1,7 @@
 package io.flowdux.sample.poker.server
 
 import io.flowdux.Middleware
+import io.flowdux.sequential
 import io.flowdux.remote.server.RemoteServer
 import io.flowdux.remote.server.TypedServerConnection
 import io.flowdux.remote.server.createRemoteServer
@@ -145,28 +146,32 @@ class PokerTable(
             on<SharedPokerAction.JoinTable> { _, action ->
                 emit(ServerPokerAction.PlayerJoined(action.playerId))
             }
-            on<SharedPokerAction.PlaceBet> { state, action ->
-                val currentPlayerId = state.currentTurnPlayerId
-                if (currentPlayerId != null) {
-                    emit(ServerPokerAction.PlayerBet(currentPlayerId, action.amount))
+            // Use sequential strategy to ensure poker actions are processed in order
+            // and prevent race conditions from rapid action submissions
+            group(sequential()) {
+                on<SharedPokerAction.PlaceBet> { state, action ->
+                    val currentPlayerId = state.currentTurnPlayerId
+                    if (currentPlayerId != null) {
+                        emit(ServerPokerAction.PlayerBet(currentPlayerId, action.amount))
+                    }
                 }
-            }
-            on<SharedPokerAction.Fold> { state, _ ->
-                val currentPlayerId = state.currentTurnPlayerId
-                if (currentPlayerId != null) {
-                    emit(ServerPokerAction.PlayerFolded(currentPlayerId))
+                on<SharedPokerAction.Fold> { state, _ ->
+                    val currentPlayerId = state.currentTurnPlayerId
+                    if (currentPlayerId != null) {
+                        emit(ServerPokerAction.PlayerFolded(currentPlayerId))
+                    }
                 }
-            }
-            on<SharedPokerAction.Check> { state, _ ->
-                val currentPlayerId = state.currentTurnPlayerId
-                if (currentPlayerId != null) {
-                    emit(ServerPokerAction.PlayerChecked(currentPlayerId))
+                on<SharedPokerAction.Check> { state, _ ->
+                    val currentPlayerId = state.currentTurnPlayerId
+                    if (currentPlayerId != null) {
+                        emit(ServerPokerAction.PlayerChecked(currentPlayerId))
+                    }
                 }
-            }
-            on<SharedPokerAction.Call> { state, _ ->
-                val currentPlayerId = state.currentTurnPlayerId
-                if (currentPlayerId != null) {
-                    emit(ServerPokerAction.PlayerCalled(currentPlayerId))
+                on<SharedPokerAction.Call> { state, _ ->
+                    val currentPlayerId = state.currentTurnPlayerId
+                    if (currentPlayerId != null) {
+                        emit(ServerPokerAction.PlayerCalled(currentPlayerId))
+                    }
                 }
             }
         }.build()
