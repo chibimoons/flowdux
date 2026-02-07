@@ -26,19 +26,31 @@ internal class InternalAddSession<A : Action>(
  *
  * Handles:
  * - [InternalAddSession]: emits a [FlowHolderAction] to listen for client messages
- * - [ClientSharedAction]: delegates to [RemoteServerSession] for broadcasting (NOT emitted locally)
+ * - [ClientSharedAction]: delegates to [SessionBroadcaster] for broadcasting (NOT emitted locally)
  * - Registered processors for server-side action handling
  * - Pass-through for all other actions
  *
- * Session storage is managed by [RemoteServerSession]; this middleware only handles action routing.
+ * Session storage is managed by [SessionRegistry]; this middleware only handles action routing.
  *
  * @param processors Action processors for server-side action handling.
- * @param session Session registry for broadcasting to clients.
+ * @param broadcaster Session broadcaster for sending actions to clients.
  */
 internal class MultiClientServerRemoteMiddleware<S : State, A : Action>(
     override val processors: ActionProcessorMap<S, A> = emptyMap(),
-    private val session: RemoteServerSession<A>,
+    private val broadcaster: SessionBroadcaster<A>,
 ) : Middleware<S, A> {
+
+    /**
+     * Secondary constructor for backward compatibility.
+     * Accepts a [RemoteServerSession] and creates a sequential broadcaster from it.
+     */
+    constructor(
+        processors: ActionProcessorMap<S, A> = emptyMap(),
+        session: RemoteServerSession<A>,
+    ) : this(
+        processors = processors,
+        broadcaster = SessionBroadcaster(session, BroadcastConfig.Sequential),
+    )
 
     override val name: String = "MultiClientServerRemoteMiddleware"
 
@@ -53,7 +65,7 @@ internal class MultiClientServerRemoteMiddleware<S : State, A : Action>(
 
         // 1. ClientSharedAction: broadcast to all clients, do NOT emit locally
         if (action is ClientSharedAction) {
-            session.broadcast(action)
+            broadcaster.broadcast(action)
             return@flow
         }
 
