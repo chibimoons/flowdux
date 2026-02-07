@@ -1,6 +1,6 @@
 # Scaling Architecture
 
-FlowDux Remote supports scaling to 100k+ concurrent connections through parallel broadcast and pluggable session storage.
+FlowDux Remote is designed for large-scale deployments through parallel broadcast and pluggable session storage.
 
 ## Overview
 
@@ -164,6 +164,8 @@ class RedisSessionRegistry<A : Action>(
 }
 ```
 
+> **Note:** This example shows session ID storage in Redis. For cross-node broadcast, you'll also need Redis Pub/Sub or a message queue (e.g., Kafka) to fan out messages to all nodes.
+
 Usage:
 
 ```kotlin
@@ -321,4 +323,3 @@ Test endpoints:
 
 - [Remote State Sync](./remote.md) — Basic client-server setup
 - [Room Store Pattern](./room-store.md) — Multi-room management
-- [Per-Client Store Pattern](./per-client-store.md) — Private state per client

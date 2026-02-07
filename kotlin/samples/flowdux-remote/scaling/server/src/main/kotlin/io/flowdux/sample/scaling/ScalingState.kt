@@ -13,7 +13,6 @@ import kotlinx.serialization.Serializable
 data class ScalingState(
     val counter: Long = 0,
     val connectedClients: Int = 0,
-    val broadcastCount: Long = 0,
 ) : State
 
 /**
@@ -44,7 +43,6 @@ sealed interface SharedScalingAction : ScalingAction {
     @Serializable
     data class ServerStats(
         val connectedClients: Int,
-        val broadcastCount: Long,
         val counter: Long,
     ) : SharedScalingAction, ClientSharedAction
 }
@@ -55,7 +53,6 @@ sealed interface SharedScalingAction : ScalingAction {
 sealed interface ServerScalingAction : ScalingAction {
     data class ClientConnected(val clientId: String) : ServerScalingAction
     data class ClientDisconnected(val clientId: String) : ServerScalingAction
-    data class BroadcastCompleted(val count: Int) : ServerScalingAction
 }
 
 /**
@@ -68,9 +65,6 @@ val scalingReducer = Reducer<ScalingState, ScalingAction> { state, action ->
         is ServerScalingAction.ClientConnected -> state.copy(connectedClients = state.connectedClients + 1)
         is ServerScalingAction.ClientDisconnected -> state.copy(
             connectedClients = maxOf(0, state.connectedClients - 1)
-        )
-        is ServerScalingAction.BroadcastCompleted -> state.copy(
-            broadcastCount = state.broadcastCount + action.count
         )
         // Client-side actions (never reach reducer on server)
         is SharedScalingAction.Pong,

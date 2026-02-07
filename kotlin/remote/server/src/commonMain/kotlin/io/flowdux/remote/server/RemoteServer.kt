@@ -86,6 +86,10 @@ class RemoteServer<S : State, A : Action> internal constructor(
 ) {
     /**
      * Legacy access to session management.
+     *
+     * Returns `null` if the server was created with a custom [SessionRegistry]
+     * that is not a [RemoteServerSession].
+     *
      * @deprecated Use [sessionRegistry] and [broadcaster] instead.
      */
     @Deprecated(
@@ -93,11 +97,8 @@ class RemoteServer<S : State, A : Action> internal constructor(
         replaceWith = ReplaceWith("sessionRegistry"),
         level = DeprecationLevel.WARNING,
     )
-    val session: RemoteServerSession<A>
-        get() = when (val registry = sessionRegistry) {
-            is RemoteServerSession -> registry
-            else -> error("sessionRegistry is not a RemoteServerSession. Use sessionRegistry directly.")
-        }
+    val session: RemoteServerSession<A>?
+        get() = sessionRegistry as? RemoteServerSession<A>
 
     /** Current server state as a reactive flow. */
     val state: StateFlow<S> get() = store.state

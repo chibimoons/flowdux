@@ -80,11 +80,10 @@ fun main() {
                 server.broadcast(
                     SharedScalingAction.ServerStats(
                         connectedClients = clientCount,
-                        broadcastCount = state.broadcastCount,
                         counter = state.counter,
                     )
                 )
-                println("[Stats] clients=$clientCount, counter=${state.counter}, broadcasts=${state.broadcastCount}")
+                println("[Stats] clients=$clientCount, counter=${state.counter}")
             }
         }
     }
@@ -114,7 +113,6 @@ fun main() {
                     {
                         "connectedClients": $clientCount,
                         "counter": ${state.counter},
-                        "broadcastCount": ${state.broadcastCount},
                         "broadcastConcurrency": ${broadcastConfig.concurrency}
                     }
                     """.trimIndent()
@@ -130,7 +128,6 @@ fun main() {
                 server.broadcast(
                     SharedScalingAction.ServerStats(
                         connectedClients = clientCount,
-                        broadcastCount = state.broadcastCount,
                         counter = state.counter,
                     )
                 )
@@ -190,7 +187,7 @@ fun main() {
 private fun scalingProcessors() =
     Middleware.ActionProcessorBuilder<ScalingState, ScalingAction>().apply {
         on<SharedScalingAction.Ping> { state, _ ->
-            // Respond to ping with pong (individual client response)
+            // Respond with pong containing current stats
             emit(
                 SharedScalingAction.Pong(
                     counter = state.counter,
