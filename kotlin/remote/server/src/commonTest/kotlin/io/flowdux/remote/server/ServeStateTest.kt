@@ -1,6 +1,7 @@
 package io.flowdux.remote.server
 
 import io.flowdux.createStore
+import io.flowdux.remote.server.middleware.ServerRemoteMiddleware
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest

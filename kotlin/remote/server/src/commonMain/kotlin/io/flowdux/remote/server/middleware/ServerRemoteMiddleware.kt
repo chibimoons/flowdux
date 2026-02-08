@@ -1,4 +1,4 @@
-package io.flowdux.remote.server
+package io.flowdux.remote.server.middleware
 
 import io.flowdux.Action
 import io.flowdux.ActionProcessorMap
@@ -9,6 +9,7 @@ import io.flowdux.Middleware
 import io.flowdux.State
 import io.flowdux.concurrent
 import io.flowdux.remote.ClientSharedAction
+import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map

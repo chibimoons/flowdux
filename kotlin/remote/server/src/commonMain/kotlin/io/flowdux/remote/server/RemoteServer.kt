@@ -10,6 +10,13 @@ import io.flowdux.State
 import io.flowdux.Store
 import io.flowdux.StoreLogger
 import io.flowdux.createStore
+import io.flowdux.remote.server.connection.TypedServerConnection
+import io.flowdux.remote.server.middleware.InternalAddSession
+import io.flowdux.remote.server.middleware.MultiClientServerRemoteMiddleware
+import io.flowdux.remote.server.session.BroadcastConfig
+import io.flowdux.remote.server.session.InMemorySessionRegistry
+import io.flowdux.remote.server.session.SessionBroadcaster
+import io.flowdux.remote.server.session.SessionRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -84,22 +91,6 @@ class RemoteServer<S : State, A : Action> internal constructor(
     val store: Store<S, A>,
     private val serveJob: Job,
 ) {
-    /**
-     * Legacy access to session management.
-     *
-     * Returns `null` if the server was created with a custom [SessionRegistry]
-     * that is not a [RemoteServerSession].
-     *
-     * @deprecated Use [sessionRegistry] and [broadcaster] instead.
-     */
-    @Deprecated(
-        message = "Use sessionRegistry and broadcaster instead",
-        replaceWith = ReplaceWith("sessionRegistry"),
-        level = DeprecationLevel.WARNING,
-    )
-    val session: RemoteServerSession<A>?
-        get() = sessionRegistry as? RemoteServerSession<A>
-
     /** Current server state as a reactive flow. */
     val state: StateFlow<S> get() = store.state
 

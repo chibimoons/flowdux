@@ -4,8 +4,8 @@ import io.flowdux.State
 import io.flowdux.Store
 import io.flowdux.createStore
 import io.flowdux.buildReducer
-import io.flowdux.remote.server.ServerRemoteMiddleware
-import io.flowdux.remote.server.TypedServerConnection
+import io.flowdux.remote.server.middleware.ServerRemoteMiddleware
+import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.serve
 import io.flowdux.sample.poker.Card
 import io.flowdux.sample.poker.PokerAction

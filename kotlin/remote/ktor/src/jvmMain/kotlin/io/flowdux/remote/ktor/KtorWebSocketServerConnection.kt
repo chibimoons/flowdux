@@ -1,6 +1,6 @@
 package io.flowdux.remote.ktor
 
-import io.flowdux.remote.server.ServerConnection
+import io.flowdux.remote.server.connection.ServerConnection
 import io.ktor.websocket.Frame
 import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.readText
@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
  * Ktor-based WebSocket server implementation of [ServerConnection].
  *
  * Wraps a Ktor [WebSocketSession] to provide a [ServerConnection]
- * for use with [ServerRemoteMiddleware][io.flowdux.remote.server.ServerRemoteMiddleware].
+ * for use with [ServerRemoteMiddleware][io.flowdux.remote.server.middleware.ServerRemoteMiddleware].
  *
  * @param session Ktor WebSocket session (typically a server session from a `webSocket` route)
  */

@@ -3,7 +3,7 @@ package io.flowdux.sample.poker.server
 import io.flowdux.Middleware
 import io.flowdux.sequential
 import io.flowdux.remote.server.RemoteServer
-import io.flowdux.remote.server.TypedServerConnection
+import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.createRemoteServer
 import io.flowdux.sample.poker.Card
 import io.flowdux.sample.poker.GamePhase

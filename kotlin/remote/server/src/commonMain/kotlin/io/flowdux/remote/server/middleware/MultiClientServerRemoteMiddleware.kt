@@ -1,4 +1,4 @@
-package io.flowdux.remote.server
+package io.flowdux.remote.server.middleware
 
 import io.flowdux.Action
 import io.flowdux.ActionProcessorMap
@@ -9,6 +9,8 @@ import io.flowdux.Middleware
 import io.flowdux.State
 import io.flowdux.concurrent
 import io.flowdux.remote.ClientSharedAction
+import io.flowdux.remote.server.connection.TypedServerConnection
+import io.flowdux.remote.server.session.SessionBroadcaster
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -16,7 +18,7 @@ import kotlinx.coroutines.flow.map
 /**
  * Internal action dispatched to start listening for incoming messages from a client connection.
  */
-internal class InternalAddSession<A : Action>(
+class InternalAddSession<A : Action>(
     val sessionId: String,
     val connection: TypedServerConnection<A>,
 ) : Action
@@ -30,27 +32,16 @@ internal class InternalAddSession<A : Action>(
  * - Registered processors for server-side action handling
  * - Pass-through for all other actions
  *
- * Session storage is managed by [SessionRegistry]; this middleware only handles action routing.
+ * Session storage is managed by [SessionRegistry][io.flowdux.remote.server.session.SessionRegistry];
+ * this middleware only handles action routing.
  *
  * @param processors Action processors for server-side action handling.
  * @param broadcaster Session broadcaster for sending actions to clients.
  */
-internal class MultiClientServerRemoteMiddleware<S : State, A : Action>(
+class MultiClientServerRemoteMiddleware<S : State, A : Action>(
     override val processors: ActionProcessorMap<S, A> = emptyMap(),
     private val broadcaster: SessionBroadcaster<A>,
 ) : Middleware<S, A> {
-
-    /**
-     * Secondary constructor for backward compatibility.
-     * Accepts a [RemoteServerSession] and creates a sequential broadcaster from it.
-     */
-    constructor(
-        processors: ActionProcessorMap<S, A> = emptyMap(),
-        session: RemoteServerSession<A>,
-    ) : this(
-        processors = processors,
-        broadcaster = SessionBroadcaster(session, BroadcastConfig.Sequential),
-    )
 
     override val name: String = "MultiClientServerRemoteMiddleware"
 

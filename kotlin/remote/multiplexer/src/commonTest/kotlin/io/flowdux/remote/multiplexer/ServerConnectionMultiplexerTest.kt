@@ -1,7 +1,7 @@
 package io.flowdux.remote.multiplexer
 
 import io.flowdux.Action
-import io.flowdux.remote.server.TypedServerConnection
+import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.take

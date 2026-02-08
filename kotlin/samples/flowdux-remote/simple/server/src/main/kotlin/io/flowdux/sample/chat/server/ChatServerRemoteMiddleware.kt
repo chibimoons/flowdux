@@ -1,7 +1,7 @@
 package io.flowdux.sample.chat.server
 
-import io.flowdux.remote.server.ServerRemoteMiddleware
-import io.flowdux.remote.server.TypedServerConnection
+import io.flowdux.remote.server.middleware.ServerRemoteMiddleware
+import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.SharedChatAction
 

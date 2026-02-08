@@ -85,7 +85,7 @@ class ClientSession(
         scope.launch {
             room.handleClient(
                 sessionId,
-                virtualConnection as io.flowdux.remote.server.TypedServerConnection<ChatAction>,
+                virtualConnection as io.flowdux.remote.server.connection.TypedServerConnection<ChatAction>,
             )
         }
 

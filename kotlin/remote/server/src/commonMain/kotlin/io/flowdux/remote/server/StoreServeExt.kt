@@ -3,6 +3,7 @@ package io.flowdux.remote.server
 import io.flowdux.Action
 import io.flowdux.State
 import io.flowdux.Store
+import io.flowdux.remote.server.middleware.InternalStartListening
 
 /**
  * Collect state changes and dispatch each as a wrapped action.

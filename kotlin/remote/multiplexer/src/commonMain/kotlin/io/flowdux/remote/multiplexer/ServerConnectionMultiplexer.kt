@@ -1,7 +1,7 @@
 package io.flowdux.remote.multiplexer
 
 import io.flowdux.Action
-import io.flowdux.remote.server.TypedServerConnection
+import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

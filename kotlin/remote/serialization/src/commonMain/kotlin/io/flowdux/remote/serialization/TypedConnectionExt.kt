@@ -4,8 +4,8 @@ import io.flowdux.Action
 import io.flowdux.remote.ClientConnection
 import io.flowdux.remote.ConnectionState
 import io.flowdux.remote.TypedClientConnection
-import io.flowdux.remote.server.ServerConnection
-import io.flowdux.remote.server.TypedServerConnection
+import io.flowdux.remote.server.connection.ServerConnection
+import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.typed
 import io.flowdux.remote.typed
 import kotlinx.coroutines.flow.Flow
