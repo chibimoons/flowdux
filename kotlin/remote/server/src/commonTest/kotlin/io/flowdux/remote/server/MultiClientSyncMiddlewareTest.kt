@@ -2,7 +2,7 @@ package io.flowdux.remote.server
 
 import io.flowdux.createStore
 import io.flowdux.remote.server.connection.TypedServerConnection
-import io.flowdux.remote.server.middleware.MultiClientServerRemoteMiddleware
+import io.flowdux.remote.server.middleware.MultiClientSyncMiddleware
 import io.flowdux.remote.server.session.BroadcastConfig
 import io.flowdux.remote.server.session.InMemorySessionRegistry
 import io.flowdux.remote.server.session.SessionBroadcaster
@@ -14,14 +14,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class MultiClientServerRemoteMiddlewareTest {
+class MultiClientSyncMiddlewareTest {
 
     @Test
     fun `addSession registers session and sessionCount increases`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val registry = InMemorySessionRegistry<ServerAction>()
         val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Sequential)
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
+        val middleware = MultiClientSyncMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -44,7 +44,7 @@ class MultiClientServerRemoteMiddlewareTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val registry = InMemorySessionRegistry<ServerAction>()
         val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Sequential)
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
+        val middleware = MultiClientSyncMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -69,7 +69,7 @@ class MultiClientServerRemoteMiddlewareTest {
     fun `multiple sessions can be registered`() = runTest {
         val registry = InMemorySessionRegistry<ServerAction>()
         val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Sequential)
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
+        val middleware = MultiClientSyncMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -96,7 +96,7 @@ class MultiClientServerRemoteMiddlewareTest {
         val conn2 = MockTypedServerConnection<ServerAction>()
         val registry = InMemorySessionRegistry<ServerAction>()
         val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Sequential)
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
+        val middleware = MultiClientSyncMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -138,7 +138,7 @@ class MultiClientServerRemoteMiddlewareTest {
         }
         val registry = InMemorySessionRegistry<ServerAction>()
         val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Sequential)
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
+        val middleware = MultiClientSyncMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -169,7 +169,7 @@ class MultiClientServerRemoteMiddlewareTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val registry = InMemorySessionRegistry<ServerAction>()
         val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Sequential)
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
+        val middleware = MultiClientSyncMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer, // sealed when — would crash if InternalAddSession leaked
@@ -190,7 +190,7 @@ class MultiClientServerRemoteMiddlewareTest {
     fun `non-SharedAction passes through unchanged`() = runTest {
         val registry = InMemorySessionRegistry<ServerAction>()
         val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Sequential)
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
+        val middleware = MultiClientSyncMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
 
         val action = ServerAction.InternalReset(42)
         val result = middleware.process(
@@ -211,7 +211,7 @@ class MultiClientServerRemoteMiddlewareTest {
 
         val registry = InMemorySessionRegistry<ServerAction>()
         val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Sequential)
-        val middleware = MultiClientServerRemoteMiddleware(processors, broadcaster)
+        val middleware = MultiClientSyncMiddleware(processors, broadcaster)
 
         val result = middleware.process(
             getState = { ServerState() },
@@ -228,7 +228,7 @@ class MultiClientServerRemoteMiddlewareTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val registry = InMemorySessionRegistry<ServerAction>()
         val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Sequential)
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
+        val middleware = MultiClientSyncMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -256,7 +256,7 @@ class MultiClientServerRemoteMiddlewareTest {
         val conn2 = MockTypedServerConnection<ServerAction>()
         val registry = InMemorySessionRegistry<ServerAction>()
         val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Sequential)
-        val middleware = MultiClientServerRemoteMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
+        val middleware = MultiClientSyncMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,

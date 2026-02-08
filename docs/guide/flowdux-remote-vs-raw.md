@@ -268,7 +268,7 @@ class PlayerSession(playerId: String, connection: TypedServerConnection<PokerAct
     val store = createStore(
         initialState = PlayerState(playerId),
         reducer = playerReducer,
-        middlewares = listOf(ServerRemoteMiddleware(connection)),
+        middlewares = listOf(SingleClientSyncMiddleware(connection)),
     )
 
     fun updateHand(cards: List<Card>) {

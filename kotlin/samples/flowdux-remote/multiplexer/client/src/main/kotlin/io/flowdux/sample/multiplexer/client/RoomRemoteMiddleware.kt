@@ -1,6 +1,6 @@
 package io.flowdux.sample.multiplexer.client
 
-import io.flowdux.remote.ClientRemoteMiddleware
+import io.flowdux.remote.SyncMiddleware
 import io.flowdux.remote.TypedClientConnection
 import io.flowdux.sample.multiplexer.ChatAction
 
@@ -12,7 +12,7 @@ import io.flowdux.sample.multiplexer.ChatAction
  */
 class RoomRemoteMiddleware(
     connection: TypedClientConnection<ChatAction>,
-) : ClientRemoteMiddleware<ClientRoomState, ChatAction>(
+) : SyncMiddleware<ClientRoomState, ChatAction>(
     connection = connection,
 ) {
     override val name: String = "RoomRemoteMiddleware"

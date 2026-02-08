@@ -1,13 +1,13 @@
 package io.flowdux.sample.chat.server
 
-import io.flowdux.remote.server.middleware.ServerRemoteMiddleware
+import io.flowdux.remote.server.middleware.SingleClientSyncMiddleware
 import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.SharedChatAction
 
 class ChatServerRemoteMiddleware(
     connection: TypedServerConnection<ChatAction>,
-) : ServerRemoteMiddleware<ServerChatState, ChatAction>(
+) : SingleClientSyncMiddleware<ServerChatState, ChatAction>(
     connection = connection,
 ) {
     override val name: String = "ChatServerRemoteMiddleware"

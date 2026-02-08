@@ -1009,7 +1009,7 @@ sealed interface ContentBlock {
       ▼ ServerSharedAction → WebSocket
       │
 ② Server: RemoteServer("alice")
-   MultiClientServerRemoteMiddleware
+   MultiClientSingleClientSyncMiddleware
       │
       ├── ServerSharedAction이므로 Processor로 라우팅
       │

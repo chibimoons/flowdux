@@ -177,9 +177,9 @@ val serverChatReducer: Reducer<ServerChatState, ChatAction> = buildReducer {
 미들웨어가 들어오는 공유 액션을 서버 내부 액션으로 변환합니다:
 
 ```kotlin
-class ChatServerRemoteMiddleware(
+class ChatSingleClientSyncMiddleware(
     connection: TypedServerConnection<ChatAction>,
-) : ServerRemoteMiddleware<ServerChatState, ChatAction>(connection) {
+) : SingleClientSyncMiddleware<ServerChatState, ChatAction>(connection) {
 
     override val processors = buildProcessors {
         on<SharedChatAction.SendMessage> { _, action ->
@@ -274,7 +274,7 @@ val clientChatReducer: Reducer<ClientChatState, ChatAction> = buildReducer {
 ```kotlin
 class ChatRemoteMiddleware(
     connection: TypedClientConnection<ChatAction>,
-) : ClientRemoteMiddleware<ClientChatState, ChatAction>(connection) {
+) : SyncMiddleware<ClientChatState, ChatAction>(connection) {
 
     override val processors = buildProcessors {
         on<ClientChatAction.Connect> { _, _ ->
@@ -313,7 +313,7 @@ fun main() = runBlocking {
 }
 ```
 
-클라이언트 코드를 보세요. `SharedChatAction.JoinRoom`을 디스패치합니다 — 공유 액션입니다. `ClientRemoteMiddleware`가 가로채서(`ServerSharedAction`이므로) 직렬화하고 WebSocket으로 전송합니다. 서버 쪽에서 `ServerRemoteMiddleware`가 수신하고 서버 스토어에 디스패치하고, 미들웨어가 처리하고, 리듀서가 상태를 업데이트하고, `.serve {}`가 `SyncState`를 모든 클라이언트에 푸시합니다.
+클라이언트 코드를 보세요. `SharedChatAction.JoinRoom`을 디스패치합니다 — 공유 액션입니다. `SyncMiddleware`가 가로채서(`ServerSharedAction`이므로) 직렬화하고 WebSocket으로 전송합니다. 서버 쪽에서 `SingleClientSyncMiddleware`가 수신하고 서버 스토어에 디스패치하고, 미들웨어가 처리하고, 리듀서가 상태를 업데이트하고, `.serve {}`가 `SyncState`를 모든 클라이언트에 푸시합니다.
 
 이 모든 것이 단일 `store.dispatch()` 호출에서 일어납니다. HTTP 요청 없음. 엔드포인트 URL 없음. 상태 코드 처리 없음.
 
@@ -329,16 +329,16 @@ fun main() = runBlocking {
   1.   │  dispatch(SendMessage(       │                            │
        │    "Alice", "Hello"))        │                            │
        │                              │                            │
-  2.   │  ClientRemoteMiddleware      │                            │
+  2.   │  SyncMiddleware      │                            │
        │  ServerSharedAction 인터셉트  │                            │
        │  → 직렬화 → WebSocket        │                            │
        │                              │                            │
   3.   │ ──── SendMessage ──────────→ │                            │
        │                              │                            │
-  4.   │                  ServerRemoteMiddleware                    │
+  4.   │                  SingleClientSyncMiddleware                    │
        │                  수신 & 디스패치                            │
        │                              │                            │
-  5.   │                  ChatServerRemoteMiddleware                │
+  5.   │                  ChatSingleClientSyncMiddleware                │
        │                  MessageReceived emit                     │
        │                              │                            │
   6.   │                  Reducer 상태 업데이트:                     │
@@ -349,7 +349,7 @@ fun main() = runBlocking {
        │                              │                            │
   8.   │ ←── SyncState(newState) ──── │ ── SyncState(newState) ──→ │
        │                              │                            │
-  9.   │  ClientRemoteMiddleware      │    ClientRemoteMiddleware  │
+  9.   │  SyncMiddleware      │    SyncMiddleware  │
        │  ClientSharedAction 수신     │    같은 액션 수신            │
        │  → 클라이언트 스토어 디스패치  │    → 스토어 디스패치          │
        │                              │                            │
@@ -496,7 +496,7 @@ on<ActionError> { state, action ->
 
 이 글의 모든 코드는 Action/State 패턴의 참조 구현으로 만든 Kotlin 라이브러리 [flowdux-remote](https://github.com/chibimoons/flowdux)를 사용합니다. 제공하는 것:
 
-- `ServerRemoteMiddleware` / `ClientRemoteMiddleware` — 직렬화와 WebSocket 전송 처리
+- `SingleClientSyncMiddleware` / `SyncMiddleware` — 직렬화와 WebSocket 전송 처리
 - `serve {}` — 상태 변경 관찰 및 클라이언트에 푸시
 - `createRemoteServer` — 공유 Store에 다중 클라이언트 연결을 관리하는 `RemoteServer` 파사드 생성
 - `TypedConnection` — 와이어 프로토콜에 대한 타입 안전 추상화

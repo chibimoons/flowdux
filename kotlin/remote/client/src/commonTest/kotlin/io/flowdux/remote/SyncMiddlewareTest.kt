@@ -20,12 +20,12 @@ import kotlin.test.assertTrue
 import kotlin.test.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ClientRemoteMiddlewareTest {
+class SyncMiddlewareTest {
 
     @Test
     fun `ServerSharedAction is intercepted and sent to server`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestClientRemoteMiddleware(
+        val middleware = TestSyncMiddleware(
             connection = connection,
             scope = backgroundScope,
         )
@@ -62,7 +62,7 @@ class ClientRemoteMiddlewareTest {
     @Test
     fun `non-ServerSharedAction passes through to local reducer`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestClientRemoteMiddleware(
+        val middleware = TestSyncMiddleware(
             connection = connection,
             scope = backgroundScope,
         )
@@ -97,7 +97,7 @@ class ClientRemoteMiddlewareTest {
     @Test
     fun `server response actions are dispatched to local store`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestClientRemoteMiddleware(
+        val middleware = TestSyncMiddleware(
             connection = connection,
             scope = backgroundScope,
         )
@@ -128,7 +128,7 @@ class ClientRemoteMiddlewareTest {
     @Test
     fun `non-ServerSharedAction server responses pass through without being sent to server`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestClientRemoteMiddleware(
+        val middleware = TestSyncMiddleware(
             connection = connection,
             scope = backgroundScope,
         )
@@ -162,7 +162,7 @@ class ClientRemoteMiddlewareTest {
     @Test
     fun `multiple server response actions are all dispatched`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestClientRemoteMiddleware(
+        val middleware = TestSyncMiddleware(
             connection = connection,
             scope = backgroundScope,
         )
@@ -205,7 +205,7 @@ class ClientRemoteMiddlewareTest {
         val cancellationSignal = CompletableDeferred<Boolean>()
         val connection = CancellationTrackingMockConnection<TestAction>(cancellationSignal)
 
-        val middleware = TestClientRemoteMiddleware(
+        val middleware = TestSyncMiddleware(
             connection = connection,
             scope = backgroundScope,
         )
@@ -246,7 +246,7 @@ class ClientRemoteMiddlewareTest {
     @Test
     fun `reconnect works after disconnect`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestClientRemoteMiddleware(
+        val middleware = TestSyncMiddleware(
             connection = connection,
             scope = backgroundScope,
         )
@@ -302,7 +302,7 @@ class ClientRemoteMiddlewareTest {
         val connection = MockTypedClientConnection<TestAction>(
             connectException = RuntimeException("Connection failed"),
         )
-        val middleware = TestClientRemoteMiddleware(
+        val middleware = TestSyncMiddleware(
             connection = connection,
             scope = backgroundScope,
             onConnectionError = { e -> TestAction.ConnectionError(e.message ?: "Unknown error") },
@@ -334,7 +334,7 @@ class ClientRemoteMiddlewareTest {
         val connection = MockTypedClientConnection<TestAction>(
             connectException = RuntimeException("Connection failed"),
         )
-        val middleware = TestClientRemoteMiddleware(
+        val middleware = TestSyncMiddleware(
             connection = connection,
             scope = backgroundScope,
             // No onConnectionError callback
@@ -394,7 +394,7 @@ class ClientRemoteMiddlewareTest {
         }
 
         val errorActions = mutableListOf<String>()
-        val middleware = TestClientRemoteMiddleware(
+        val middleware = TestSyncMiddleware(
             connection = connection,
             scope = backgroundScope,
             onConnectionError = { e ->
@@ -466,7 +466,7 @@ class ClientRemoteMiddlewareTest {
             }
         }
 
-        val middleware = TestClientRemoteMiddleware(
+        val middleware = TestSyncMiddleware(
             connection = connection,
             scope = backgroundScope,
             onConnectionError = { _ ->
@@ -514,7 +514,7 @@ class ClientRemoteMiddlewareTest {
     @Test
     fun `rapid connect disconnect connect sequence works correctly`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestClientRemoteMiddleware(
+        val middleware = TestSyncMiddleware(
             connection = connection,
             scope = backgroundScope,
         )

@@ -1,7 +1,7 @@
 package io.flowdux.remote.server
 
 import io.flowdux.createStore
-import io.flowdux.remote.server.middleware.ServerRemoteMiddleware
+import io.flowdux.remote.server.middleware.SingleClientSyncMiddleware
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -9,12 +9,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class ServerRemoteMiddlewareTest {
+class SingleClientSyncMiddlewareTest {
 
     @Test
     fun `ClientSharedAction is intercepted and sent to client`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(
+        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(
             connection = connection,
         )
 
@@ -35,7 +35,7 @@ class ServerRemoteMiddlewareTest {
     @Test
     fun `non-ClientSharedAction passes through unchanged`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(
+        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(
             connection = connection,
         )
 
@@ -55,7 +55,7 @@ class ServerRemoteMiddlewareTest {
     @Test
     fun `multiple ClientSharedActions are each sent separately`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(
+        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(
             connection = connection,
         )
 
@@ -79,7 +79,7 @@ class ServerRemoteMiddlewareTest {
     @Test
     fun `typed action roundtrip preserves action data`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(
+        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(
             connection = connection,
         )
 
@@ -96,7 +96,7 @@ class ServerRemoteMiddlewareTest {
     @Test
     fun `incoming client messages are dispatched through pipeline via FlowHolderAction`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(
+        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(
             connection = connection,
         )
 
@@ -116,7 +116,7 @@ class ServerRemoteMiddlewareTest {
         connection.simulateClientAction(ServerAction.ClientAdd(10))
         delay(100)
 
-        // ClientAdd is ServerSharedAction — passes through SRM, reaches reducer
+        // ClientAdd is ServerSharedAction — passes through middleware, reaches reducer
         assertEquals(10, store.state.value.count)
 
         store.close()
@@ -125,7 +125,7 @@ class ServerRemoteMiddlewareTest {
     @Test
     fun `InternalStartListening is consumed by middleware and does not reach reducer`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(connection)
+        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(connection)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer, // sealed when — would crash if InternalStartListening leaked
@@ -147,7 +147,7 @@ class ServerRemoteMiddlewareTest {
     @Test
     fun `InternalStartListening is handled before processors`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ProcessorEmittingSRM(connection) // has processors for ClientAdd
+        val middleware = ProcessorEmittingMiddleware(connection) // has processors for ClientAdd
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -171,7 +171,7 @@ class ServerRemoteMiddlewareTest {
     @Test
     fun `ServerSharedAction passes through unchanged`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(connection)
+        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(connection)
 
         val action = ServerAction.ClientAdd(10)
         val result = middleware.process(
@@ -179,7 +179,7 @@ class ServerRemoteMiddlewareTest {
             action = action,
         ).toList()
 
-        // ServerSharedAction passes through (not intercepted by SRM)
+        // ServerSharedAction passes through (not intercepted by middleware)
         assertEquals(listOf(action), result)
 
         // Nothing sent to client

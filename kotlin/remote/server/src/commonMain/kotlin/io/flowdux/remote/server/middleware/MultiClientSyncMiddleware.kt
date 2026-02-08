@@ -38,12 +38,12 @@ class InternalAddSession<A : Action>(
  * @param processors Action processors for server-side action handling.
  * @param broadcaster Session broadcaster for sending actions to clients.
  */
-class MultiClientServerRemoteMiddleware<S : State, A : Action>(
+class MultiClientSyncMiddleware<S : State, A : Action>(
     override val processors: ActionProcessorMap<S, A> = emptyMap(),
     private val broadcaster: SessionBroadcaster<A>,
 ) : Middleware<S, A> {
 
-    override val name: String = "MultiClientServerRemoteMiddleware"
+    override val name: String = "MultiClientSyncMiddleware"
 
     @Suppress("UNCHECKED_CAST")
     override fun process(getState: () -> S, action: A): Flow<A> = flow {

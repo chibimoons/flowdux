@@ -12,7 +12,7 @@ import io.flowdux.StoreLogger
 import io.flowdux.createStore
 import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.middleware.InternalAddSession
-import io.flowdux.remote.server.middleware.MultiClientServerRemoteMiddleware
+import io.flowdux.remote.server.middleware.MultiClientSyncMiddleware
 import io.flowdux.remote.server.session.BroadcastConfig
 import io.flowdux.remote.server.session.InMemorySessionRegistry
 import io.flowdux.remote.server.session.SessionBroadcaster
@@ -181,7 +181,7 @@ fun <S : State, A : Action> createRemoteServer(
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ): RemoteServer<S, A> {
     val broadcaster = SessionBroadcaster(sessionRegistry, broadcastConfig)
-    val middleware = MultiClientServerRemoteMiddleware<S, A>(processors, broadcaster)
+    val middleware = MultiClientSyncMiddleware<S, A>(processors, broadcaster)
 
     val store = createStore(
         initialState = initialState,
@@ -237,7 +237,7 @@ fun <S : State, A : Action> createSessionAwareRemoteServer(
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ): RemoteServer<S, A> {
     val broadcaster = SessionBroadcaster(sessionRegistry, broadcastConfig)
-    val middleware = MultiClientServerRemoteMiddleware<S, A>(processors, broadcaster)
+    val middleware = MultiClientSyncMiddleware<S, A>(processors, broadcaster)
 
     val store = createStore(
         initialState = initialState,

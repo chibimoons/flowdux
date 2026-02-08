@@ -24,9 +24,9 @@ internal class InternalStartListening : Action
  * Server-side middleware that intercepts [ClientSharedAction]s and sends them to the client,
  * and listens for client messages via a [FlowHolderAction]-based client listener.
  *
- * This is the server-side counterpart to [ClientRemoteMiddleware][io.flowdux.remote.ClientRemoteMiddleware]:
- * - Client CRM: intercepts [ServerSharedAction][io.flowdux.remote.ServerSharedAction]s → sends to server, NOT emitted locally
- * - **Server SRM: intercepts [ClientSharedAction]s → sends to client, NOT emitted locally**
+ * This is the server-side counterpart to [SyncMiddleware][io.flowdux.remote.SyncMiddleware]:
+ * - Client SyncMiddleware: intercepts [ServerSharedAction][io.flowdux.remote.ServerSharedAction]s → sends to server, NOT emitted locally
+ * - **Server SingleClientSyncMiddleware: intercepts [ClientSharedAction]s → sends to client, NOT emitted locally**
  *
  * Data flow:
  * ```
@@ -49,11 +49,11 @@ internal class InternalStartListening : Action
  *
  * @param connection The [TypedServerConnection] for communicating with the client.
  */
-open class ServerRemoteMiddleware<S : State, A : Action>(
+open class SingleClientSyncMiddleware<S : State, A : Action>(
     private val connection: TypedServerConnection<A>,
 ) : Middleware<S, A> {
 
-    override val name: String = "ServerRemoteMiddleware"
+    override val name: String = "SingleClientSyncMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     /**

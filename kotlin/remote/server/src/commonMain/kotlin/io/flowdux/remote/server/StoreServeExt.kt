@@ -49,7 +49,7 @@ suspend inline fun <S : State, A : Action> Store<S, A>.use(
  * Combines [use], client listener setup, and [serveState] into a single call.
  * Suspends until the calling coroutine is cancelled (e.g., by WebSocket disconnect).
  *
- * **Requires [ServerRemoteMiddleware] in the store's middleware list.**
+ * **Requires [SingleClientSyncMiddleware] in the store's middleware list.**
  *
  * ```kotlin
  * webSocket("/game") {

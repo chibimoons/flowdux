@@ -320,7 +320,7 @@ val clientStore = createStore(
     reducer = gameReducer,
     middlewares = listOf(
         loggingMiddleware,
-        ClientRemoteMiddleware(typedConnection),  // ServerSharedAction 가로채서 전송
+        SyncMiddleware(typedConnection),  // ServerSharedAction 가로채서 전송
         validationMiddleware
     )
 )

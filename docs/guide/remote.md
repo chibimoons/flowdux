@@ -7,26 +7,26 @@ FlowDux Remote enables real-time client-server state synchronization over WebSoc
 ```mermaid
 flowchart LR
     subgraph Client
-        CS["Store"] --> CRM["ClientRemote<br/>Middleware"]
+        CS["Store"] --> SM["Sync<br/>Middleware"]
     end
 
-    CRM -- "ServerSharedAction<br/>(encode → send)" --> WS(("WebSocket"))
-    WS -- "ClientSharedAction<br/>(receive → decode)" --> CRM
+    SM -- "ServerSharedAction<br/>(encode → send)" --> WS(("WebSocket"))
+    WS -- "ClientSharedAction<br/>(receive → decode)" --> SM
 
     subgraph Server
-        SRM["ServerRemote<br/>Middleware"] --> SS["Store"]
+        SSM["SingleClientSync<br/>Middleware"] --> SS["Store"]
     end
 
-    WS -- "ServerSharedAction<br/>(receive → decode)" --> SRM
-    SRM -- "ClientSharedAction<br/>(encode → send)" --> WS
+    WS -- "ServerSharedAction<br/>(receive → decode)" --> SSM
+    SSM -- "ClientSharedAction<br/>(encode → send)" --> WS
 ```
 
 | Component | Role |
 |-----------|------|
-| **ServerSharedAction** | Client → Server action marker (intercepted by CRM, sent over wire) |
-| **ClientSharedAction** | Server → Client action marker (intercepted by SRM, sent over wire) |
-| **ClientRemoteMiddleware** | Intercepts `ServerSharedAction`s, sends to server; listens for server messages |
-| **ServerRemoteMiddleware** | Intercepts `ClientSharedAction`s, sends to client; listens for client messages |
+| **ServerSharedAction** | Client → Server action marker (intercepted by SyncMiddleware, sent over wire) |
+| **ClientSharedAction** | Server → Client action marker (intercepted by SingleClientSyncMiddleware, sent over wire) |
+| **SyncMiddleware** | Intercepts `ServerSharedAction`s, sends to server; listens for server messages |
+| **SingleClientSyncMiddleware** | Intercepts `ClientSharedAction`s, sends to client; listens for client messages |
 | **TypedConnection** | Type-safe transport abstraction (encode/decode via `ActionCodec`) |
 | **ActionCodec** | Serialization interface (`kotlinx.serialization` binding provided) |
 
@@ -40,9 +40,9 @@ kotlin {
         commonMain.dependencies {
             // Shared action markers (ServerSharedAction, ClientSharedAction)
             implementation("io.github.chibimoons:flowdux-remote-core:1.12.0")
-            // Client middleware (ClientRemoteMiddleware)
+            // Client middleware (SyncMiddleware)
             implementation("io.github.chibimoons:flowdux-remote-client:1.12.0")
-            // Server middleware (ServerRemoteMiddleware)
+            // Server middleware (SingleClientSyncMiddleware, MultiClientSyncMiddleware)
             implementation("io.github.chibimoons:flowdux-remote-server:1.12.0")
             // kotlinx.serialization codecs (ActionCodec, MessageCodec)
             implementation("io.github.chibimoons:flowdux-remote-serialization:1.12.0")

@@ -111,8 +111,8 @@ hotfix/xxx   ──────────────────────�
 - `FlowHolderAction` - Action that holds a Flow/Stream of inner actions
 - `FlowActionDelivery` - `Emit` (default, bypasses middleware) or `Dispatch` (full pipeline)
 - `SharedAction` - Marker interface for actions shared between client and server
-  - `ServerSharedAction` - Client → server (intercepted by `ClientRemoteMiddleware`)
-  - `ClientSharedAction` - Server → client (intercepted by `ServerRemoteMiddleware`)
+  - `ServerSharedAction` - Client → server (intercepted by `SyncMiddleware`)
+  - `ClientSharedAction` - Server → client (intercepted by `SingleClientSyncMiddleware` or `MultiClientSyncMiddleware`)
 - `ClientConnection` - Client-side raw transport abstraction (WebSocket, SSE, etc.)
 - `ServerConnection` - Server-side raw transport abstraction (incoming Flow + send)
 - `TypedClientConnection` - Typed wrapper over `ClientConnection` (send/receive actions, not strings)

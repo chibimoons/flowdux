@@ -1,7 +1,7 @@
 package io.flowdux.remote.server
 
 import io.flowdux.createStore
-import io.flowdux.remote.server.middleware.ServerRemoteMiddleware
+import io.flowdux.remote.server.middleware.SingleClientSyncMiddleware
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -31,7 +31,7 @@ class ServeStateTest {
     @Test
     fun `without serveState - server updates state but client receives nothing`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ProcessorEmittingSRM(connection)
+        val middleware = ProcessorEmittingMiddleware(connection)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -67,7 +67,7 @@ class ServeStateTest {
     @Test
     fun `with serveState - client receives state after each server change`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ProcessorEmittingSRM(connection)
+        val middleware = ProcessorEmittingMiddleware(connection)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -110,7 +110,7 @@ class ServeStateTest {
     @Test
     fun `serve - auto starts listening and syncs state`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ProcessorEmittingSRM(connection)
+        val middleware = ProcessorEmittingMiddleware(connection)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -147,7 +147,7 @@ class ServeStateTest {
     @Test
     fun `serve - closes store after cancellation`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(connection)
+        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(connection)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
@@ -173,7 +173,7 @@ class ServeStateTest {
     @Test
     fun `use - closes store after block`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = ServerRemoteMiddleware<ServerState, ServerAction>(connection)
+        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(connection)
         val store = createStore(
             initialState = ServerState(),
             reducer = serverReducer,
