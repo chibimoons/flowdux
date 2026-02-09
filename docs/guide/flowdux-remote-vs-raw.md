@@ -755,3 +755,11 @@ webSocket("/room/{roomId}") { rooms[roomId]?.roomStore?.handleClient(id, connect
 | "복잡한 게임/협업 도구" | **FlowDux Remote** |
 
 FlowDux Remote는 **프로토콜 정의와 상태 관리를 통합**하여 boilerplate를 줄이고, **확장 가능한 구조**를 제공합니다. Raw WebSocket 대비 코드량은 평균 **40-50% 감소**하며, 특히 복잡한 시나리오에서 그 차이가 커집니다.
+
+## Related
+
+- [Server Patterns Overview](./server-patterns.md) — Pattern selection guide (Single Client, Shared State, Room, Per-Client)
+- [Remote Guide](./remote.md) — Basic client-server setup
+- [Room Pattern](./pattern-room.md) — Multi-room management
+- [Per-Client Pattern](./pattern-per-client.md) — Private state per client
+- [Scaling Guide](./scaling.md) — Parallel broadcast for large-scale deployments

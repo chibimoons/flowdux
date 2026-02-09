@@ -321,5 +321,6 @@ Test endpoints:
 
 ## Next Steps
 
+- [Server Patterns Overview](./server-patterns.md) — Pattern selection guide
 - [Remote State Sync](./remote.md) — Basic client-server setup
-- [Room Store Pattern](./pattern-room.md) — Multi-room management
+- [Room Pattern](./pattern-room.md) — Multi-room management
