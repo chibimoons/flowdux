@@ -64,6 +64,9 @@ chatRoom.close()
 실제 서비스에서는 여러 방을 동시에 운영합니다.
 
 ```kotlin
+import io.flowdux.remote.server.pattern.SharedStateServer
+import io.flowdux.remote.server.pattern.createSharedStateServer
+import kotlinx.coroutines.CoroutineScope
 import java.util.concurrent.ConcurrentHashMap
 
 class RoomManager(
