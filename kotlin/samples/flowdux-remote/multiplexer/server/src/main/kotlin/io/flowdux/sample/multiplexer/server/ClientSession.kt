@@ -20,8 +20,8 @@ class ClientSession(
     val sessionId: String,
     private val roomManager: RoomManager,
 ) {
-    // Track which rooms this client has joined
-    private val joinedRooms = mutableSetOf<String>()
+    // Track which rooms this client has joined and their handler jobs
+    private val roomJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
 
     // Multiplexer is set after construction (due to circular dependency with callback)
     private lateinit var multiplexer: ServerConnectionMultiplexer<SharedChatAction>
@@ -66,7 +66,7 @@ class ClientSession(
      * Join a room and start handling its actions.
      */
     private suspend fun joinRoom(roomId: String, joinAction: SharedChatAction.JoinRoom, scope: CoroutineScope) {
-        if (roomId in joinedRooms) {
+        if (roomId in roomJobs) {
             println("[ClientSession $sessionId] Already in room: $roomId")
             return
         }
@@ -80,19 +80,23 @@ class ClientSession(
         val virtualConnection = multiplexer.getOrCreateRoom(roomId)
 
         // Register with the room's RemoteServer (launches handler in background)
+        // Track the job so we can cancel it when leaving the room
         // The upcast is needed because SharedChatAction extends ChatAction
         @Suppress("UNCHECKED_CAST")
-        scope.launch {
+        val job = scope.launch {
             room.handleClient(
                 sessionId,
                 virtualConnection as io.flowdux.remote.server.connection.TypedServerConnection<ChatAction>,
             )
         }
 
-        // Wait for session to be registered before dispatching
-        kotlinx.coroutines.delay(50)
+        // Store the job for cleanup on leave
+        roomJobs[roomId] = job
 
-        joinedRooms.add(roomId)
+        // Wait for session to be registered before dispatching
+        // Note: This delay is a simple approach for demo purposes. In production,
+        // consider using a deterministic signal (e.g., callback or channel).
+        kotlinx.coroutines.delay(50)
 
         // Dispatch the JoinRoom action to the room (it was consumed by the callback)
         room.store.dispatch(joinAction)
@@ -102,22 +106,23 @@ class ClientSession(
      * Leave a room.
      */
     private suspend fun leaveRoom(roomId: String) {
-        if (roomId !in joinedRooms) {
-            return
-        }
+        val job = roomJobs.remove(roomId) ?: return
 
         println("[ClientSession $sessionId] Leaving room: $roomId")
+
+        // Cancel the handleClient job to unregister from sessionRegistry
+        job.cancel()
+
         if (::multiplexer.isInitialized) {
             multiplexer.removeRoom(roomId)
         }
-        joinedRooms.remove(roomId)
     }
 
     /**
      * Leave all rooms (called on disconnect).
      */
     suspend fun leaveAllRooms() {
-        joinedRooms.toList().forEach { roomId ->
+        roomJobs.keys.toList().forEach { roomId ->
             leaveRoom(roomId)
         }
         // Signal connection close

@@ -58,8 +58,16 @@ class ClientConnectionMultiplexer<A : Action>(
      *
      * This launches the connection in a background coroutine and starts routing
      * immediately. The connection runs until [disconnect] or [close] is called.
+     *
+     * This method is idempotent - calling it multiple times has no effect if
+     * already connected.
      */
     fun connect() {
+        // Idempotency guard: skip if already routing
+        if (routingJob?.isActive == true) {
+            return
+        }
+
         // Start routing first so we're ready to receive messages
         startRouting()
         // Launch connection in background (connect() suspends until closed)
