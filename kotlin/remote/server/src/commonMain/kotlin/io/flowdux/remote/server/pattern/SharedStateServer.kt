@@ -9,11 +9,9 @@ import io.flowdux.Reducer
 import io.flowdux.State
 import io.flowdux.Store
 import io.flowdux.StoreLogger
-import io.flowdux.createStore
 import io.flowdux.remote.server.ClientHandler
 import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.middleware.InternalAddSession
-import io.flowdux.remote.server.middleware.MultiClientSyncMiddleware
 import io.flowdux.remote.server.serveState
 import io.flowdux.remote.server.session.BroadcastConfig
 import io.flowdux.remote.server.session.InMemorySessionRegistry
@@ -191,12 +189,12 @@ fun <S : State, A : Action> createSharedStateServer(
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ): SharedStateServer<S, A> {
     val broadcaster = SessionBroadcaster(sessionRegistry, broadcastConfig)
-    val middleware = MultiClientSyncMiddleware<S, A>(processors, broadcaster)
 
-    val store = createStore(
+    val store = createMultiClientStore(
         initialState = initialState,
-        middlewares = listOf(middleware),
         reducer = reducer,
+        broadcaster = broadcaster,
+        processors = processors,
         errorProcessor = errorProcessor,
         logger = logger,
         scope = scope,
@@ -213,19 +211,18 @@ fun <S : State, A : Action> createSharedStateServer(
 /**
  * Create a [SharedStateServer] from an existing [Store].
  *
- * This is the recommended way to create a SharedStateServer as it gives full control
- * over store configuration, middleware, and other settings.
+ * Use this when you need full control over store configuration. For most cases,
+ * use [createMultiClientStore] to create the store:
  *
  * ```kotlin
  * val registry = InMemorySessionRegistry<MyAction>()
  * val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Default)
- * val middleware = MultiClientSyncMiddleware<MyState, MyAction>(processors, broadcaster)
  *
- * val store = createStore(
+ * val store = createMultiClientStore(
  *     initialState = MyState(),
  *     reducer = myReducer,
- *     middlewares = listOf(middleware, otherMiddleware),
- *     scope = scope,
+ *     broadcaster = broadcaster,
+ *     processors = myProcessors,
  * )
  *
  * val server = createSharedStateServer(
@@ -236,8 +233,10 @@ fun <S : State, A : Action> createSharedStateServer(
  * )
  * ```
  *
- * @param store The store to use for state management.
- * @param broadcaster The broadcaster for sending actions to clients.
+ * @param store The store to use for state management. Should be created with
+ *              [createMultiClientStore] or configured with [MultiClientSyncMiddleware].
+ * @param broadcaster The broadcaster for sending actions to clients. Must be the same
+ *                    instance used when creating the store.
  * @param stateMapper Maps server state to an action that will be broadcast to all clients.
  * @param scope Coroutine scope for state broadcasting. The caller is responsible for
  *              managing the lifecycle of this scope.
@@ -317,12 +316,12 @@ fun <S : State, A : Action> createSessionAwareSharedStateServer(
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ): SharedStateServer<S, A> {
     val broadcaster = SessionBroadcaster(sessionRegistry, broadcastConfig)
-    val middleware = MultiClientSyncMiddleware<S, A>(processors, broadcaster)
 
-    val store = createStore(
+    val store = createMultiClientStore(
         initialState = initialState,
-        middlewares = listOf(middleware),
         reducer = reducer,
+        broadcaster = broadcaster,
+        processors = processors,
         errorProcessor = errorProcessor,
         logger = logger,
         scope = scope,

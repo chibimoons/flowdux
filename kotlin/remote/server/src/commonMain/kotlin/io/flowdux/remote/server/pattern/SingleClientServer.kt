@@ -43,7 +43,66 @@ import kotlinx.coroutines.SupervisorJob
 typealias SingleClientServer<S, A> = Store<S, A>
 
 /**
+ * Create a [Store] configured for single-client communication.
+ *
+ * The store is pre-configured with [SingleClientSyncMiddleware] that:
+ * - Listens for incoming actions from the client connection
+ * - Processes [ServerSharedAction]s through the provided processors
+ * - Passes actions to the reducer for state updates
+ *
+ * Use [serve][io.flowdux.remote.server.serve] to start syncing state changes
+ * back to the client.
+ *
+ * ```kotlin
+ * val store = createSingleClientStore(
+ *     initialState = GameState(),
+ *     reducer = gameReducer,
+ *     connection = connection,
+ *     processors = gameProcessors,
+ * )
+ * store.serve { SyncState(it) }
+ * ```
+ *
+ * @param initialState Initial state for the store.
+ * @param reducer Reducer for processing actions.
+ * @param connection Typed connection for sending/receiving actions with the client.
+ * @param processors Action processors for server-side handling.
+ * @param errorProcessor Error processor for the store.
+ * @param logger Logger for the store.
+ * @param scope Coroutine scope for the store.
+ * @return A [Store] configured with [SingleClientSyncMiddleware].
+ */
+fun <S : State, A : Action> createSingleClientStore(
+    initialState: S,
+    reducer: Reducer<S, A>,
+    connection: TypedServerConnection<A>,
+    processors: ActionProcessorMap<S, A> = emptyMap(),
+    errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
+    logger: StoreLogger<S, A> = NoOpStoreLogger(),
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+): Store<S, A> {
+    val middleware = if (processors.isEmpty()) {
+        SingleClientSyncMiddleware(connection)
+    } else {
+        object : SingleClientSyncMiddleware<S, A>(connection) {
+            override val processors: ActionProcessorMap<S, A> = processors
+        }
+    }
+
+    return createStore(
+        initialState = initialState,
+        reducer = reducer,
+        middlewares = listOf(middleware),
+        errorProcessor = errorProcessor,
+        logger = logger,
+        scope = scope,
+    )
+}
+
+/**
  * Create a [SingleClientServer] for 1:1:1 pattern.
+ *
+ * This is an alias for [createSingleClientStore] that emphasizes the server role.
  *
  * ```kotlin
  * webSocket("/game") {
@@ -76,21 +135,12 @@ fun <S : State, A : Action> createSingleClientServer(
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
     logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-): SingleClientServer<S, A> {
-    val middleware = if (processors.isEmpty()) {
-        SingleClientSyncMiddleware(connection)
-    } else {
-        object : SingleClientSyncMiddleware<S, A>(connection) {
-            override val processors: ActionProcessorMap<S, A> = processors
-        }
-    }
-
-    return createStore(
-        initialState = initialState,
-        reducer = reducer,
-        middlewares = listOf(middleware),
-        errorProcessor = errorProcessor,
-        logger = logger,
-        scope = scope,
-    )
-}
+): SingleClientServer<S, A> = createSingleClientStore(
+    initialState = initialState,
+    reducer = reducer,
+    connection = connection,
+    processors = processors,
+    errorProcessor = errorProcessor,
+    logger = logger,
+    scope = scope,
+)
