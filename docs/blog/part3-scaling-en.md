@@ -71,7 +71,7 @@ class Room(
             middlewares = listOf(
                 ValidationMiddleware(),
                 GameLogicMiddleware(),
-                GameServerRemoteMiddleware(connection),
+                GameSingleClientSyncMiddleware(connection),
             ),
             scope = scope,
         )
@@ -139,7 +139,7 @@ The boundary between FlowDux and server code is clear:
 | WebSocket Routing | No | Ktor routing |
 | **Store (per Room)** | **Yes** | State management |
 | **Middleware Pipeline** | **Yes** | Validation, game logic |
-| **ServerRemoteMiddleware** | **Yes** | Client ↔ Store bridge |
+| **SingleClientSyncMiddleware** | **Yes** | Client ↔ Store bridge |
 
 FlowDux manages the state and business logic *inside* each Room. Everything outside — authentication, matchmaking, connection management — is your server code.
 
@@ -438,7 +438,7 @@ The Room itself doesn't know about Redis. From its perspective, actions arrive a
 |---------|-----------------|-------------|
 | State management | Store | Per-room state |
 | Business logic | Middleware | Validation, game rules |
-| Client sync | ServerRemoteMiddleware | Action receive + state push |
+| Client sync | SingleClientSyncMiddleware | Action receive + state push |
 | State mapping | `serve {}` / StateView | Filter state per client |
 
 The scaling layer wraps around FlowDux without changing it. The Store, middleware, and sync mechanisms work identically whether there's one server or fifty.

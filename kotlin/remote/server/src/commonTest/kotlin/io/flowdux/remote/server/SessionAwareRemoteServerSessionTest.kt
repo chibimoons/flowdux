@@ -1,6 +1,7 @@
 package io.flowdux.remote.server
 
 import io.flowdux.Middleware
+import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.emptyFlow

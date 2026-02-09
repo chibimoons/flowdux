@@ -177,9 +177,9 @@ val serverChatReducer: Reducer<ServerChatState, ChatAction> = buildReducer {
 The middleware translates incoming shared actions into server-internal actions:
 
 ```kotlin
-class ChatServerRemoteMiddleware(
+class ChatSingleClientSyncMiddleware(
     connection: TypedServerConnection<ChatAction>,
-) : ServerRemoteMiddleware<ServerChatState, ChatAction>(connection) {
+) : SingleClientSyncMiddleware<ServerChatState, ChatAction>(connection) {
 
     override val processors = buildProcessors {
         on<SharedChatAction.SendMessage> { _, action ->
@@ -274,7 +274,7 @@ The client middleware handles connection lifecycle:
 ```kotlin
 class ChatRemoteMiddleware(
     connection: TypedClientConnection<ChatAction>,
-) : ClientRemoteMiddleware<ClientChatState, ChatAction>(connection) {
+) : SyncMiddleware<ClientChatState, ChatAction>(connection) {
 
     override val processors = buildProcessors {
         on<ClientChatAction.Connect> { _, _ ->
@@ -313,7 +313,7 @@ fun main() = runBlocking {
 }
 ```
 
-Look at the client code. It dispatches `SharedChatAction.JoinRoom` — a shared action. The `ClientRemoteMiddleware` intercepts it (because it's a `ServerSharedAction`), serializes it, and sends it over the WebSocket. On the server side, `ServerRemoteMiddleware` receives it, dispatches it to the server store, the middleware processes it, the reducer updates state, and `.serve {}` pushes `SyncState` back to all clients.
+Look at the client code. It dispatches `SharedChatAction.JoinRoom` — a shared action. The `SyncMiddleware` intercepts it (because it's a `ServerSharedAction`), serializes it, and sends it over the WebSocket. On the server side, `SingleClientSyncMiddleware` receives it, dispatches it to the server store, the middleware processes it, the reducer updates state, and `.serve {}` pushes `SyncState` back to all clients.
 
 All of that happens from a single `store.dispatch()` call. No HTTP request. No endpoint URL. No status code handling.
 
@@ -329,16 +329,16 @@ Let's trace the complete lifecycle of a single action — Alice sends a message:
   1.   │  dispatch(SendMessage(       │                            │
        │    "Alice", "Hello"))        │                            │
        │                              │                            │
-  2.   │  ClientRemoteMiddleware      │                            │
+  2.   │  SyncMiddleware      │                            │
        │  intercepts ServerSharedAction│                            │
        │  → serializes → WebSocket    │                            │
        │                              │                            │
   3.   │ ──── SendMessage ──────────→ │                            │
        │                              │                            │
-  4.   │                  ServerRemoteMiddleware                    │
+  4.   │                  SingleClientSyncMiddleware                    │
        │                  receives & dispatches                    │
        │                              │                            │
-  5.   │                  ChatServerRemoteMiddleware                │
+  5.   │                  ChatSingleClientSyncMiddleware                │
        │                  emits MessageReceived                    │
        │                              │                            │
   6.   │                  Reducer updates state:                   │
@@ -349,7 +349,7 @@ Let's trace the complete lifecycle of a single action — Alice sends a message:
        │                              │                            │
   8.   │ ←── SyncState(newState) ──── │ ── SyncState(newState) ──→ │
        │                              │                            │
-  9.   │  ClientRemoteMiddleware      │    ClientRemoteMiddleware  │
+  9.   │  SyncMiddleware      │    SyncMiddleware  │
        │  receives ClientSharedAction │    receives same action    │
        │  → dispatches to client store│    → dispatches to store   │
        │                              │                            │
@@ -496,7 +496,7 @@ No status codes to memorize. No error response format to design separately. Erro
 
 All the code in this post uses [flowdux-remote](https://github.com/chibimoons/flowdux), a Kotlin library we built as a reference implementation of the Action/State pattern. It provides:
 
-- `ServerRemoteMiddleware` / `ClientRemoteMiddleware` — handle serialization and WebSocket transport
+- `SingleClientSyncMiddleware` / `SyncMiddleware` — handle serialization and WebSocket transport
 - `serve {}` — observe state changes and push to clients
 - `createRemoteServer` — create a `RemoteServer` facade managing multiple client connections to a shared Store
 - `TypedConnection` — type-safe abstraction over the wire protocol

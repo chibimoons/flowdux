@@ -1,6 +1,7 @@
-package io.flowdux.remote.server
+package io.flowdux.remote.server.session
 
 import io.flowdux.Action
+import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.asFlow
@@ -49,7 +50,7 @@ data class BroadcastConfig(
  * @param config Broadcast configuration (concurrency level).
  */
 class SessionBroadcaster<A : Action>(
-    private val registry: SessionRegistry<A>,
+    val registry: SessionRegistry<A>,
     private val config: BroadcastConfig = BroadcastConfig.Sequential,
 ) {
 

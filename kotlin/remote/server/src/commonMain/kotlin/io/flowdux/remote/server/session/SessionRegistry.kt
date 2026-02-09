@@ -1,6 +1,7 @@
-package io.flowdux.remote.server
+package io.flowdux.remote.server.session
 
 import io.flowdux.Action
+import io.flowdux.remote.server.connection.TypedServerConnection
 
 /**
  * Abstraction for storing and managing client session connections.

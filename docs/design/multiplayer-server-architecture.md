@@ -102,7 +102,7 @@ sequenceDiagram
     Note right of SRM: 내부: MessageCodec.decodeActionFromClient()<br/>→ ActionCodec.decode()
     SRM->>Store: dispatch(action)
 
-    Note over Store: Middleware Pipeline<br/>1. Validation<br/>2. AuthCheck<br/>3. GameLogic<br/>4. ServerRemoteMiddleware
+    Note over Store: Middleware Pipeline<br/>1. Validation<br/>2. AuthCheck<br/>3. GameLogic<br/>4. SingleClientSyncMiddleware
 
     Store->>Store: reducer → state 업데이트
     Store->>SRM: serve() → state 변경 감지
@@ -163,7 +163,7 @@ flowchart TD
 | **RoomManager** | 서버 자체 로직 (Room 생성/매칭/삭제) | X |
 | **Room 안의 Store** | `createStore()` - 게임 상태 관리 | **O** |
 | **Room 안의 Middleware Pipeline** | FlowDux `Middleware` (검증, 게임 로직) | **O** |
-| **ServerRemoteMiddleware** | FlowDux remote 모듈 (클라이언트 ↔ Store 연결) | **O** |
+| **SingleClientSyncMiddleware** | FlowDux remote 모듈 (클라이언트 ↔ Store 연결) | **O** |
 | **Tick Loop / StateView** | 서버 코드 (향후 FlowDux 기능으로 추가 가능) | X |
 
 ```mermaid
@@ -281,7 +281,7 @@ class Room(
     private lateinit var store: Store<GameState, GameAction>
 
     fun initialize(connection: TypedServerConnection<GameAction>) {
-        val srm = GameServerRemoteMiddleware(connection)
+        val srm = GameSingleClientSyncMiddleware(connection)
         store = createStore(
             initialState = GameState(),
             reducer = gameReducer,
@@ -415,7 +415,7 @@ fun main() {
 main()                               GameState, GameAction (상태/액션 정의)
 ├─ install(Authentication)           gameReducer (상태 변환 로직)
 ├─ install(WebSockets)               GameLogicMiddleware (게임 로직)
-├─ authenticate("game-auth")         ServerRemoteMiddleware (클라이언트 ↔ Store)
+├─ authenticate("game-auth")         SingleClientSyncMiddleware (클라이언트 ↔ Store)
 ├─ RoomManager.findOrCreateRoom()    createStore() (Store 생성)
 ├─ room.addPlayer()
 ├─ room.initialize(typedConn)

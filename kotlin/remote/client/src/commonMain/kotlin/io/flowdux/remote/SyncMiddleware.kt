@@ -67,7 +67,7 @@ import kotlinx.coroutines.sync.withLock
  * @param onConnectionError Optional callback to convert connection errors to actions.
  *        When provided, connection failures will be dispatched through the store.
  */
-open class ClientRemoteMiddleware<S : State, A : Action>(
+open class SyncMiddleware<S : State, A : Action>(
     private val connection: TypedClientConnection<A>,
     scope: CoroutineScope? = null,
     private val onConnectionError: ((Throwable) -> A)? = null,
@@ -83,7 +83,7 @@ open class ClientRemoteMiddleware<S : State, A : Action>(
         actualScope.coroutineContext[Job]?.invokeOnCompletion { errorChannel.close() }
     }
 
-    override val name: String = "ClientRemoteMiddleware"
+    override val name: String = "SyncMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     /**

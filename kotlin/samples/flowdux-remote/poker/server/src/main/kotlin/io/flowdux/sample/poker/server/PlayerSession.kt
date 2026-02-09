@@ -4,8 +4,8 @@ import io.flowdux.State
 import io.flowdux.Store
 import io.flowdux.createStore
 import io.flowdux.buildReducer
-import io.flowdux.remote.server.ServerRemoteMiddleware
-import io.flowdux.remote.server.TypedServerConnection
+import io.flowdux.remote.server.middleware.SingleClientSyncMiddleware
+import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.serve
 import io.flowdux.sample.poker.Card
 import io.flowdux.sample.poker.PokerAction
@@ -79,7 +79,7 @@ private val playerReducer = buildReducer<PlayerState, PokerAction> {
 /** Middleware for player session - handles private state sync. */
 private class PlayerRemoteMiddleware(
     connection: TypedServerConnection<PokerAction>,
-) : ServerRemoteMiddleware<PlayerState, PokerAction>(
+) : SingleClientSyncMiddleware<PlayerState, PokerAction>(
     connection = connection,
 ) {
     override val name: String = "PlayerRemoteMiddleware"

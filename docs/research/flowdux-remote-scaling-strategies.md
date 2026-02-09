@@ -14,7 +14,7 @@
 │  ┌────────────────────────────────────────────┐  │
 │  │           Store<GameState, GameAction>      │  │
 │  │  ┌──────────────────────────────────────┐  │  │
-│  │  │  MultiClientServerRemoteMiddleware   │  │  │
+│  │  │  MultiClientSingleClientSyncMiddleware   │  │  │
 │  │  │                                      │  │  │
 │  │  │  sessions = {                        │  │  │
 │  │  │    "alice" → TypedServerConnection   │  │  │
@@ -147,11 +147,11 @@
 
 ```
 현재:
-  MultiClientServerRemoteMiddleware
+  MultiClientSingleClientSyncMiddleware
     └── broadcast(action)  →  로컬 sessions만 순회
 
 변경:
-  MultiClientServerRemoteMiddleware
+  MultiClientSingleClientSyncMiddleware
     └── broadcast(action)
           ├── 로컬 sessions 순회 (기존)
           └── backplane.publish("room-A", action)  ← 추가

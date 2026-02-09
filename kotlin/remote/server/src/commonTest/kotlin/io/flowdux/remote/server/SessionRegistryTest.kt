@@ -1,5 +1,6 @@
 package io.flowdux.remote.server
 
+import io.flowdux.remote.server.session.InMemorySessionRegistry
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

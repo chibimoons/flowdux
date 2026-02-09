@@ -47,7 +47,7 @@ The Per-Client Store pattern uses existing FlowDux APIs:
 | API | Purpose |
 |-----|---------|
 | `createRemoteServer()` | Room Store for shared state |
-| `createStore()` + `ServerRemoteMiddleware` | Per-Client Store for private state |
+| `createStore()` + `SingleClientSyncMiddleware` | Per-Client Store for private state |
 | `Store.serve()` | Sync private state to client |
 | `store.dispatch()` | Inject updates from Room Store |
 
@@ -82,7 +82,7 @@ class PlayerSession(
     val playerId: String,
     private val connection: TypedServerConnection<PokerAction>,
 ) {
-    private val middleware = ServerRemoteMiddleware<PlayerState, PokerAction>(connection)
+    private val middleware = SingleClientSyncMiddleware<PlayerState, PokerAction>(connection)
 
     val store: Store<PlayerState, PokerAction> = createStore(
         initialState = PlayerState(playerId = playerId),

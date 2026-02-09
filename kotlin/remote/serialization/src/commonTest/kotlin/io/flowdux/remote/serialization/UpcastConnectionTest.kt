@@ -3,7 +3,7 @@ package io.flowdux.remote.serialization
 import io.flowdux.Action
 import io.flowdux.remote.ConnectionState
 import io.flowdux.remote.TypedClientConnection
-import io.flowdux.remote.server.TypedServerConnection
+import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

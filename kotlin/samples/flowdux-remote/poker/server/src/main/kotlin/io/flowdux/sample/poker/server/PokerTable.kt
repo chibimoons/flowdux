@@ -2,9 +2,8 @@ package io.flowdux.sample.poker.server
 
 import io.flowdux.Middleware
 import io.flowdux.sequential
-import io.flowdux.remote.server.RemoteServer
-import io.flowdux.remote.server.TypedServerConnection
-import io.flowdux.remote.server.createRemoteServer
+import io.flowdux.remote.server.pattern.SharedStateServer
+import io.flowdux.remote.server.pattern.createSharedStateServer
 import io.flowdux.sample.poker.Card
 import io.flowdux.sample.poker.GamePhase
 import io.flowdux.sample.poker.PokerAction
@@ -43,7 +42,7 @@ class PokerTable(
 ) {
     private val players = ConcurrentHashMap<String, PlayerSession>()
 
-    val roomStore: RemoteServer<ServerTableState, PokerAction> = createRemoteServer(
+    val roomStore: SharedStateServer<ServerTableState, PokerAction> = createSharedStateServer(
         initialState = ServerTableState(),
         reducer = serverTableReducer,
         processors = tableProcessors(),

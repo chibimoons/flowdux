@@ -1,4 +1,4 @@
-package io.flowdux.remote.server
+package io.flowdux.remote.server.connection
 
 import io.flowdux.Action
 import kotlinx.coroutines.flow.Flow

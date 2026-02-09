@@ -59,9 +59,9 @@ kotlin {
         commonMain.dependencies {
             // Shared action markers (ServerSharedAction, ClientSharedAction)
             implementation("io.github.chibimoons:flowdux-remote-core:1.12.0")
-            // Client middleware (ClientRemoteMiddleware)
+            // Client middleware (SyncMiddleware)
             implementation("io.github.chibimoons:flowdux-remote-client:1.12.0")
-            // Server middleware (ServerRemoteMiddleware)
+            // Server middleware (SingleClientSyncMiddleware, MultiClientSyncMiddleware)
             implementation("io.github.chibimoons:flowdux-remote-server:1.12.0")
             // kotlinx.serialization codecs (ActionCodec, MessageCodec)
             implementation("io.github.chibimoons:flowdux-remote-serialization:1.12.0")

@@ -49,13 +49,13 @@ val testErrorProcessor = object : ErrorProcessor<TestAction> {
     override fun process(throwable: Throwable): Flow<TestAction> = emptyFlow()
 }
 
-// -- Test ClientRemoteMiddleware subclass --
+// -- Test SyncMiddleware subclass --
 
-class TestClientRemoteMiddleware(
+class TestSyncMiddleware(
     connection: TypedClientConnection<TestAction>,
     scope: CoroutineScope? = null,
     onConnectionError: ((Throwable) -> TestAction)? = null,
-) : ClientRemoteMiddleware<TestState, TestAction>(
+) : SyncMiddleware<TestState, TestAction>(
     connection = connection,
     scope = scope,
     onConnectionError = onConnectionError,

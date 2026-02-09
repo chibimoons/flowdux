@@ -71,7 +71,7 @@ class Room(
             middlewares = listOf(
                 ValidationMiddleware(),
                 GameLogicMiddleware(),
-                GameServerRemoteMiddleware(connection),
+                GameSingleClientSyncMiddleware(connection),
             ),
             scope = scope,
         )
@@ -139,7 +139,7 @@ FlowDux와 서버 코드의 경계가 명확합니다:
 | WebSocket 라우팅 | 아니오 | Ktor 라우팅 |
 | **Store (Room당)** | **예** | 상태 관리 |
 | **미들웨어 파이프라인** | **예** | 검증, 게임 로직 |
-| **ServerRemoteMiddleware** | **예** | 클라이언트 ↔ Store 브릿지 |
+| **SingleClientSyncMiddleware** | **예** | 클라이언트 ↔ Store 브릿지 |
 
 FlowDux는 각 Room *내부*의 상태와 비즈니스 로직을 관리합니다. 그 바깥의 모든 것 — 인증, 매치메이킹, 연결 관리 — 은 서버 코드입니다.
 
@@ -438,7 +438,7 @@ Room 자체는 Redis를 모릅니다. Room 관점에서는 액션이 도착하�
 |--------|-------------|------|
 | 상태 관리 | Store | Room별 상태 |
 | 비즈니스 로직 | Middleware | 검증, 게임 규칙 |
-| 클라이언트 동기화 | ServerRemoteMiddleware | 액션 수신 + 상태 푸시 |
+| 클라이언트 동기화 | SingleClientSyncMiddleware | 액션 수신 + 상태 푸시 |
 | 상태 매핑 | `serve {}` / StateView | 클라이언트별 상태 필터 |
 
 스케일링 레이어가 FlowDux를 변경하지 않고 감쌉니다. Store, 미들웨어, 동기화 메커니즘은 서버가 하나든 오십 개든 동일하게 동작합니다.

@@ -49,8 +49,8 @@
 
 ```
 flowdux-remote-core          SharedAction, ServerSharedAction, ClientSharedAction
-flowdux-remote-client        ClientRemoteMiddleware, ClientConnection, TypedClientConnection
-flowdux-remote-server        MultiClientServerRemoteMiddleware, RemoteServerSession, ServerConnection
+flowdux-remote-client        SyncMiddleware, ClientConnection, TypedClientConnection
+flowdux-remote-server        MultiClientSingleClientSyncMiddleware, RemoteServerSession, ServerConnection
 flowdux-remote-serialization ActionCodec, MessageCodec, DefaultTyped*Connection
 flowdux-remote-ktor          KtorWebSocket*Connection (transport 구현체)
 ```
@@ -70,8 +70,8 @@ flowdux-remote-ktor          KtorWebSocket*Connection (transport 구현체)
 
 | 마커 | 방향 | Middleware 동작 |
 |------|------|----------------|
-| `ServerSharedAction` | Client → Server | `ClientRemoteMiddleware`가 가로채서 서버로 전송. 로컬 Store에는 emit하지 않음. |
-| `ClientSharedAction` | Server → Client | `MultiClientServerRemoteMiddleware`가 가로채서 클라이언트로 broadcast. 로컬 Store에는 emit하지 않음. |
+| `ServerSharedAction` | Client → Server | `SyncMiddleware`가 가로채서 서버로 전송. 로컬 Store에는 emit하지 않음. |
+| `ClientSharedAction` | Server → Client | `MultiClientSingleClientSyncMiddleware`가 가로채서 클라이언트로 broadcast. 로컬 Store에는 emit하지 않음. |
 | `SessionAwareAction<A>` *(미구현, 설계 중)* | Server → Client (per-session) | `forSession(sessionId): A?`로 클라이언트별 다른 액션 전송. null 반환 시 해당 세션 스킵. 현재는 `createSessionAwareRemoteServer`의 `sessionStateMapper`로 동일 기능 제공. |
 
 **세션 관리**
@@ -79,7 +79,7 @@ flowdux-remote-ktor          KtorWebSocket*Connection (transport 구현체)
 | 클래스 | 역할 | 핵심 멤버 |
 |--------|------|----------|
 | `RemoteServerSession<A>` | 멀티 클라이언트 세션 관리자 | `handleClient(id, conn)`, `broadcast(action)`, `sendToClient(id, action)`, `sendPerSession(mapper)` |
-| `MultiClientServerRemoteMiddleware<S, A>` | 서버 미들웨어 | `ClientSharedAction` 가로채기, `InternalAddSession` 처리 (FlowHolderAction으로 수신 리스닝 시작) |
+| `MultiClientSingleClientSyncMiddleware<S, A>` | 서버 미들웨어 | `ClientSharedAction` 가로채기, `InternalAddSession` 처리 (FlowHolderAction으로 수신 리스닝 시작) |
 
 ### 1.3 현재 데이터 흐름
 
@@ -90,7 +90,7 @@ flowdux-remote-ktor          KtorWebSocket*Connection (transport 구현체)
 │  ┌─────────────────────────────────────────────────────────────┐  │
 │  │ Store<S, A>                                                 │  │
 │  │                                                             │  │
-│  │  Reducer ◄── action ◄── MultiClientServerRemoteMiddleware   │  │
+│  │  Reducer ◄── action ◄── MultiClientSingleClientSyncMiddleware   │  │
 │  │    │                          │              │              │  │
 │  │    ▼                          │              │              │  │
 │  │  new state ──► serveState() ──┘     sessions(MutableMap)    │  │
@@ -115,7 +115,7 @@ flowdux-remote-ktor          KtorWebSocket*Connection (transport 구현체)
   dispatch(ServerSharedAction)
       │
       ▼
-  ClientRemoteMiddleware
+  SyncMiddleware
   → connection.send(action)  ─────►  SessionListenerAction
   → 로컬 emit 안 함                  → dispatch to Store
                                       → Reducer 처리
@@ -277,7 +277,7 @@ alice가 "game-1"에서 액션 전송:
 | `RoomManager` | **신규**. Room 생성/삭제/조회, 클라이언트-Room 라우팅. |
 | `RemoteServer` | Room당 1개 인스턴스 생성. Store + Session을 캡슐화. |
 | `RemoteServerSession` | 변경 없음. `RemoteServer` 내부에서 세션 관리. |
-| `MultiClientServerRemoteMiddleware` | 변경 없음. Session 단위로 동작. |
+| `MultiClientSingleClientSyncMiddleware` | 변경 없음. Session 단위로 동작. |
 | Ktor 엔드포인트 | Room ID를 URL path 또는 쿼리로 수신하여 RoomManager에 전달. |
 
 ### 3.5 적용 시나리오
@@ -558,7 +558,7 @@ Gateway 분리 후:
 | `GatewayServer` | **신규 서비스**. WebSocket 수립, 직렬화, 라우팅. |
 | `GatewayConnection` | **신규**. `TypedServerConnection` 구현체. Gateway ↔ Logic 통신. |
 | `RemoteServerSession` | 변경 없음. `TypedServerConnection`이 추상화되어 있으므로. |
-| `MultiClientServerRemoteMiddleware` | 변경 없음. |
+| `MultiClientSingleClientSyncMiddleware` | 변경 없음. |
 | 내부 프로토콜 | **신규**. Gateway ↔ Logic 간 gRPC 또는 MQ 프로토콜 정의. |
 | 라우팅 테이블 | **신규**. sessionId → Logic Server 매핑. |
 
@@ -1187,7 +1187,7 @@ PR #95는 서버측 아키텍처를 대폭 리팩토링하여 관심사를 분�
 ### 13.1 변경 전 (Before PR #95)
 
 ```
-MultiClientServerRemoteMiddleware
+MultiClientSingleClientSyncMiddleware
 ├── 세션 저장소 (MutableMap + Mutex)     ← 직접 관리
 ├── 액션 라우팅 (ClientSharedAction 가로채기)
 ├── 프로세서 실행
@@ -1208,7 +1208,7 @@ RemoteServer<S, A>                       ← 신규 Facade
 │   ├── sendPerSession(mapper)
 │   ├── sessionIds()
 │   └── sessionCount()
-├── MultiClientServerRemoteMiddleware    ← 액션 라우팅만 담당
+├── MultiClientSingleClientSyncMiddleware    ← 액션 라우팅만 담당
 │   ├── InternalAddSession 처리
 │   ├── ClientSharedAction → session.broadcast()
 │   └── Processor 실행 + pass-through
@@ -1223,7 +1223,7 @@ RemoteServer<S, A>                       ← 신규 Facade
 
 | 항목 | Before | After |
 |------|--------|-------|
-| 세션 저장 | `MultiClientServerRemoteMiddleware` 내부 `MutableMap` | `RemoteServerSession` (독립 클래스) |
+| 세션 저장 | `MultiClientSingleClientSyncMiddleware` 내부 `MutableMap` | `RemoteServerSession` (독립 클래스) |
 | 세션 정리 | `InternalRemoveSession` 액션 dispatch | `handleClient()` 의 `finally` 블록 |
 | Store + 세션 조합 | 앱 개발자가 직접 조립 | `createRemoteServer()` 팩토리 함수 |
 | 세션별 상태 전송 | 없음 | `createSessionAwareRemoteServer()` + `sessionStateMapper` |
@@ -1479,8 +1479,8 @@ suspend fun handleClient(sessionId: String, connection: TypedServerConnection<A>
 val lobbyConnection = KtorWebSocketClientConnection("ws://server/lobby")
 val gameConnection = KtorWebSocketClientConnection("ws://server/game/123")
 
-val lobbyStore = createStore(middlewares = listOf(ClientRemoteMiddleware(lobbyConnection)))
-val gameStore = createStore(middlewares = listOf(ClientRemoteMiddleware(gameConnection)))
+val lobbyStore = createStore(middlewares = listOf(SyncMiddleware(lobbyConnection)))
+val gameStore = createStore(middlewares = listOf(SyncMiddleware(gameConnection)))
 ```
 
 - 장점: 현재 API 변경 없이 즉시 가능
@@ -1554,7 +1554,7 @@ val server = createSessionAwareRemoteServer(
   → finally 블록 기반 정리로 세션 누수 위험 감소
 
 ✓ Middleware가 세션 저장을 몰라도 됨
-  → MultiClientServerRemoteMiddleware의 단일 책임 원칙 달성
+  → MultiClientSingleClientSyncMiddleware의 단일 책임 원칙 달성
 ```
 
 ### 16.3 남은 Gap
@@ -1659,7 +1659,7 @@ Part 3 §15에서 식별한 **1 connection = 1 RemoteServer** 제약의 근본�
 │                                                                 │
 │  영향: 변경 불필요 (가상 구현체로 대체)                           │
 ├─────────────────────────────────────────────────────────────────┤
-│  Layer 4: Middleware (MultiClientServerRemoteMiddleware)         │
+│  Layer 4: Middleware (MultiClientSingleClientSyncMiddleware)         │
 │                                                                 │
 │  InternalAddSession(sessionId, connection)                      │
 │  → 1 session = 1 TypedServerConnection                         │
@@ -1692,7 +1692,7 @@ Part 3 §15에서 식별한 **1 connection = 1 RemoteServer** 제약의 근본�
 변경 불필요:
   ③ ServerConnection / ClientConnection     ← raw transport, 그대로 사용
   ④ TypedServerConnection                   ← 인터페이스 유지, 구현체만 교체
-  ⑤ MultiClientServerRemoteMiddleware       ← 가상 connection이 투명하게 동작
+  ⑤ MultiClientSingleClientSyncMiddleware       ← 가상 connection이 투명하게 동작
   ⑥ RemoteServerSession                     ← 가상 connection이 투명하게 동작
   ⑦ RemoteServer                            ← 가상 connection이 투명하게 동작
 ```
@@ -1709,7 +1709,7 @@ Part 3 §15에서 식별한 **1 connection = 1 RemoteServer** 제약의 근본�
 |------|------|----------|--------|
 | **A. Wire Envelope 확장만** | MessageCodec에 채널 필드 추가 | MessageCodec | 낮음 (불충분) |
 | **B. Multiplexing Wrapper** | Transport 위에 demux/mux 레이어 추가 | 신규 레이어 + MessageCodec | 중간 |
-| **C. Middleware 통합** | MultiClientServerRemoteMiddleware 내에서 채널 라우팅 | Middleware 대폭 수정 | 높음 |
+| **C. Middleware 통합** | MultiClientSingleClientSyncMiddleware 내에서 채널 라우팅 | Middleware 대폭 수정 | 높음 |
 | **D. 채널별 독립 Store** | 채널마다 RemoteServer, 물리 WS 공유 | B와 실질 동일 | 높음 |
 
 ### 19.2 각 접근 방식의 문제점
@@ -1725,7 +1725,7 @@ TypedServerConnection.incoming이 여전히 단일 Flow<A>이므로
 
 **C. Middleware 통합:**
 ```
-MultiClientServerRemoteMiddleware 내부에서 채널별 라우팅을 처리하면:
+MultiClientSingleClientSyncMiddleware 내부에서 채널별 라우팅을 처리하면:
 - InternalAddSession에 채널 정보 추가 필요
 - ClientSharedAction broadcast 시 채널별 필터링 필요
 - Processor에도 채널 컨텍스트 전달 필요
@@ -1930,9 +1930,9 @@ RemoteServer.handleClient(sessionId, connection)
 ### 21.1 현재 클라이언트 구조
 
 ```kotlin
-// 현재: 1 connection = 1 ClientRemoteMiddleware = 1 Store
+// 현재: 1 connection = 1 SyncMiddleware = 1 Store
 val connection = KtorWebSocketClientConnection("ws://server/chat")
-val middleware = ClientRemoteMiddleware<ChatState, ChatAction>(connection)
+val middleware = SyncMiddleware<ChatState, ChatAction>(connection)
 val store = createStore(middlewares = listOf(middleware), ...)
 ```
 
@@ -1949,11 +1949,11 @@ val mux = MultiplexedClientConnection<SharedAction>(
 
 // 채널별 독립 Store
 val lobbyConn = mux.channelConnection("lobby")
-val lobbyMiddleware = ClientRemoteMiddleware<LobbyState, LobbyAction>(lobbyConn)
+val lobbyMiddleware = SyncMiddleware<LobbyState, LobbyAction>(lobbyConn)
 val lobbyStore = createStore(middlewares = listOf(lobbyMiddleware), ...)
 
 val gameConn = mux.channelConnection("game")
-val gameMiddleware = ClientRemoteMiddleware<GameState, GameAction>(gameConn)
+val gameMiddleware = SyncMiddleware<GameState, GameAction>(gameConn)
 val gameStore = createStore(middlewares = listOf(gameMiddleware), ...)
 ```
 
@@ -2160,8 +2160,8 @@ flowdux-remote-ktor
   ├─ ClientConnection            raw transport (그대로)
   ├─ TypedServerConnection       인터페이스 유지 (구현체만 추가)
   ├─ TypedClientConnection       인터페이스 유지 (구현체만 추가)
-  ├─ MultiClientServerRemoteMiddleware   가상 connection에 투명
-  ├─ ClientRemoteMiddleware              가상 connection에 투명
+  ├─ MultiClientSingleClientSyncMiddleware   가상 connection에 투명
+  ├─ SyncMiddleware              가상 connection에 투명
   ├─ RemoteServerSession                 가상 connection에 투명
   ├─ RemoteServer                        가상 connection에 투명
   ├─ KtorWebSocket*Connection            raw transport (그대로)
