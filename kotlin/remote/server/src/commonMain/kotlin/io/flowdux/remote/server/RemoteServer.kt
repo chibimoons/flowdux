@@ -27,42 +27,48 @@ import kotlinx.coroutines.launch
 /**
  * Combines a [Store], [SessionRegistry], [SessionBroadcaster], and state broadcasting into a single object.
  *
- * Created by [createRemoteServer] or [createSessionAwareRemoteServer].
+ * ## Creating a RemoteServer
  *
- * Example (default - sequential broadcast):
+ * ### Option 1: Full control with store (recommended)
+ * ```kotlin
+ * // 1. Create session infrastructure
+ * val registry = InMemorySessionRegistry<ChatAction>()
+ * val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Default)
+ *
+ * // 2. Create middleware (custom or default)
+ * val middleware = MultiClientSyncMiddleware<ServerState, ChatAction>(
+ *     processors = myProcessors,
+ *     broadcaster = broadcaster,
+ * )
+ *
+ * // 3. Create store with full flexibility
+ * val store = createStore(
+ *     initialState = ServerState(),
+ *     reducer = serverReducer,
+ *     middlewares = listOf(middleware, loggingMiddleware), // add any middlewares
+ *     scope = applicationScope,
+ * )
+ *
+ * // 4. Create server
+ * val server = createRemoteServer(
+ *     store = store,
+ *     broadcaster = broadcaster,
+ *     stateMapper = { state -> SyncState(state) },
+ * )
+ * ```
+ *
+ * ### Option 2: Quick setup (convenience)
  * ```kotlin
  * val server = createRemoteServer(
- *     initialState = ServerChatState(),
- *     reducer = serverChatReducer,
- *     stateMapper = { state -> SyncState(state.toChatState()) },
+ *     initialState = ServerState(),
+ *     reducer = serverReducer,
+ *     processors = myProcessors,
+ *     stateMapper = { state -> SyncState(state) },
  *     scope = applicationScope,
  * )
  * ```
  *
- * Example (parallel broadcast for high throughput):
- * ```kotlin
- * val server = createRemoteServer(
- *     initialState = ServerChatState(),
- *     reducer = serverChatReducer,
- *     stateMapper = { state -> SyncState(state.toChatState()) },
- *     broadcastConfig = BroadcastConfig(concurrency = 32),
- *     scope = applicationScope,
- * )
- * ```
- *
- * Example (custom session registry for distributed deployments):
- * ```kotlin
- * val server = createRemoteServer(
- *     initialState = ServerChatState(),
- *     reducer = serverChatReducer,
- *     stateMapper = { state -> SyncState(state.toChatState()) },
- *     sessionRegistry = RedisSessionRegistry(redis, codec),
- *     broadcastConfig = BroadcastConfig(concurrency = 64),
- *     scope = applicationScope,
- * )
- * ```
- *
- * In WebSocket handler:
+ * ## Handling clients
  * ```kotlin
  * webSocket("/chat") {
  *     val connection = KtorWebSocketServerConnection(this)
@@ -71,7 +77,7 @@ import kotlinx.coroutines.launch
  * }
  * ```
  *
- * Shutdown:
+ * ## Shutdown
  * ```kotlin
  * server.close()
  * ```
@@ -154,9 +160,109 @@ class RemoteServer<S : State, A : Action> internal constructor(
 }
 
 /**
- * Create a [RemoteServer] that manages a single [Store] serving multiple clients.
+ * Create a [RemoteServer] from an existing [Store].
  *
- * Internally creates the session registry, broadcaster, middleware, store, and state broadcasting coroutine.
+ * This is the recommended way to create a RemoteServer as it gives full control
+ * over store configuration, middleware, and other settings.
+ *
+ * ```kotlin
+ * val registry = InMemorySessionRegistry<MyAction>()
+ * val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Default)
+ * val middleware = MultiClientSyncMiddleware<MyState, MyAction>(processors, broadcaster)
+ *
+ * val store = createStore(
+ *     initialState = MyState(),
+ *     reducer = myReducer,
+ *     middlewares = listOf(middleware, otherMiddleware),
+ *     scope = scope,
+ * )
+ *
+ * val server = createRemoteServer(
+ *     store = store,
+ *     broadcaster = broadcaster,
+ *     stateMapper = { state -> SyncState(state) },
+ * )
+ * ```
+ *
+ * @param store The store to use for state management.
+ * @param broadcaster The broadcaster for sending actions to clients.
+ * @param stateMapper Maps server state to an action (typically a [ClientSharedAction][io.flowdux.remote.ClientSharedAction])
+ *   that will be broadcast to all clients on state change.
+ * @param scope Coroutine scope for state broadcasting. Defaults to the store's scope if not provided.
+ */
+fun <S : State, A : Action> createRemoteServer(
+    store: Store<S, A>,
+    broadcaster: SessionBroadcaster<A>,
+    stateMapper: (S) -> A,
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+): RemoteServer<S, A> {
+    val serveJob = scope.launch {
+        store.serveState(stateMapper)
+    }
+
+    return RemoteServer(
+        sessionRegistry = broadcaster.registry,
+        broadcaster = broadcaster,
+        store = store,
+        serveJob = serveJob,
+    )
+}
+
+/**
+ * Create a [RemoteServer] from an existing [Store] with per-session state mapping.
+ *
+ * Unlike [createRemoteServer] which broadcasts the same action to all clients,
+ * this variant calls [sessionStateMapper] with the session ID for each connected client,
+ * allowing each client to receive a different view of the state.
+ *
+ * ```kotlin
+ * val server = createSessionAwareRemoteServer(
+ *     store = store,
+ *     broadcaster = broadcaster,
+ *     sessionStateMapper = { state, sessionId ->
+ *         // Return personalized state for each session
+ *         SyncPlayerView(hand = state.hands[sessionId] ?: emptyList())
+ *     },
+ * )
+ * ```
+ *
+ * @param store The store to use for state management.
+ * @param broadcaster The broadcaster for sending actions to clients.
+ * @param sessionStateMapper Maps server state and session ID to an action for that session,
+ *   or `null` to skip sending to that session.
+ * @param scope Coroutine scope for state broadcasting.
+ */
+fun <S : State, A : Action> createSessionAwareRemoteServer(
+    store: Store<S, A>,
+    broadcaster: SessionBroadcaster<A>,
+    sessionStateMapper: (S, String) -> A?,
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+): RemoteServer<S, A> {
+    val serveJob = scope.launch {
+        store.state.collect { state ->
+            broadcaster.sendPerSession { sessionId ->
+                sessionStateMapper(state, sessionId)
+            }
+        }
+    }
+
+    return RemoteServer(
+        sessionRegistry = broadcaster.registry,
+        broadcaster = broadcaster,
+        store = store,
+        serveJob = serveJob,
+    )
+}
+
+// ============================================================================
+// Convenience functions (creates store internally)
+// ============================================================================
+
+/**
+ * Create a [RemoteServer] with a new store (convenience function).
+ *
+ * This function creates the store internally. For more control over middleware
+ * and store configuration, use the overload that accepts a [Store] directly.
  *
  * @param initialState Initial state for the store.
  * @param reducer Reducer for processing actions.
@@ -192,27 +298,19 @@ fun <S : State, A : Action> createRemoteServer(
         scope = scope,
     )
 
-    val serveJob = scope.launch {
-        store.serveState(stateMapper)
-    }
-
-    return RemoteServer(
-        sessionRegistry = sessionRegistry,
-        broadcaster = broadcaster,
+    return createRemoteServer(
         store = store,
-        serveJob = serveJob,
+        broadcaster = broadcaster,
+        stateMapper = stateMapper,
+        scope = scope,
     )
 }
 
 /**
- * Create a [RemoteServer] with per-session state mapping.
+ * Create a [RemoteServer] with per-session state mapping (convenience function).
  *
- * Unlike [createRemoteServer] which broadcasts the same action to all clients,
- * this variant calls [sessionStateMapper] with the session ID for each connected client,
- * allowing each client to receive a different view of the state.
- *
- * State changes are observed directly and mapped per-session without going through
- * the dispatch pipeline.
+ * This function creates the store internally. For more control over middleware
+ * and store configuration, use the overload that accepts a [Store] directly.
  *
  * @param initialState Initial state for the store.
  * @param reducer Reducer for processing actions.
@@ -248,18 +346,10 @@ fun <S : State, A : Action> createSessionAwareRemoteServer(
         scope = scope,
     )
 
-    val serveJob = scope.launch {
-        store.state.collect { state ->
-            broadcaster.sendPerSession { sessionId ->
-                sessionStateMapper(state, sessionId)
-            }
-        }
-    }
-
-    return RemoteServer(
-        sessionRegistry = sessionRegistry,
-        broadcaster = broadcaster,
+    return createSessionAwareRemoteServer(
         store = store,
-        serveJob = serveJob,
+        broadcaster = broadcaster,
+        sessionStateMapper = sessionStateMapper,
+        scope = scope,
     )
 }

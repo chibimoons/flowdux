@@ -50,7 +50,7 @@ data class BroadcastConfig(
  * @param config Broadcast configuration (concurrency level).
  */
 class SessionBroadcaster<A : Action>(
-    private val registry: SessionRegistry<A>,
+    val registry: SessionRegistry<A>,
     private val config: BroadcastConfig = BroadcastConfig.Sequential,
 ) {
 
