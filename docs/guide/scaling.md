@@ -30,7 +30,7 @@ flowchart TB
 
 ### Default (Sequential Broadcast)
 
-Existing code works without changes:
+The default configuration uses sequential broadcast. Both `createSharedStateServer` (recommended) and `createRemoteServer` (legacy) are supported:
 
 ```kotlin
 val server = createSharedStateServer(
