@@ -247,7 +247,7 @@ WebSocket은 수신자가 느릴 때 알려주는 내장 메커니즘이 없음.
 ### 현재 상태
 - 단일 Store, in-memory 세션 관리 (`MultiClientSingleClientSyncMiddleware`)
 - 매 state 변경마다 전체 클라이언트 broadcast (`StoreServeExt.serveState()`)
-- `createSessionAwareRemoteServer`의 `sessionStateMapper`로 클라이언트별 데이터 차별화 가능
+- `createSessionAwareSharedStateServer`의 `sessionStateMapper`로 클라이언트별 데이터 차별화 가능
 - **Small 규모 (< 10K)에 적합**
 
 ### 스케일링 시 고려사항

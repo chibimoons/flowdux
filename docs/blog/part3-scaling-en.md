@@ -288,10 +288,10 @@ Full Server State
 
 Each player gets a `SyncState` containing only the information they're allowed to see. The full state never leaves the server.
 
-In flowdux-remote, `createSessionAwareRemoteServer` supports this directly — instead of one global `stateMapper`, you provide a `sessionStateMapper` that receives both the state and the session ID:
+In flowdux-remote, `createSessionAwareSharedStateServer` supports this directly — instead of one global `stateMapper`, you provide a `sessionStateMapper` that receives both the state and the session ID:
 
 ```kotlin
-val server = createSessionAwareRemoteServer(
+val server = createSessionAwareSharedStateServer(
     initialState = GameState(),
     reducer = gameReducer,
     processors = gameProcessors(),

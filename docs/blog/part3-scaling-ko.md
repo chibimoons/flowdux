@@ -288,10 +288,10 @@ fun stateViewFor(playerId: String, fullState: GameState): PlayerGameView {
 
 각 플레이어는 볼 수 있는 정보만 담긴 `SyncState`를 받습니다. 전체 상태는 서버를 절대 떠나지 않습니다.
 
-flowdux-remote에서는 `createSessionAwareRemoteServer`가 이를 직접 지원합니다 — 하나의 글로벌 `stateMapper` 대신, 상태와 세션 ID를 모두 받는 `sessionStateMapper`를 제공합니다:
+flowdux-remote에서는 `createSessionAwareSharedStateServer`가 이를 직접 지원합니다 — 하나의 글로벌 `stateMapper` 대신, 상태와 세션 ID를 모두 받는 `sessionStateMapper`를 제공합니다:
 
 ```kotlin
-val server = createSessionAwareRemoteServer(
+val server = createSessionAwareSharedStateServer(
     initialState = GameState(),
     reducer = gameReducer,
     processors = gameProcessors(),

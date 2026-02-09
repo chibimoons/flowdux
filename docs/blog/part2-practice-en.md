@@ -417,7 +417,7 @@ fun main() {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // One server for ALL clients — shared state
-    val server = createRemoteServer(
+    val server = createSharedStateServer(
         initialState = ServerChatState(),
         reducer = serverChatReducer,
         processors = chatProcessors(),
@@ -448,7 +448,7 @@ fun main() {
 }
 ```
 
-`createRemoteServer` creates a `RemoteServer` facade that combines a single Store, a session registry, and state broadcasting. Each WebSocket connection calls `handleClient`, which registers the connection for both receiving actions and broadcasting state updates. When any client dispatches an action, the Store processes it and broadcasts the new state to *all* connected clients.
+`createSharedStateServer` creates a `RemoteServer` facade that combines a single Store, a session registry, and state broadcasting. Each WebSocket connection calls `handleClient`, which registers the connection for both receiving actions and broadcasting state updates. When any client dispatches an action, the Store processes it and broadcasts the new state to *all* connected clients.
 
 The client code doesn't change at all. It still dispatches actions and receives state updates. It doesn't know or care whether the server has one client or a thousand.
 
@@ -498,7 +498,7 @@ All the code in this post uses [flowdux-remote](https://github.com/chibimoons/fl
 
 - `SingleClientSyncMiddleware` / `SyncMiddleware` — handle serialization and WebSocket transport
 - `serve {}` — observe state changes and push to clients
-- `createRemoteServer` — create a `RemoteServer` facade managing multiple client connections to a shared Store
+- `createSharedStateServer` — create a `RemoteServer` facade managing multiple client connections to a shared Store
 - `TypedConnection` — type-safe abstraction over the wire protocol
 - `ActionCodec` — pluggable serialization (JSON via `kotlinx.serialization` included)
 
