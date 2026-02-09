@@ -64,6 +64,8 @@ class ClientConnectionMultiplexerTest {
 
         assertEquals(ConnectionState.DISCONNECTED, mux.connectionState.value)
         mux.connect()
+        // connect() launches a coroutine - advance scheduler to execute it
+        testScheduler.advanceUntilIdle()
         assertEquals(ConnectionState.CONNECTED, mux.connectionState.value)
 
         mux.close()
@@ -249,6 +251,8 @@ class ClientConnectionMultiplexerTest {
         assertEquals(ConnectionState.DISCONNECTED, room1.connectionState.value)
 
         mux.connect()
+        // connect() launches a coroutine - advance scheduler to execute it
+        testScheduler.advanceUntilIdle()
         assertEquals(ConnectionState.CONNECTED, room1.connectionState.value)
 
         mux.disconnect()
