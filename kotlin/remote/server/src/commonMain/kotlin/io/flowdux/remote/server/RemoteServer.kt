@@ -77,6 +77,11 @@ class RemoteServer<S : State, A : Action> internal constructor(
      */
     val store: Store<S, A>,
     internal val serveJob: Job,
+    /**
+     * Optional scope job to cancel when [close] is called.
+     * Used when the factory function creates a default scope.
+     */
+    private val ownedScopeJob: Job? = null,
 ) {
     /** Current server state as a reactive flow. */
     val state: StateFlow<S> get() = store.state
@@ -133,9 +138,13 @@ class RemoteServer<S : State, A : Action> internal constructor(
 
     /**
      * Close the server, stopping state broadcasting and closing the store.
+     *
+     * If the server was created with a default scope (no explicit scope parameter),
+     * that scope is also cancelled.
      */
     fun close() {
         serveJob.cancel()
+        ownedScopeJob?.cancel()
         store.close()
     }
 }

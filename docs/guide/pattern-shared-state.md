@@ -347,7 +347,7 @@ fun docProcessors() = Middleware.ActionProcessorBuilder<DocumentState, DocAction
 data class PollState(
     val question: String = "",
     val options: List<PollOption> = emptyList(),
-    val votes: Map<String, String> = emptyMap(),  // odUserId -> optionId
+    val votes: Map<String, String> = emptyMap(),  // userId -> optionId
     val totalVotes: Int = 0,
     val status: PollStatus = PollStatus.OPEN,
 ) : State

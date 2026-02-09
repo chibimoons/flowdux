@@ -19,6 +19,7 @@ import io.flowdux.remote.server.session.SessionBroadcaster
 import io.flowdux.remote.server.session.SessionRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
@@ -114,19 +115,21 @@ fun <S : State, A : Action> createSharedStateServer(
  *     store = store,
  *     broadcaster = broadcaster,
  *     stateMapper = { state -> SyncState(state) },
+ *     scope = scope,
  * )
  * ```
  *
  * @param store The store to use for state management.
  * @param broadcaster The broadcaster for sending actions to clients.
  * @param stateMapper Maps server state to an action that will be broadcast to all clients.
- * @param scope Coroutine scope for state broadcasting.
+ * @param scope Coroutine scope for state broadcasting. The caller is responsible for
+ *              managing the lifecycle of this scope.
  */
 fun <S : State, A : Action> createSharedStateServer(
     store: Store<S, A>,
     broadcaster: SessionBroadcaster<A>,
     stateMapper: (S) -> A,
-    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    scope: CoroutineScope,
 ): SharedStateServer<S, A> {
     val serveJob = scope.launch {
         store.serveState(stateMapper)
@@ -137,6 +140,34 @@ fun <S : State, A : Action> createSharedStateServer(
         broadcaster = broadcaster,
         store = store,
         serveJob = serveJob,
+    )
+}
+
+/**
+ * Create a [SharedStateServer] from an existing [Store] with a default scope.
+ *
+ * The created scope is automatically cancelled when [SharedStateServer.close] is called.
+ *
+ * @param store The store to use for state management.
+ * @param broadcaster The broadcaster for sending actions to clients.
+ * @param stateMapper Maps server state to an action that will be broadcast to all clients.
+ */
+fun <S : State, A : Action> createSharedStateServer(
+    store: Store<S, A>,
+    broadcaster: SessionBroadcaster<A>,
+    stateMapper: (S) -> A,
+): SharedStateServer<S, A> {
+    val ownedScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val serveJob = ownedScope.launch {
+        store.serveState(stateMapper)
+    }
+
+    return RemoteServer(
+        sessionRegistry = broadcaster.registry,
+        broadcaster = broadcaster,
+        store = store,
+        serveJob = serveJob,
+        ownedScopeJob = ownedScope.coroutineContext[Job],
     )
 }
 
@@ -198,13 +229,14 @@ fun <S : State, A : Action> createSessionAwareSharedStateServer(
  * @param store The store to use for state management.
  * @param broadcaster The broadcaster for sending actions to clients.
  * @param sessionStateMapper Maps state and session ID to an action for that session.
- * @param scope Coroutine scope for state broadcasting.
+ * @param scope Coroutine scope for state broadcasting. The caller is responsible for
+ *              managing the lifecycle of this scope.
  */
 fun <S : State, A : Action> createSessionAwareSharedStateServer(
     store: Store<S, A>,
     broadcaster: SessionBroadcaster<A>,
     sessionStateMapper: (S, String) -> A?,
-    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    scope: CoroutineScope,
 ): SharedStateServer<S, A> {
     val serveJob = scope.launch {
         store.state.collect { state ->
@@ -219,5 +251,37 @@ fun <S : State, A : Action> createSessionAwareSharedStateServer(
         broadcaster = broadcaster,
         store = store,
         serveJob = serveJob,
+    )
+}
+
+/**
+ * Create a [SharedStateServer] from an existing [Store] with per-session state mapping and a default scope.
+ *
+ * The created scope is automatically cancelled when [SharedStateServer.close] is called.
+ *
+ * @param store The store to use for state management.
+ * @param broadcaster The broadcaster for sending actions to clients.
+ * @param sessionStateMapper Maps state and session ID to an action for that session.
+ */
+fun <S : State, A : Action> createSessionAwareSharedStateServer(
+    store: Store<S, A>,
+    broadcaster: SessionBroadcaster<A>,
+    sessionStateMapper: (S, String) -> A?,
+): SharedStateServer<S, A> {
+    val ownedScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val serveJob = ownedScope.launch {
+        store.state.collect { state ->
+            broadcaster.sendPerSession { sessionId ->
+                sessionStateMapper(state, sessionId)
+            }
+        }
+    }
+
+    return RemoteServer(
+        sessionRegistry = broadcaster.registry,
+        broadcaster = broadcaster,
+        store = store,
+        serveJob = serveJob,
+        ownedScopeJob = ownedScope.coroutineContext[Job],
     )
 }
