@@ -1,8 +1,8 @@
 package io.flowdux.sample.multiplexer.server
 
 import io.flowdux.Middleware
-import io.flowdux.remote.server.RemoteServer
-import io.flowdux.remote.server.createRemoteServer
+import io.flowdux.remote.server.pattern.SharedStateServer
+import io.flowdux.remote.server.pattern.createSharedStateServer
 import io.flowdux.sample.multiplexer.ChatAction
 import io.flowdux.sample.multiplexer.RoomState
 import io.flowdux.sample.multiplexer.SharedChatAction
@@ -10,7 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Manages multiple chat rooms, each with its own independent [RemoteServer].
+ * Manages multiple chat rooms, each with its own independent [SharedStateServer].
  *
  * This is similar to the multi-room sample's RoomManager, but designed to work
  * with the ConnectionMultiplexer where a single client can participate in
@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 class RoomManager(
     private val applicationScope: CoroutineScope,
 ) {
-    private val rooms = ConcurrentHashMap<String, RemoteServer<ServerRoomState, ChatAction>>()
+    private val rooms = ConcurrentHashMap<String, SharedStateServer<ServerRoomState, ChatAction>>()
 
     /** Get all active room IDs */
     fun getRoomIds(): Set<String> = rooms.keys.toSet()
@@ -28,10 +28,10 @@ class RoomManager(
     fun roomCount(): Int = rooms.size
 
     /** Get or create a room */
-    fun getOrCreateRoom(roomId: String): RemoteServer<ServerRoomState, ChatAction> {
+    fun getOrCreateRoom(roomId: String): SharedStateServer<ServerRoomState, ChatAction> {
         return rooms.computeIfAbsent(roomId) { id ->
             println("[RoomManager] Creating room: $id")
-            createRemoteServer(
+            createSharedStateServer(
                 initialState = ServerRoomState(roomId = id),
                 reducer = serverRoomReducer,
                 processors = roomProcessors(),

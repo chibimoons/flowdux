@@ -1,8 +1,8 @@
 package io.flowdux.sample.chat.multiroom
 
 import io.flowdux.Middleware
-import io.flowdux.remote.server.RemoteServer
-import io.flowdux.remote.server.createRemoteServer
+import io.flowdux.remote.server.pattern.SharedStateServer
+import io.flowdux.remote.server.pattern.createSharedStateServer
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatState
 import io.flowdux.sample.chat.SharedChatAction
@@ -10,7 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Manages multiple chat rooms, each with its own independent [RemoteServer].
+ * Manages multiple chat rooms, each with its own independent [SharedStateServer].
  *
  * This demonstrates the Room Store pattern where:
  * - Each room has its own Store and state
@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap
 class RoomManager(
     private val applicationScope: CoroutineScope,
 ) {
-    private val rooms = ConcurrentHashMap<String, RemoteServer<ServerChatState, ChatAction>>()
+    private val rooms = ConcurrentHashMap<String, SharedStateServer<ServerChatState, ChatAction>>()
 
     /** Get all active room IDs (snapshot) */
     fun getRoomIds(): Set<String> = rooms.keys.toSet()
@@ -29,10 +29,10 @@ class RoomManager(
     fun roomCount(): Int = rooms.size
 
     /** Create a new room or return existing one */
-    fun getOrCreateRoom(roomId: String): RemoteServer<ServerChatState, ChatAction> {
+    fun getOrCreateRoom(roomId: String): SharedStateServer<ServerChatState, ChatAction> {
         return rooms.computeIfAbsent(roomId) { id ->
             println("[RoomManager] Creating room: $id")
-            createRemoteServer(
+            createSharedStateServer(
                 initialState = ServerChatState(roomId = id),
                 reducer = serverChatReducer,
                 processors = chatProcessors(),
@@ -52,7 +52,7 @@ class RoomManager(
     }
 
     /** Get room by ID */
-    fun getRoom(roomId: String): RemoteServer<ServerChatState, ChatAction>? = rooms[roomId]
+    fun getRoom(roomId: String): SharedStateServer<ServerChatState, ChatAction>? = rooms[roomId]
 
     /**
      * Destroy a room only if it's empty (no active sessions).

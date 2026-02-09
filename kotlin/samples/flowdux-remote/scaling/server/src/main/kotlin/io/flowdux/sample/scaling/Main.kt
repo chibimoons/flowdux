@@ -4,9 +4,9 @@ import io.flowdux.Middleware
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.serialization.typedJson
 import io.flowdux.remote.serialization.upcast
-import io.flowdux.remote.server.BroadcastConfig
-import io.flowdux.remote.server.InMemorySessionRegistry
-import io.flowdux.remote.server.createRemoteServer
+import io.flowdux.remote.server.session.BroadcastConfig
+import io.flowdux.remote.server.session.InMemorySessionRegistry
+import io.flowdux.remote.server.pattern.createSharedStateServer
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
@@ -56,7 +56,7 @@ fun main() {
     println("Broadcast concurrency: ${broadcastConfig.concurrency}")
     println()
 
-    val server = createRemoteServer(
+    val server = createSharedStateServer(
         initialState = ScalingState(),
         reducer = scalingReducer,
         processors = scalingProcessors(),
