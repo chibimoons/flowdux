@@ -14,6 +14,8 @@ FlowDux 샘플 앱 가이드입니다. 각 샘플은 특정 기능이나 패턴�
 | [remote-simple](#remote-simple-sample) | 1:1 WebSocket | JVM | 단일 클라이언트-서버 |
 | [remote-multi](#remote-multi-client-sample) | Room Store (단일 방) | JVM | N 클라이언트 = 1 Store |
 | [remote-multiroom](#remote-multi-room-sample) | Room Store (다중 방) | JVM | 독립된 여러 방 관리 |
+| [remote-scaling](#remote-scaling-sample) | 병렬 브로드캐스트, 스케일링 | JVM | 대규모 동시 연결 |
+| [remote-poker](#remote-poker-sample) | Per-Client Store | JVM | 비공개 상태 관리 (포커) |
 
 ---
 
@@ -184,6 +186,26 @@ WASM으로 컴파일된 Counter 앱입니다.
 # 또는 이름 지정: ./gradlew :kotlin:sample-remote-multi:client:run --args="Alice"
 ```
 
+### 시스템 공지 (System Announcements)
+
+서버에서 연결된 모든 클라이언트에게 시스템 공지를 보낼 수 있습니다:
+
+```bash
+# 공지 보내기
+curl -X POST http://localhost:8080/announce -d "서버 점검 예정"
+
+# 점검 모드 전환
+curl -X POST http://localhost:8080/maintenance/true
+curl -X POST http://localhost:8080/maintenance/false
+```
+
+클라이언트에서 확인:
+```
+  *** SYSTEM: 서버 점검 예정 ***
+```
+
+이 기능은 `SharedStateServer.broadcast()`를 사용하여 구현됩니다. 자세한 내용은 [Remote 가이드](./remote.md#2-server-setup)를 참조하세요.
+
 ---
 
 ## Remote Multi-Room Sample
@@ -244,8 +266,157 @@ WASM으로 컴파일된 Counter 앱입니다.
 
 ---
 
+## Remote Scaling Sample
+
+**학습 포인트:** BroadcastConfig, SessionRegistry, 병렬 브로드캐스트
+
+대규모 동시 연결을 처리하기 위한 스케일링 아키텍처를 보여줍니다.
+
+```
+┌───────────────────────────────────────────────────┐
+│                     Server                         │
+│  ┌─────────────────────────────────────────────┐  │
+│  │           SessionBroadcaster                 │  │
+│  │  concurrency = 32 (병렬 전송)                │  │
+│  └──────────────────┬──────────────────────────┘  │
+│                     │                              │
+│  ┌──────────────────┼──────────────────────────┐  │
+│  │          SessionRegistry                     │  │
+│  │  ┌─────┐ ┌─────┐ ┌─────┐      ┌─────┐      │  │
+│  │  │ C1  │ │ C2  │ │ C3  │ ···  │ CN  │      │  │
+│  │  └─────┘ └─────┘ └─────┘      └─────┘      │  │
+│  └─────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────┘
+```
+
+### 핵심 컴포넌트
+
+| 컴포넌트 | 역할 |
+|----------|------|
+| `BroadcastConfig` | 브로드캐스트 동시성 설정 (1=순차, 32=병렬) |
+| `SessionRegistry` | 세션 저장소 인터페이스 (커스텀 구현 가능) |
+| `InMemorySessionRegistry` | 기본 인메모리 구현 |
+| `SessionBroadcaster` | 병렬 메시지 전송 처리 |
+
+### 서버 시작
+
+```bash
+./gradlew :kotlin:sample-remote-scaling:server:run
+```
+
+### 테스트 엔드포인트
+
+```bash
+# 서버 상태 조회
+curl http://localhost:8080/stats
+
+# 수동 브로드캐스트 트리거
+curl -X POST http://localhost:8080/broadcast
+
+# 스트레스 테스트 (1000회 increment)
+curl -X POST http://localhost:8080/stress/1000
+```
+
+### WebSocket 클라이언트 연결
+
+```bash
+# websocat 사용 예시
+websocat ws://localhost:8080/ws
+```
+
+### 스케일링 단계
+
+| 단계 | 규모 | 구현 |
+|------|------|------|
+| 기본 | ~10k | 순차 브로드캐스트 |
+| Stage 1 | ~100k | `BroadcastConfig(concurrency = 32)` |
+| Stage 2 | ~1M | 커스텀 `SessionRegistry` (Redis) |
+| Stage 3 | ~10M+ | Kafka + Redis Cluster |
+
+자세한 내용은 [Scaling Architecture](./scaling.md) 문서를 참조하세요.
+
+---
+
+## Remote Poker Sample
+
+**학습 포인트:** Per-Client Store 패턴, Room Store 조합, 비공개 정보 관리
+
+서버가 각 플레이어의 비공개 패를 관리하는 포커 게임 예제입니다.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Poker Table (Room Store)                  │
+│  상태: 게임 진행, 베팅, 공개 카드, 턴 순서                    │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ dispatch (비공개 카드 분배)
+         ┌─────────────────┼─────────────────┐
+         ▼                 ▼                 ▼
+    ┌─────────┐       ┌─────────┐       ┌─────────┐
+    │Player 1 │       │Player 2 │       │Player 3 │
+    │ Store   │       │ Store   │       │ Store   │
+    │(비공개패)│       │(비공개패)│       │(비공개패)│
+    └────┬────┘       └────┬────┘       └────┬────┘
+         │                 │                 │
+         ▼                 ▼                 ▼
+        C1                C2                C3
+                    (WebSocket Clients)
+```
+
+| 패턴 | 용도 |
+|------|------|
+| Room Store | 포커 테이블 (공개 정보: 베팅, 턴, 커뮤니티 카드) |
+| Per-Client Store | 각 플레이어의 비공개 패 |
+
+### 서버 시작
+
+```bash
+./gradlew :kotlin:sample-remote-poker:server:run
+```
+
+### 클라이언트 실행 (여러 터미널에서)
+
+```bash
+./gradlew :kotlin:sample-remote-poker:client:run --args="Alice" --console=plain
+./gradlew :kotlin:sample-remote-poker:client:run --args="Bob" --console=plain
+```
+
+### 게임 제어 (관리자 엔드포인트)
+
+```bash
+# 게임 시작 (2명 이상 접속 필요)
+curl -X POST http://localhost:8080/start
+
+# 다음 단계로 진행 (FLOP → TURN → RIVER)
+curl -X POST http://localhost:8080/advance
+
+# 승자 결정
+curl -X POST http://localhost:8080/winner
+```
+
+### 클라이언트 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `bet <amount>` | 베팅 (자신의 턴일 때만) |
+| `fold` | 폴드 |
+| `check` | 체크 |
+| `call` | 콜 |
+| `status` | 현재 테이블 상태 확인 |
+| `quit` | 종료 |
+
+### 검증 포인트
+
+- 각 플레이어가 **자신의 패만** 볼 수 있는지 확인
+- 공개 정보 (베팅, 턴, 커뮤니티 카드)는 모두에게 보이는지 확인
+- 게임 진행이 정상 동작하는지 확인
+
+---
+
 ## 관련 문서
 
+- [Server Patterns Overview](./server-patterns.md) — 패턴 선택 가이드 (Single Client, Shared State, Room, Per-Client)
 - [Remote (WebSocket)](./remote.md) — 클라이언트-서버 설정 가이드
-- [Room Store Pattern](./room-store.md) — 다중 방 관리 패턴 상세
-- [Server Architecture Patterns](../design/server-architecture-patterns.md) — 아키텍처 패턴 설계 문서
+- [Scaling Architecture](./scaling.md) — 병렬 브로드캐스트, 대규모 연결
+- [Room Pattern](./pattern-room.md) — 다중 방 관리 패턴 상세
+- [Per-Client Pattern](./pattern-per-client.md) — 비공개 상태 관리 패턴
+- [FlowDux Remote vs Raw WebSocket](./flowdux-remote-vs-raw.md) — Use Case별 비교 및 선택 가이드

@@ -89,7 +89,7 @@
 Player Action 발생 (예: 캐릭터 이동)
   │
   ▼
-Client: ClientRemoteMiddleware → TypedClientConnection.send(action)
+Client: SyncMiddleware → TypedClientConnection.send(action)
   │  내부: ActionCodec.encode() → MessageCodec.encodeActionMessage()
   ▼
 WSS 전송 ──────────────────────────────────────────────────┐
@@ -101,7 +101,7 @@ Server: Ktor WebSocket Handler                              │
 RoomManager.getRoom(userId)                                 │
   │                                                         │
   ▼                                                         │
-ServerRemoteMiddleware (FlowHolderAction으로 수신)           │
+SingleClientSyncMiddleware (FlowHolderAction으로 수신)           │
   │  TypedServerConnection.incoming 에서 디코딩:            │
   │    내부: MessageCodec → ActionCodec.decode()            │
   │  store.dispatch(action)  ← Middleware Pipeline 통과     │

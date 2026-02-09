@@ -13,6 +13,9 @@ val clientChatReducer: Reducer<ClientChatState, ChatAction> = buildReducer {
             lastEvent = action.state.lastEvent,
         )
     }
+    on<SharedChatAction.SystemAnnouncement> { state, action ->
+        state.copy(systemAnnouncement = action.message)
+    }
     on<ClientChatAction.SetCurrentUser> { state, action ->
         state.copy(currentUser = action.user)
     }

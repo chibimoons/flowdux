@@ -92,7 +92,7 @@ shared 모듈의 sealed interface 하나가 API 스펙 전체를 대체한다.
 핵심 모델은 설득력 있고, 단일 세션에서는 이미 동작하는 단계.
 
 구현 완료:
-- `ServerRemoteMiddleware` / `ClientRemoteMiddleware`
+- `SingleClientSyncMiddleware` / `SyncMiddleware`
 - `TypedServerConnection` / `TypedClientConnection`
 - `ActionCodec` + `MessageCodec` (직렬화 계층)
 - `serveState` (서버→클라이언트 상태 동기화)

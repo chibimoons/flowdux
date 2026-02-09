@@ -1,9 +1,12 @@
 package io.flowdux.sample.chat.multiroom
 
+import io.flowdux.Middleware
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.serialization.typedJson
-import io.flowdux.remote.server.TypedServerConnection
+import io.flowdux.remote.server.connection.TypedServerConnection
+import io.flowdux.remote.server.pattern.createSharedStateRoomServer
 import io.flowdux.sample.chat.ChatAction
+import io.flowdux.sample.chat.ChatState
 import io.flowdux.sample.chat.SharedChatAction
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
@@ -23,7 +26,8 @@ import java.util.UUID
 /**
  * Multi-Room Chat Server Demo
  *
- * This sample demonstrates the Room Store pattern with multiple independent rooms:
+ * This sample demonstrates the Room Store pattern with multiple independent rooms
+ * using [createSharedStateRoomServer]:
  * - Dynamic room creation/destruction
  * - Room isolation (messages stay within their room)
  * - Automatic empty room cleanup
@@ -34,13 +38,36 @@ import java.util.UUID
  */
 fun main() {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    val roomManager = RoomManager(applicationScope)
+
+    // Create room server using the new pattern-based API
+    val roomServer = createSharedStateRoomServer(
+        initialStateFactory = { roomId ->
+            println("[RoomServer] Creating room: $roomId")
+            ServerChatState(roomId = roomId)
+        },
+        reducer = serverChatReducer,
+        processors = chatProcessors(),
+        stateMapper = { state ->
+            println("[Room ${state.roomId}] State changed: users=${state.users}, messages=${state.messages.size}")
+            SharedChatAction.SyncState(
+                ChatState(
+                    messages = state.messages,
+                    users = state.users,
+                    lastEvent = state.lastEvent,
+                )
+            )
+        },
+        scope = applicationScope,
+    )
 
     // Periodic cleanup of empty rooms
     applicationScope.launch {
         while (isActive) {
             delay(30_000) // Every 30 seconds
-            roomManager.cleanupEmptyRooms()
+            val destroyed = roomServer.cleanupEmptyRooms()
+            if (destroyed.isNotEmpty()) {
+                println("[RoomServer] Cleaned up ${destroyed.size} empty rooms: $destroyed")
+            }
         }
     }
 
@@ -48,7 +75,7 @@ fun main() {
     applicationScope.launch {
         while (isActive) {
             delay(10_000) // Every 10 seconds
-            roomManager.printStatus()
+            printStatus(roomServer)
         }
     }
 
@@ -71,7 +98,7 @@ fun main() {
         routing {
             // List active rooms
             get("/rooms") {
-                val roomIds = roomManager.getRoomIds()
+                val roomIds = roomServer.roomIds()
                 call.respondText("Active rooms (${roomIds.size}): ${roomIds.joinToString(", ").ifEmpty { "(none)" }}")
             }
 
@@ -83,7 +110,7 @@ fun main() {
                     return@webSocket
                 }
 
-                val room = roomManager.getOrCreateRoom(roomId)
+                val room = roomServer.getOrCreateRoom(roomId)
                 val sessionId = UUID.randomUUID().toString()
 
                 @Suppress("UNCHECKED_CAST")
@@ -98,12 +125,42 @@ fun main() {
                     println("[Server] [$roomId] Client $sessionId disconnected")
 
                     // Auto-cleanup: destroy room atomically if it's empty
-                    // This avoids race condition with new clients connecting
-                    roomManager.destroyRoomIfEmpty(roomId)
+                    roomServer.destroyRoomIfEmpty(roomId)
                 }
             }
         }
     }.start(wait = true)
 
-    roomManager.shutdown()
+    roomServer.close()
 }
+
+private suspend fun printStatus(roomServer: io.flowdux.remote.server.pattern.RoomServer<*>) {
+    val roomIds = roomServer.roomIds()
+    println("\n=== Room Status ===")
+    if (roomIds.isEmpty()) {
+        println("No active rooms")
+    } else {
+        roomIds.forEach { roomId ->
+            @Suppress("UNCHECKED_CAST")
+            val room = roomServer.getRoom(roomId) as? io.flowdux.remote.server.pattern.SharedStateServer<ServerChatState, ChatAction>
+            room?.let {
+                val state = it.currentState
+                println("  [$roomId] users=${state.users}, messages=${state.messages.size}")
+            }
+        }
+    }
+    println("===================\n")
+}
+
+private fun chatProcessors() =
+    Middleware.ActionProcessorBuilder<ServerChatState, ChatAction>().apply {
+        on<SharedChatAction.SendMessage> { _, action ->
+            emit(ServerChatAction.MessageReceived(user = action.user, text = action.text))
+        }
+        on<SharedChatAction.JoinRoom> { _, action ->
+            emit(ServerChatAction.UserJoined(user = action.user))
+        }
+        on<SharedChatAction.LeaveRoom> { _, action ->
+            emit(ServerChatAction.UserLeft(user = action.user))
+        }
+    }.build()

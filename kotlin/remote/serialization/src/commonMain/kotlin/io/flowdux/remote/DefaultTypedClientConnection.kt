@@ -1,6 +1,7 @@
 package io.flowdux.remote
 
 import io.flowdux.Action
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.transform
@@ -20,9 +21,22 @@ internal class DefaultTypedClientConnection<A : Action>(
 
     @Suppress("UNCHECKED_CAST")
     override val incoming: Flow<A> = connection.incoming.transform { raw ->
-        val response = messageCodec.decodeServerMessage(raw)
+        val response = try {
+            messageCodec.decodeServerMessage(raw)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return@transform // Skip malformed server messages
+        }
         for (actionJson in response.actions) {
-            emit(actionCodec.decode(actionJson))
+            val action = try {
+                actionCodec.decode(actionJson)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                continue // Skip malformed actions
+            }
+            emit(action)
         }
     }
 

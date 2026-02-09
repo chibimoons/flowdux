@@ -7,6 +7,12 @@ import io.flowdux.State
 import io.flowdux.Store
 import io.flowdux.remote.ClientSharedAction
 import io.flowdux.remote.ServerSharedAction
+import io.flowdux.remote.server.connection.TypedServerConnection
+import io.flowdux.remote.server.middleware.InternalAddSession
+import io.flowdux.remote.server.middleware.InternalRemoveSession
+import io.flowdux.remote.server.middleware.InternalSendToClient
+import io.flowdux.remote.server.middleware.InternalStartListening
+import io.flowdux.remote.server.middleware.SingleClientSyncMiddleware
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -44,13 +50,13 @@ val serverErrorProcessor = object : ErrorProcessor<ServerAction> {
 }
 
 /**
- * SRM subclass whose processor emits a [ClientSharedAction].
- * Reproduces the scenario where the emitted action bypasses the SRM's
+ * Middleware subclass whose processor emits a [ClientSharedAction].
+ * Reproduces the scenario where the emitted action bypasses the middleware's
  * ClientSharedAction interception and is NOT sent to the client.
  */
-class ProcessorEmittingSRM(
+class ProcessorEmittingMiddleware(
     connection: TypedServerConnection<ServerAction>,
-) : ServerRemoteMiddleware<ServerState, ServerAction>(
+) : SingleClientSyncMiddleware<ServerState, ServerAction>(
     connection = connection,
 ) {
     override val processors = buildProcessors {
@@ -70,9 +76,21 @@ fun <S : State, A : Action> Store<S, A>.dispatchStartListening() {
 @Suppress("UNCHECKED_CAST")
 fun <S : State, A : Action> Store<S, A>.dispatchAddSession(
     sessionId: String,
-    connection: TypedServerConnection<A>,
+    connection: TypedServerConnection<*>,
 ) {
     dispatch(InternalAddSession(sessionId, connection) as A)
+}
+
+/** Dispatch [InternalRemoveSession] via unchecked cast (type-erased at runtime). */
+@Suppress("UNCHECKED_CAST")
+fun <S : State, A : Action> Store<S, A>.dispatchRemoveSession(sessionId: String) {
+    dispatch(InternalRemoveSession(sessionId) as A)
+}
+
+/** Dispatch [InternalSendToClient] via unchecked cast (type-erased at runtime). */
+@Suppress("UNCHECKED_CAST")
+fun <S : State, A : Action> Store<S, A>.dispatchSendToClient(sessionId: String, action: Action) {
+    dispatch(InternalSendToClient(sessionId, action) as A)
 }
 
 // -- Session-Aware Test Fixtures --
