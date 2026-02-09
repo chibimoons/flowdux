@@ -182,11 +182,8 @@ room1Store.dispatch(SharedChatAction.SendMessage("Alice", "Hello in general!"))
 
 방장에게만 관리 정보를 보내거나, 유저별로 다른 데이터를 전송할 때 사용합니다.
 
-> **Note**: SessionAware API는 현재 `createSessionAwareRemoteServer`를 사용합니다.
-> 패턴 기반 API (`createSessionAwareSharedStateServer`)는 향후 버전에서 제공될 예정입니다.
-
 ```kotlin
-val room = createSessionAwareRemoteServer(
+val room = createSessionAwareSharedStateServer(
     initialState = GameRoomState(),
     reducer = gameRoomReducer,
     processors = gameProcessors(),

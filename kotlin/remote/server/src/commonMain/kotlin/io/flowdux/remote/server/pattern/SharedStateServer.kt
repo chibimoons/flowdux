@@ -7,16 +7,20 @@ import io.flowdux.ErrorProcessor
 import io.flowdux.NoOpStoreLogger
 import io.flowdux.Reducer
 import io.flowdux.State
+import io.flowdux.Store
 import io.flowdux.StoreLogger
+import io.flowdux.createStore
 import io.flowdux.remote.server.RemoteServer
-import io.flowdux.remote.server.createRemoteServer
-import io.flowdux.remote.server.createSessionAwareRemoteServer
+import io.flowdux.remote.server.middleware.MultiClientSyncMiddleware
+import io.flowdux.remote.server.serveState
 import io.flowdux.remote.server.session.BroadcastConfig
 import io.flowdux.remote.server.session.InMemorySessionRegistry
+import io.flowdux.remote.server.session.SessionBroadcaster
 import io.flowdux.remote.server.session.SessionRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * A server for 1:1:N pattern (1 Server : 1 Store : N Clients).
@@ -67,17 +71,74 @@ fun <S : State, A : Action> createSharedStateServer(
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
     logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-): SharedStateServer<S, A> = createRemoteServer(
-    initialState = initialState,
-    reducer = reducer,
-    processors = processors,
-    stateMapper = stateMapper,
-    sessionRegistry = sessionRegistry,
-    broadcastConfig = broadcastConfig,
-    errorProcessor = errorProcessor,
-    logger = logger,
-    scope = scope,
-)
+): SharedStateServer<S, A> {
+    val broadcaster = SessionBroadcaster(sessionRegistry, broadcastConfig)
+    val middleware = MultiClientSyncMiddleware<S, A>(processors, broadcaster)
+
+    val store = createStore(
+        initialState = initialState,
+        middlewares = listOf(middleware),
+        reducer = reducer,
+        errorProcessor = errorProcessor,
+        logger = logger,
+        scope = scope,
+    )
+
+    return createSharedStateServer(
+        store = store,
+        broadcaster = broadcaster,
+        stateMapper = stateMapper,
+        scope = scope,
+    )
+}
+
+/**
+ * Create a [SharedStateServer] from an existing [Store].
+ *
+ * This is the recommended way to create a SharedStateServer as it gives full control
+ * over store configuration, middleware, and other settings.
+ *
+ * ```kotlin
+ * val registry = InMemorySessionRegistry<MyAction>()
+ * val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Default)
+ * val middleware = MultiClientSyncMiddleware<MyState, MyAction>(processors, broadcaster)
+ *
+ * val store = createStore(
+ *     initialState = MyState(),
+ *     reducer = myReducer,
+ *     middlewares = listOf(middleware, otherMiddleware),
+ *     scope = scope,
+ * )
+ *
+ * val server = createSharedStateServer(
+ *     store = store,
+ *     broadcaster = broadcaster,
+ *     stateMapper = { state -> SyncState(state) },
+ * )
+ * ```
+ *
+ * @param store The store to use for state management.
+ * @param broadcaster The broadcaster for sending actions to clients.
+ * @param stateMapper Maps server state to an action that will be broadcast to all clients.
+ * @param scope Coroutine scope for state broadcasting.
+ */
+fun <S : State, A : Action> createSharedStateServer(
+    store: Store<S, A>,
+    broadcaster: SessionBroadcaster<A>,
+    stateMapper: (S) -> A,
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+): SharedStateServer<S, A> {
+    val serveJob = scope.launch {
+        store.serveState(stateMapper)
+    }
+
+    return RemoteServer(
+        sessionRegistry = broadcaster.registry,
+        broadcaster = broadcaster,
+        store = store,
+        serveJob = serveJob,
+    )
+}
 
 /**
  * Create a [SharedStateServer] with per-session state mapping.
@@ -106,14 +167,57 @@ fun <S : State, A : Action> createSessionAwareSharedStateServer(
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
     logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-): SharedStateServer<S, A> = createSessionAwareRemoteServer(
-    initialState = initialState,
-    reducer = reducer,
-    processors = processors,
-    sessionStateMapper = sessionStateMapper,
-    sessionRegistry = sessionRegistry,
-    broadcastConfig = broadcastConfig,
-    errorProcessor = errorProcessor,
-    logger = logger,
-    scope = scope,
-)
+): SharedStateServer<S, A> {
+    val broadcaster = SessionBroadcaster(sessionRegistry, broadcastConfig)
+    val middleware = MultiClientSyncMiddleware<S, A>(processors, broadcaster)
+
+    val store = createStore(
+        initialState = initialState,
+        middlewares = listOf(middleware),
+        reducer = reducer,
+        errorProcessor = errorProcessor,
+        logger = logger,
+        scope = scope,
+    )
+
+    return createSessionAwareSharedStateServer(
+        store = store,
+        broadcaster = broadcaster,
+        sessionStateMapper = sessionStateMapper,
+        scope = scope,
+    )
+}
+
+/**
+ * Create a [SharedStateServer] from an existing [Store] with per-session state mapping.
+ *
+ * Unlike [createSharedStateServer] which broadcasts the same action to all clients,
+ * this variant calls [sessionStateMapper] with the session ID for each connected client,
+ * allowing each client to receive a different view of the state.
+ *
+ * @param store The store to use for state management.
+ * @param broadcaster The broadcaster for sending actions to clients.
+ * @param sessionStateMapper Maps state and session ID to an action for that session.
+ * @param scope Coroutine scope for state broadcasting.
+ */
+fun <S : State, A : Action> createSessionAwareSharedStateServer(
+    store: Store<S, A>,
+    broadcaster: SessionBroadcaster<A>,
+    sessionStateMapper: (S, String) -> A?,
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+): SharedStateServer<S, A> {
+    val serveJob = scope.launch {
+        store.state.collect { state ->
+            broadcaster.sendPerSession { sessionId ->
+                sessionStateMapper(state, sessionId)
+            }
+        }
+    }
+
+    return RemoteServer(
+        sessionRegistry = broadcaster.registry,
+        broadcaster = broadcaster,
+        store = store,
+        serveJob = serveJob,
+    )
+}

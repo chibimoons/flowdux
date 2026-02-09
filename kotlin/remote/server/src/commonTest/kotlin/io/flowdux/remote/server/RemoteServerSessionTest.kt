@@ -1,6 +1,7 @@
 package io.flowdux.remote.server
 
 import io.flowdux.Middleware
+import io.flowdux.remote.server.pattern.createSharedStateServer
 import io.flowdux.remote.server.session.BroadcastConfig
 import io.flowdux.remote.server.session.InMemorySessionRegistry
 import kotlinx.coroutines.cancelAndJoin
@@ -17,7 +18,7 @@ class RemoteServerSessionTest {
     @Test
     fun `handleClient adds session and removes on cancellation`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val server = createRemoteServer(
+        val server = createSharedStateServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -49,7 +50,7 @@ class RemoteServerSessionTest {
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
 
-        val server = createRemoteServer(
+        val server = createSharedStateServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -82,7 +83,7 @@ class RemoteServerSessionTest {
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
 
-        val server = createRemoteServer(
+        val server = createSharedStateServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -118,7 +119,7 @@ class RemoteServerSessionTest {
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
 
-        val server = createRemoteServer(
+        val server = createSharedStateServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -149,7 +150,7 @@ class RemoteServerSessionTest {
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
 
-        val server = createRemoteServer(
+        val server = createSharedStateServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -178,7 +179,7 @@ class RemoteServerSessionTest {
 
     @Test
     fun `close stops the session`() = runTest {
-        val server = createRemoteServer(
+        val server = createSharedStateServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -205,7 +206,7 @@ class RemoteServerSessionTest {
             }
         }.build()
 
-        val server = createRemoteServer(
+        val server = createSharedStateServer(
             initialState = ServerState(),
             reducer = serverReducer,
             processors = processors,
@@ -235,7 +236,7 @@ class RemoteServerSessionTest {
         val conn2 = MockTypedServerConnection<ServerAction>()
         val conn3 = MockTypedServerConnection<ServerAction>()
 
-        val server = createRemoteServer(
+        val server = createSharedStateServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
@@ -275,7 +276,7 @@ class RemoteServerSessionTest {
 
         val customRegistry = InMemorySessionRegistry<ServerAction>()
 
-        val server = createRemoteServer(
+        val server = createSharedStateServer(
             initialState = ServerState(),
             reducer = serverReducer,
             stateMapper = { ServerAction.SyncState(it) },
