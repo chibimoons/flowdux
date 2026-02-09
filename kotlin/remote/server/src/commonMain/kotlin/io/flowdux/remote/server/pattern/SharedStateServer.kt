@@ -10,7 +10,9 @@ import io.flowdux.State
 import io.flowdux.Store
 import io.flowdux.StoreLogger
 import io.flowdux.createStore
-import io.flowdux.remote.server.RemoteServer
+import io.flowdux.remote.server.ClientHandler
+import io.flowdux.remote.server.connection.TypedServerConnection
+import io.flowdux.remote.server.middleware.InternalAddSession
 import io.flowdux.remote.server.middleware.MultiClientSyncMiddleware
 import io.flowdux.remote.server.serveState
 import io.flowdux.remote.server.session.BroadcastConfig
@@ -21,12 +23,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
  * A server for 1:1:N pattern (1 Server : 1 Store : N Clients).
  *
- * All connected clients share the same state. State changes are
+ * Combines a [Store], [SessionRegistry], [SessionBroadcaster], and state broadcasting
+ * into a single object. All connected clients share the same state. State changes are
  * automatically broadcast to all clients.
  *
  * ```
@@ -39,6 +44,34 @@ import kotlinx.coroutines.launch
  *                           └────────┘
  * ```
  *
+ * ## Creating a SharedStateServer
+ *
+ * Use [createSharedStateServer] for the recommended way:
+ *
+ * ```kotlin
+ * val server = createSharedStateServer(
+ *     initialState = ServerState(),
+ *     reducer = serverReducer,
+ *     processors = myProcessors,
+ *     stateMapper = { state -> SyncState(state) },
+ *     scope = applicationScope,
+ * )
+ * ```
+ *
+ * ## Handling clients
+ * ```kotlin
+ * webSocket("/chat") {
+ *     val connection = KtorWebSocketServerConnection(this)
+ *         .typedJson<SharedChatAction>() as TypedServerConnection<ChatAction>
+ *     server.handleClient(sessionId, connection)
+ * }
+ * ```
+ *
+ * ## Shutdown
+ * ```kotlin
+ * server.close()
+ * ```
+ *
  * Use cases:
  * - Chat rooms (everyone sees the same messages)
  * - Real-time dashboards
@@ -47,7 +80,91 @@ import kotlinx.coroutines.launch
  * @param S State type
  * @param A Action type
  */
-typealias SharedStateServer<S, A> = RemoteServer<S, A>
+class SharedStateServer<S : State, A : Action> internal constructor(
+    /**
+     * The session registry managing client connections.
+     */
+    val sessionRegistry: SessionRegistry<A>,
+    /**
+     * The broadcaster for sending actions to clients.
+     */
+    val broadcaster: SessionBroadcaster<A>,
+    /**
+     * The underlying store.
+     */
+    val store: Store<S, A>,
+    internal val serveJob: Job,
+    /**
+     * Optional scope job to cancel when [close] is called.
+     * Used when the factory function creates a default scope.
+     */
+    private val ownedScopeJob: Job? = null,
+) : ClientHandler<A> {
+    /** Current server state as a reactive flow. */
+    val state: StateFlow<S> get() = store.state
+
+    /** Current server state snapshot. */
+    val currentState: S get() = store.currentState
+
+    /** Snapshot of currently connected session IDs. */
+    override suspend fun sessionIds(): Set<String> = sessionRegistry.sessionIds()
+
+    /** Number of currently connected sessions. */
+    override suspend fun sessionCount(): Int = sessionRegistry.sessionCount()
+
+    /**
+     * Handle a client connection.
+     *
+     * Dispatches [InternalAddSession] to start listening for incoming messages,
+     * registers the session in [SessionRegistry], suspends until cancelled,
+     * then cleans up the session.
+     *
+     * @param sessionId Unique identifier for this client session.
+     * @param connection Typed connection for sending/receiving actions.
+     */
+    @Suppress("UNCHECKED_CAST")
+    override suspend fun handleClient(
+        sessionId: String,
+        connection: TypedServerConnection<A>,
+    ) {
+        store.dispatch(InternalAddSession(sessionId, connection) as A)
+        sessionRegistry.addSession(sessionId, connection)
+        try {
+            awaitCancellation()
+        } finally {
+            sessionRegistry.removeSession(sessionId)
+        }
+    }
+
+    /**
+     * Send an action to a specific client by session ID.
+     * No-op if the session does not exist.
+     */
+    suspend fun sendToClient(sessionId: String, action: A) {
+        broadcaster.sendToClient(sessionId, action)
+    }
+
+    /**
+     * Send an action to all connected clients.
+     *
+     * Uses parallel sending if configured with [BroadcastConfig.concurrency] > 1.
+     */
+    suspend fun broadcast(action: A) {
+        broadcaster.broadcast(action)
+    }
+
+    /**
+     * Close the server, stopping state broadcasting and closing the store.
+     *
+     * If the server was created with a default scope (no explicit scope parameter),
+     * that scope is also cancelled.
+     */
+    override fun close() {
+        serveJob.cancel()
+        ownedScopeJob?.cancel()
+        store.close()
+    }
+}
 
 /**
  * Create a [SharedStateServer] for 1:1:N pattern.
@@ -135,7 +252,7 @@ fun <S : State, A : Action> createSharedStateServer(
         store.serveState(stateMapper)
     }
 
-    return RemoteServer(
+    return SharedStateServer(
         sessionRegistry = broadcaster.registry,
         broadcaster = broadcaster,
         store = store,
@@ -162,7 +279,7 @@ fun <S : State, A : Action> createSharedStateServer(
         store.serveState(stateMapper)
     }
 
-    return RemoteServer(
+    return SharedStateServer(
         sessionRegistry = broadcaster.registry,
         broadcaster = broadcaster,
         store = store,
@@ -246,7 +363,7 @@ fun <S : State, A : Action> createSessionAwareSharedStateServer(
         }
     }
 
-    return RemoteServer(
+    return SharedStateServer(
         sessionRegistry = broadcaster.registry,
         broadcaster = broadcaster,
         store = store,
@@ -277,7 +394,7 @@ fun <S : State, A : Action> createSessionAwareSharedStateServer(
         }
     }
 
-    return RemoteServer(
+    return SharedStateServer(
         sessionRegistry = broadcaster.registry,
         broadcaster = broadcaster,
         store = store,

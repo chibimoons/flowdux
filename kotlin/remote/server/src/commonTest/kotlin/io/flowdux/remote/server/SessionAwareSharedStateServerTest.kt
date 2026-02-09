@@ -12,7 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class SessionAwareRemoteServerSessionTest {
+class SessionAwareSharedStateServerTest {
 
     @Test
     fun `state changes trigger per-session mapping for all connected clients`() = runTest {

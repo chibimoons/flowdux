@@ -13,7 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class RemoteServerSessionTest {
+class SharedStateServerTest {
 
     @Test
     fun `handleClient adds session and removes on cancellation`() = runTest {

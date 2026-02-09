@@ -145,14 +145,14 @@ FlowDux Remote는 다양한 실시간 앱 요구사항에 맞는 서버 아키�
 
 ### Single Client (1:1:1)
 ```kotlin
-// 클라이언트당 별도 Store 생성
+// createSingleClientServer: 간편한 팩토리 함수 사용
 webSocket("/ws") {
-    val store = createStore(
+    val server = createSingleClientServer(
         initialState = UserState(),
         reducer = userReducer,
-        middlewares = listOf(SingleClientSyncMiddleware(connection)),
+        connection = connection,
     )
-    store.serve { SharedAction.SyncState(it) }
+    server.serve { SharedAction.SyncState(it) }
 }
 ```
 
@@ -171,30 +171,58 @@ webSocket("/chat") {
 
 ### Room (1:N:M)
 ```kotlin
-class RoomManager {
-    private val rooms = ConcurrentHashMap<String, SharedStateServer<...>>()
+// SharedStateServer 방: 방 내 상태 공유
+val chatRoomServer = createSharedStateRoomServer(
+    initialStateFactory = { roomId -> ChatState(roomId = roomId) },
+    reducer = chatReducer,
+    stateMapper = { SharedAction.SyncState(it) },
+    scope = applicationScope,
+)
 
-    fun getOrCreateRoom(roomId: String) = rooms.computeIfAbsent(roomId) {
-        createSharedStateServer(...)
-    }
-}
+// PerClientServer 방: 방 내 클라이언트별 비공개 상태
+val pokerLobby = createPerClientRoomServer(
+    initialStateFactory = { tableId, playerId -> PlayerState(tableId, playerId) },
+    reducer = playerReducer,
+    stateMapper = { SyncHand(it.hand) },
+    scope = applicationScope,
+)
 
 webSocket("/room/{roomId}") {
-    val room = roomManager.getOrCreateRoom(roomId)
+    val roomId = call.parameters["roomId"]!!
+    val room = chatRoomServer.getOrCreateRoom(roomId)
     room.handleClient(sessionId, connection)
 }
+
+// 빈 방 정리
+chatRoomServer.cleanupEmptyRooms()
 ```
 
 ### Per-Client (1:N:N)
 ```kotlin
-// Room Store (공개 상태) + Per-Client Store (비공개 상태)
+// createPerClientServer: 클라이언트당 독립 Store
+val playerServer = createPerClientServer(
+    initialStateFactory = { playerId -> PlayerState(playerId = playerId) },
+    reducer = playerReducer,
+    stateMapper = { SharedAction.SyncHand(it.hand) },
+    scope = applicationScope,
+)
+
+webSocket("/game/{playerId}") {
+    val playerId = call.parameters["playerId"]!!
+    playerServer.handleClient(playerId, connection)
+}
+```
+
+### Hybrid (Room + Per-Client)
+```kotlin
+// 공개 상태 + 비공개 상태 조합
 val roomStore = createSharedStateServer(...)
 
 class PlayerSession(connection: TypedServerConnection<...>) {
-    val store = createStore(
+    val store = createSingleClientServer(
         initialState = PlayerState(),
         reducer = playerReducer,
-        middlewares = listOf(SingleClientSyncMiddleware(connection)),
+        connection = connection,
     )
 }
 
@@ -202,7 +230,7 @@ webSocket("/game/{playerId}") {
     val session = PlayerSession(connection)
     coroutineScope {
         launch { roomStore.handleClient(playerId, connection) }  // 공개
-        launch { session.store.serve { ... } }                    // 비공개
+        launch { session.store.serve { SyncHand(it.hand) } }     // 비공개
     }
 }
 ```

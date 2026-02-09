@@ -54,7 +54,73 @@ chatRoom.close()
 
 ## 다중 방 관리
 
-실제 서비스에서는 여러 방을 동시에 운영합니다.
+### createRoomServer 사용 (권장)
+
+`RoomServer`는 다중 방 관리를 위한 래퍼입니다. `SharedStateServer` 또는 `PerClientServer` 방을 지원합니다.
+
+#### SharedStateServer 방 (방 내 상태 공유)
+
+```kotlin
+import io.flowdux.remote.server.pattern.createSharedStateRoomServer
+
+val roomServer = createSharedStateRoomServer(
+    initialStateFactory = { roomId -> ChatRoomState(roomId = roomId) },
+    reducer = chatRoomReducer,
+    stateMapper = { state -> SharedChatAction.SyncState(state.toChatState()) },
+    processors = chatProcessors(),
+    scope = applicationScope,
+)
+
+// 방 접근
+val room = roomServer.getOrCreateRoom("general")
+room.handleClient(sessionId, connection)
+
+// 빈 방 정리
+roomServer.cleanupEmptyRooms()
+
+// 종료
+roomServer.close()
+```
+
+#### PerClientServer 방 (방 내 클라이언트별 비공개 상태)
+
+```kotlin
+import io.flowdux.remote.server.pattern.createPerClientRoomServer
+
+val pokerLobby = createPerClientRoomServer(
+    initialStateFactory = { tableId, playerId -> PlayerState(tableId, playerId) },
+    reducer = playerReducer,
+    stateMapper = { SyncHand(it.hand) },
+    scope = applicationScope,
+)
+
+webSocket("/table/{tableId}/{playerId}") {
+    val tableId = call.parameters["tableId"]!!
+    val playerId = call.parameters["playerId"]!!
+    val table = pokerLobby.getOrCreateRoom(tableId)
+    table.handleClient(playerId, connection)
+}
+```
+
+#### 커스텀 팩토리
+
+```kotlin
+import io.flowdux.remote.server.pattern.createRoomServer
+
+// 어떤 ClientHandler든 사용 가능
+val roomServer = createRoomServer { roomId ->
+    createSharedStateServer(
+        initialState = ChatRoomState(roomId = roomId),
+        reducer = chatRoomReducer,
+        stateMapper = { state -> SharedChatAction.SyncState(state.toChatState()) },
+        scope = applicationScope,
+    )
+}
+```
+
+### 커스텀 RoomManager (세부 제어 필요 시)
+
+`createRoomServer`가 제공하는 것 이상의 제어가 필요한 경우 직접 구현할 수 있습니다.
 
 ```kotlin
 import io.flowdux.remote.server.pattern.SharedStateServer
@@ -111,12 +177,17 @@ class RoomManager(
 ### WebSocket 라우팅
 
 ```kotlin
-val roomManager = RoomManager(applicationScope)
+val roomServer = createSharedStateRoomServer(
+    initialStateFactory = { roomId -> ChatRoomState(roomId = roomId) },
+    reducer = chatRoomReducer,
+    stateMapper = { state -> SharedChatAction.SyncState(state.toChatState()) },
+    scope = applicationScope,
+)
 
 routing {
     // 방 목록 API
     get("/rooms") {
-        // ... 방 목록 반환
+        call.respond(roomServer.roomIds())
     }
 
     // 방별 WebSocket 연결
@@ -125,7 +196,7 @@ routing {
             CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Room ID required")
         )
 
-        val room = roomManager.getRoom(roomId) ?: roomManager.createRoom(roomId)
+        val room = roomServer.getOrCreateRoom(roomId)
         val sessionId = UUID.randomUUID().toString()
 
         val connection = KtorWebSocketServerConnection(this)
@@ -139,9 +210,7 @@ routing {
             println("[$roomId] Client $sessionId left")
 
             // 선택: 빈 방 자동 정리
-            if (room.sessionCount() == 0) {
-                roomManager.destroyRoom(roomId)
-            }
+            roomServer.destroyRoomIfEmpty(roomId)
         }
     }
 }

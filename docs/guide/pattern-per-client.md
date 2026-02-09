@@ -40,14 +40,36 @@ Each client receives:
 - **Public state** from the Room Store (same for everyone)
 - **Private state** from their Per-Client Store (unique to them)
 
-## Existing API Combination
+## API Options
 
-The Per-Client Store pattern uses existing FlowDux APIs:
+There are two ways to implement Per-Client pattern:
+
+### 1. createPerClientServer (Simple Case)
+
+For standalone per-client stores without a shared Room Store:
+
+```kotlin
+val playerServer = createPerClientServer(
+    initialStateFactory = { playerId -> PlayerState(playerId = playerId) },
+    reducer = playerReducer,
+    stateMapper = { state -> SharedAction.SyncHand(state.hand) },
+    scope = applicationScope,
+)
+
+webSocket("/game/{playerId}") {
+    val playerId = call.parameters["playerId"]!!
+    playerServer.handleClient(playerId, connection)
+}
+```
+
+### 2. Room + Per-Client (Hybrid)
+
+For games with both public and private state, combine manually:
 
 | API | Purpose |
 |-----|---------|
 | `createSharedStateServer()` | Room Store for shared state |
-| `createStore()` + `SingleClientSyncMiddleware` | Per-Client Store for private state |
+| `createSingleClientServer()` | Per-Client Store for private state |
 | `Store.serve()` | Sync private state to client |
 | `store.dispatch()` | Inject updates from Room Store |
 
@@ -82,12 +104,11 @@ class PlayerSession(
     val playerId: String,
     private val connection: TypedServerConnection<PokerAction>,
 ) {
-    private val middleware = SingleClientSyncMiddleware<PlayerState, PokerAction>(connection)
-
-    val store: Store<PlayerState, PokerAction> = createStore(
+    // createSingleClientServer 팩토리 사용
+    val store = createSingleClientServer(
         initialState = PlayerState(playerId = playerId),
         reducer = playerReducer,
-        middlewares = listOf(middleware),
+        connection = connection,
     )
 
     // Called by Room Store to update private hand

@@ -41,9 +41,8 @@ Single Client 패턴은 각 클라이언트가 독립된 Store를 가지는 가�
 ### Server
 
 ```kotlin
-import io.flowdux.createStore
-import io.flowdux.remote.server.middleware.SingleClientSyncMiddleware
-import io.flowdux.remote.server.serveState
+import io.flowdux.remote.server.pattern.createSingleClientServer
+import io.flowdux.remote.server.serve
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.serialization.typedJson
 import io.flowdux.remote.serialization.upcast
@@ -60,21 +59,19 @@ fun main() {
                     .typedJson<SharedUserAction>()
                     .upcast<SharedUserAction, UserAction>()
 
-                // 이 클라이언트 전용 Store 생성
-                val middleware = SingleClientSyncMiddleware<UserState, UserAction>(connection)
-                val store = createStore(
+                // createSingleClientServer 팩토리 사용 (내부적으로 SingleClientSyncMiddleware 설정)
+                val server = createSingleClientServer(
                     initialState = UserState(),
                     reducer = userReducer,
-                    middlewares = listOf(middleware),
+                    connection = connection,
                 )
 
                 try {
                     // 상태 변경 시 클라이언트에 자동 전송
-                    store.serveState { state ->
+                    server.serve { state ->
                         SharedUserAction.SyncState(state)
                     }
                 } finally {
-                    store.close()
                     println("Client disconnected")
                 }
             }
@@ -235,17 +232,17 @@ data class DashboardState(
 webSocket("/dashboard") {
     val userId = authenticateUser(call) ?: return@webSocket close(...)
 
-    val store = createStore(
+    val server = createSingleClientServer(
         initialState = DashboardState(userId = userId),
         reducer = dashboardReducer,
-        middlewares = listOf(SingleClientSyncMiddleware(connection)),
+        connection = connection,
     )
 
     // 사용자별 데이터 로드
     val userData = userRepository.loadDashboardData(userId)
-    store.dispatch(ServerAction.InitializeData(userData))
+    server.dispatch(ServerAction.InitializeData(userData))
 
-    store.serveState { SharedAction.SyncDashboard(it) }
+    server.serve { SharedAction.SyncDashboard(it) }
 }
 ```
 
@@ -265,21 +262,21 @@ data class NotificationCenterState(
 webSocket("/notifications") {
     val userId = authenticateUser(call) ?: return@webSocket
 
-    val store = createStore(
+    val server = createSingleClientServer(
         initialState = NotificationCenterState(),
         reducer = notificationReducer,
-        middlewares = listOf(SingleClientSyncMiddleware(connection)),
+        connection = connection,
     )
 
     // 알림 구독
     val notificationJob = launch {
         notificationService.subscribeToUser(userId).collect { notification ->
-            store.dispatch(ServerAction.NewNotification(notification))
+            server.dispatch(ServerAction.NewNotification(notification))
         }
     }
 
     try {
-        store.serveState { SharedAction.SyncNotifications(it) }
+        server.serve { SharedAction.SyncNotifications(it) }
     } finally {
         notificationJob.cancel()
     }
@@ -359,18 +356,18 @@ data class WorkspaceState(
 webSocket("/workspace") {
     val userId = authenticateUser(call) ?: return@webSocket
 
-    val store = createStore(
+    val server = createSingleClientServer(
         initialState = WorkspaceState(),
         reducer = workspaceReducer,
+        connection = connection,
         processors = workspaceProcessors(userId),  // DB 연동
-        middlewares = listOf(SingleClientSyncMiddleware(connection)),
     )
 
     // 초기 데이터 로드
     val savedData = workspaceRepository.load(userId)
-    store.dispatch(ServerAction.LoadWorkspace(savedData))
+    server.dispatch(ServerAction.LoadWorkspace(savedData))
 
-    store.serveState { SharedAction.SyncWorkspace(it) }
+    server.serve { SharedAction.SyncWorkspace(it) }
 }
 ```
 
