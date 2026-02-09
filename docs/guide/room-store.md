@@ -21,16 +21,16 @@ Room Store 패턴은 그룹(방) 단위로 상태를 관리하고 메시지를 �
 C1 C2 C3 C4 C5 C6 C7 C8 C9
 ```
 
-- **1 Room = 1 RemoteServer** — 방마다 독립된 Store와 상태
+- **1 Room = 1 SharedStateServer** — 방마다 독립된 Store와 상태
 - **메시지 라우팅 O(방 인원)** — 전체 유저가 아닌 방 구성원에게만 전송
 - **방 간 상태 격리** — 각 방은 서로 영향 없음
 
 ## 기본 사용법 (단일 방)
 
-`RemoteServer`가 Room Store 패턴의 핵심입니다.
+`SharedStateServer`가 Room Store 패턴의 핵심입니다.
 
 ```kotlin
-import io.flowdux.remote.server.createRemoteServer
+import io.flowdux.remote.server.pattern.createSharedStateServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +38,7 @@ import kotlinx.coroutines.Dispatchers
 val roomScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 // 1개 Room 생성
-val chatRoom = createRemoteServer(
+val chatRoom = createSharedStateServer(
     initialState = ChatRoomState(),
     reducer = chatRoomReducer,
     processors = chatProcessors(),
@@ -69,12 +69,12 @@ import java.util.concurrent.ConcurrentHashMap
 class RoomManager(
     private val applicationScope: CoroutineScope,
 ) {
-    private val rooms = ConcurrentHashMap<String, RemoteServer<ChatRoomState, ChatAction>>()
+    private val rooms = ConcurrentHashMap<String, SharedStateServer<ChatRoomState, ChatAction>>()
 
     /** 방 생성 */
-    fun createRoom(roomId: String): RemoteServer<ChatRoomState, ChatAction> {
+    fun createRoom(roomId: String): SharedStateServer<ChatRoomState, ChatAction> {
         return rooms.computeIfAbsent(roomId) {
-            createRemoteServer(
+            createSharedStateServer(
                 initialState = ChatRoomState(roomId = roomId),
                 reducer = chatRoomReducer,
                 processors = chatProcessors(),
@@ -85,7 +85,7 @@ class RoomManager(
     }
 
     /** 방 조회 */
-    fun getRoom(roomId: String): RemoteServer<ChatRoomState, ChatAction>? = rooms[roomId]
+    fun getRoom(roomId: String): SharedStateServer<ChatRoomState, ChatAction>? = rooms[roomId]
 
     /** 방 삭제 */
     fun destroyRoom(roomId: String) {
@@ -257,9 +257,9 @@ fun ChatRoomState.toChatState() = ChatState(
 
 ```
 RoomManager
-├── Room "general" (RemoteServer)
-├── Room "random" (RemoteServer)
-└── Room "game-123" (RemoteServer)
+├── Room "general" (SharedStateServer)
+├── Room "random" (SharedStateServer)
+└── Room "game-123" (SharedStateServer)
 
 모두 같은 프로세스에서 실행
 ```

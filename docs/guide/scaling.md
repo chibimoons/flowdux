@@ -33,7 +33,7 @@ flowchart TB
 Existing code works without changes:
 
 ```kotlin
-val server = createRemoteServer(
+val server = createSharedStateServer(
     initialState = ChatState(),
     reducer = chatReducer,
     stateMapper = { SyncState(it) },
@@ -45,7 +45,7 @@ val server = createRemoteServer(
 For high-throughput scenarios with many concurrent clients:
 
 ```kotlin
-val server = createRemoteServer(
+val server = createSharedStateServer(
     initialState = ChatState(),
     reducer = chatReducer,
     stateMapper = { SyncState(it) },
@@ -110,7 +110,7 @@ Thread-safe in-memory implementation using Mutex:
 ```kotlin
 val registry = InMemorySessionRegistry<ChatAction>()
 
-val server = createRemoteServer(
+val server = createSharedStateServer(
     initialState = ChatState(),
     reducer = chatReducer,
     stateMapper = { SyncState(it) },
@@ -171,7 +171,7 @@ Usage:
 ```kotlin
 val redisRegistry = RedisSessionRegistry<ChatAction>(redisClient, codec)
 
-val server = createRemoteServer(
+val server = createSharedStateServer(
     initialState = ChatState(),
     reducer = chatReducer,
     stateMapper = { SyncState(it) },
@@ -214,12 +214,12 @@ Parallel (concurrency = 4):
 
 Individual connection failures are isolated and don't affect other sends.
 
-## RemoteServer API
+## SharedStateServer API
 
 Access to new scaling components:
 
 ```kotlin
-val server = createRemoteServer(...)
+val server = createSharedStateServer(...)
 
 // New properties
 val registry: SessionRegistry<A> = server.sessionRegistry
@@ -254,7 +254,7 @@ fun main() {
     val broadcastConfig = BroadcastConfig(concurrency = 32)
     val sessionRegistry = InMemorySessionRegistry<ChatAction>()
 
-    val server = createRemoteServer(
+    val server = createSharedStateServer(
         initialState = ChatState(),
         reducer = chatReducer,
         stateMapper = { SharedChatAction.SyncState(it) },
