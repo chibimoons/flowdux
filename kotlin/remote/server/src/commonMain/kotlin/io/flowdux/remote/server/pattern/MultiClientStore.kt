@@ -42,7 +42,7 @@ import kotlinx.coroutines.SupervisorJob
  *
  * val server = createSharedStateServer(
  *     store = store,
- *     broadcaster = broadcaster,
+ *     registry = registry,
  *     stateMapper = { SyncState(it) },
  * )
  * ```

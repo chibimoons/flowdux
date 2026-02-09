@@ -12,7 +12,6 @@ import io.flowdux.StoreLogger
 import io.flowdux.remote.server.ClientHandler
 import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.middleware.InternalAddSession
-import io.flowdux.remote.server.middleware.InternalRemoveSession
 import io.flowdux.remote.server.middleware.InternalSendToClient
 import io.flowdux.remote.server.middleware.InternalStartServing
 import io.flowdux.remote.server.middleware.InternalStartServingPerSession
@@ -105,8 +104,8 @@ class SharedStateServer<S : State, A : Action> internal constructor(
      * Handle a client connection.
      *
      * Dispatches [InternalAddSession] to register the session and start listening
-     * for incoming messages. Suspends until cancelled, then dispatches [InternalRemoveSession]
-     * to clean up the session.
+     * for incoming messages. Suspends until cancelled, then removes the session
+     * from the registry directly to ensure cleanup even if the store is closed.
      *
      * @param sessionId Unique identifier for this client session.
      * @param connection Typed connection for sending/receiving actions.
@@ -120,7 +119,8 @@ class SharedStateServer<S : State, A : Action> internal constructor(
         try {
             awaitCancellation()
         } finally {
-            store.dispatch(InternalRemoveSession(sessionId) as A)
+            // Direct removal ensures cleanup even if store is already closed
+            sessionRegistry.removeSession(sessionId)
         }
     }
 
