@@ -1,6 +1,6 @@
-# Per-Client Store Pattern
+# Per-Client Pattern (1:N:N)
 
-The Per-Client Store pattern allows the server to maintain separate, private state for each connected client. This is essential when different clients should see different information.
+Per-Client 패턴은 서버가 각 클라이언트별로 독립된 비공개 상태를 관리하는 구조입니다. 클라이언트마다 다른 정보를 보여줘야 할 때 사용합니다.
 
 ## When to Use
 
@@ -40,14 +40,36 @@ Each client receives:
 - **Public state** from the Room Store (same for everyone)
 - **Private state** from their Per-Client Store (unique to them)
 
-## Existing API Combination
+## API Options
 
-The Per-Client Store pattern uses existing FlowDux APIs:
+There are two ways to implement Per-Client pattern:
+
+### 1. createPerClientServer (Simple Case)
+
+For standalone per-client stores without a shared Room Store:
+
+```kotlin
+val playerServer = createPerClientServer(
+    initialStateFactory = { playerId -> PlayerState(playerId = playerId) },
+    reducer = playerReducer,
+    stateMapper = { state -> SharedAction.SyncHand(state.hand) },
+    scope = applicationScope,
+)
+
+webSocket("/game/{playerId}") {
+    val playerId = call.parameters["playerId"]!!
+    playerServer.handleClient(playerId, connection)
+}
+```
+
+### 2. Room + Per-Client (Hybrid)
+
+For games with both public and private state, combine manually:
 
 | API | Purpose |
 |-----|---------|
-| `createRemoteServer()` | Room Store for shared state |
-| `createStore()` + `SingleClientSyncMiddleware` | Per-Client Store for private state |
+| `createSharedStateServer()` | Room Store for shared state |
+| `createSingleClientServer()` | Per-Client Store for private state |
 | `Store.serve()` | Sync private state to client |
 | `store.dispatch()` | Inject updates from Room Store |
 
@@ -82,12 +104,11 @@ class PlayerSession(
     val playerId: String,
     private val connection: TypedServerConnection<PokerAction>,
 ) {
-    private val middleware = SingleClientSyncMiddleware<PlayerState, PokerAction>(connection)
-
-    val store: Store<PlayerState, PokerAction> = createStore(
+    // createSingleClientServer 팩토리 사용
+    val store = createSingleClientServer(
         initialState = PlayerState(playerId = playerId),
         reducer = playerReducer,
-        middlewares = listOf(middleware),
+        connection = connection,
     )
 
     // Called by Room Store to update private hand
@@ -112,7 +133,7 @@ class PokerTable(
 ) {
     private val players = ConcurrentHashMap<String, PlayerSession>()
 
-    val roomStore = createRemoteServer(
+    val roomStore = createSharedStateServer(
         initialState = ServerTableState(),
         reducer = serverTableReducer,
         processors = tableProcessors(),
@@ -243,8 +264,18 @@ See `kotlin/samples/flowdux-remote/poker/` for a complete working example:
 curl -X POST http://localhost:8080/start
 ```
 
+## 다른 패턴으로 전환
+
+Per-Client 패턴에서 다른 패턴으로 전환해야 하는 신호:
+
+| 신호 | 전환 대상 |
+|------|----------|
+| "비공개 정보가 필요 없어요" | [Shared State](./pattern-shared-state.md) 또는 [Room](./pattern-room.md) |
+| "공개 정보가 필요 없어요" | [Single Client](./pattern-single-client.md) |
+
 ## Related
 
-- [Remote State Sync](./remote.md) — WebSocket basics
-- [Room Store Pattern](./room-store.md) — Multi-client shared state
-- [Server Architecture Patterns](../design/server-architecture-patterns.md) — Architecture overview
+- [Server Patterns Overview](./server-patterns.md) — 패턴 선택 가이드
+- [Room Pattern](./pattern-room.md) — 다중 방 관리
+- [Shared State Pattern](./pattern-shared-state.md) — 공유 상태 패턴
+- [Remote Guide](./remote.md) — 기본 설정 가이드

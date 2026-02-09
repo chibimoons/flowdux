@@ -112,7 +112,7 @@ webSocket("/chat") {
 
 ```kotlin
 // === 서버 ===
-val chatRoom = createRemoteServer(
+val chatRoom = createSharedStateServer(
     initialState = ServerChatState(),
     reducer = serverChatReducer,
     stateMapper = { SharedChatAction.SyncState(it.toPublic()) },
@@ -239,7 +239,7 @@ class PokerServer {
 class PokerTable(private val scope: CoroutineScope) {
     private val players = ConcurrentHashMap<String, PlayerSession>()
 
-    val roomStore = createRemoteServer(
+    val roomStore = createSharedStateServer(
         initialState = ServerTableState(),
         reducer = serverTableReducer,
         processors = tableProcessors(),
@@ -334,7 +334,7 @@ class MetricsServer {
 #### FlowDux Remote 구현
 
 ```kotlin
-val dashboard = createRemoteServer(
+val dashboard = createSharedStateServer(
     initialState = MetricsState(),
     reducer = metricsReducer,
     stateMapper = { SharedAction.SyncMetrics(it) },
@@ -419,7 +419,7 @@ class DocumentServer {
 #### FlowDux Remote 구현
 
 ```kotlin
-val docServer = createRemoteServer(
+val docServer = createSharedStateServer(
     initialState = DocumentState(),
     reducer = documentReducer,
     processors = documentProcessors(),  // OT 변환 처리
@@ -506,7 +506,7 @@ class IoTGateway {
 #### FlowDux Remote 구현
 
 ```kotlin
-val iotHub = createRemoteServer(
+val iotHub = createSharedStateServer(
     initialState = IoTState(),
     reducer = iotReducer,
     processors = iotProcessors(),
@@ -619,7 +619,7 @@ class GameLobby {
 class GameLobby(private val scope: CoroutineScope) {
     private val rooms = ConcurrentHashMap<String, GameRoom>()
 
-    val lobbyStore = createRemoteServer(
+    val lobbyStore = createSharedStateServer(
         initialState = LobbyState(),
         reducer = lobbyReducer,
         stateMapper = { SharedAction.SyncLobby(it.rooms.map { r -> r.toInfo() }) },
@@ -635,7 +635,7 @@ class GameLobby(private val scope: CoroutineScope) {
 }
 
 class GameRoom(val id: String, scope: CoroutineScope) {
-    val roomStore = createRemoteServer(
+    val roomStore = createSharedStateServer(
         initialState = GameState(),
         reducer = gameReducer,
         stateMapper = { SharedAction.SyncGame(it) },
@@ -729,7 +729,7 @@ webSocket("/room/{roomId}") { rooms[roomId]?.roomStore?.handleClient(id, connect
 목적: 다중 클라이언트 채팅방
 패턴: Room Store
 코드량: 서버 60줄, 클라이언트 50줄
-핵심: createRemoteServer + stateMapper로 자동 broadcast
+핵심: createSharedStateServer + stateMapper로 자동 broadcast
 ```
 
 ### Poker Sample (poker)
@@ -755,3 +755,11 @@ webSocket("/room/{roomId}") { rooms[roomId]?.roomStore?.handleClient(id, connect
 | "복잡한 게임/협업 도구" | **FlowDux Remote** |
 
 FlowDux Remote는 **프로토콜 정의와 상태 관리를 통합**하여 boilerplate를 줄이고, **확장 가능한 구조**를 제공합니다. Raw WebSocket 대비 코드량은 평균 **40-50% 감소**하며, 특히 복잡한 시나리오에서 그 차이가 커집니다.
+
+## Related
+
+- [Server Patterns Overview](./server-patterns.md) — Pattern selection guide (Single Client, Shared State, Room, Per-Client)
+- [Remote Guide](./remote.md) — Basic client-server setup
+- [Room Pattern](./pattern-room.md) — Multi-room management
+- [Per-Client Pattern](./pattern-per-client.md) — Private state per client
+- [Scaling Guide](./scaling.md) — Parallel broadcast for large-scale deployments

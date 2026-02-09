@@ -72,7 +72,7 @@ flowdux-remote-ktor          KtorWebSocket*Connection (transport 구현체)
 |------|------|----------------|
 | `ServerSharedAction` | Client → Server | `SyncMiddleware`가 가로채서 서버로 전송. 로컬 Store에는 emit하지 않음. |
 | `ClientSharedAction` | Server → Client | `MultiClientSingleClientSyncMiddleware`가 가로채서 클라이언트로 broadcast. 로컬 Store에는 emit하지 않음. |
-| `SessionAwareAction<A>` *(미구현, 설계 중)* | Server → Client (per-session) | `forSession(sessionId): A?`로 클라이언트별 다른 액션 전송. null 반환 시 해당 세션 스킵. 현재는 `createSessionAwareRemoteServer`의 `sessionStateMapper`로 동일 기능 제공. |
+| `SessionAwareAction<A>` *(미구현, 설계 중)* | Server → Client (per-session) | `forSession(sessionId): A?`로 클라이언트별 다른 액션 전송. null 반환 시 해당 세션 스킵. 현재는 `createSessionAwareSharedStateServer`의 `sessionStateMapper`로 동일 기능 제공. |
 
 **세션 관리**
 
@@ -750,7 +750,7 @@ flowdux-remote에는 버전 호환을 위한 인프라가 **전혀 없다.**
 |------|------|------------|
 | `ActionCodec` 추상화 | 있음 | `decode()`를 `decodeOrNull()`로 확장 가능 |
 | `MessageCodec` 추상화 | 있음 | envelope에 버전 필드 추가 가능 |
-| `SessionAwareAction` | **미구현** (설계만 됨) | 구현 시 클라이언트 버전별 다른 응답 전송에 활용 가능. 현재는 `createSessionAwareRemoteServer`의 `sessionStateMapper`로 대체 가능. |
+| `SessionAwareAction` | **미구현** (설계만 됨) | 구현 시 클라이언트 버전별 다른 응답 전송에 활용 가능. 현재는 `createSessionAwareSharedStateServer`의 `sessionStateMapper`로 대체 가능. |
 | `RemoteServerSession.handleClient()` | 있음 | handshake 단계를 앞에 삽입 가능 |
 | Ktor 라우팅 | 있음 | WebSocket 엔드포인트 앞에서 버전 체크 가능 (앱 개발자 영역) |
 
@@ -1215,8 +1215,8 @@ RemoteServer<S, A>                       ← 신규 Facade
 └── serveJob                             ← 상태 변경 → broadcast 코루틴
 
 팩토리 함수:
-├── createRemoteServer()                 ← 전체 broadcast (stateMapper)
-└── createSessionAwareRemoteServer()     ← 세션별 매핑 (sessionStateMapper)
+├── createSharedStateServer()                 ← 전체 broadcast (stateMapper)
+└── createSessionAwareSharedStateServer()     ← 세션별 매핑 (sessionStateMapper)
 ```
 
 ### 13.3 핵심 변경 포인트
@@ -1225,22 +1225,22 @@ RemoteServer<S, A>                       ← 신규 Facade
 |------|--------|-------|
 | 세션 저장 | `MultiClientSingleClientSyncMiddleware` 내부 `MutableMap` | `RemoteServerSession` (독립 클래스) |
 | 세션 정리 | `InternalRemoveSession` 액션 dispatch | `handleClient()` 의 `finally` 블록 |
-| Store + 세션 조합 | 앱 개발자가 직접 조립 | `createRemoteServer()` 팩토리 함수 |
-| 세션별 상태 전송 | 없음 | `createSessionAwareRemoteServer()` + `sessionStateMapper` |
+| Store + 세션 조합 | 앱 개발자가 직접 조립 | `createSharedStateServer()` 팩토리 함수 |
+| 세션별 상태 전송 | 없음 | `createSessionAwareSharedStateServer()` + `sessionStateMapper` |
 | 외부 API | Store 직접 사용 | `RemoteServer` facade (`handleClient`, `broadcast`, `sendToClient`) |
 
 ### 13.4 SessionAwareAction과 sessionStateMapper
 
 PR #95는 세션별로 다른 상태를 전송하는 두 가지 메커니즘을 도입한다:
 
-**1. `createSessionAwareRemoteServer` + `sessionStateMapper`:**
+**1. `createSessionAwareSharedStateServer` + `sessionStateMapper`:**
 
 ```kotlin
-val server = createSessionAwareRemoteServer(
+val server = createSessionAwareSharedStateServer(
     initialState = PokerState(),
     reducer = pokerReducer,
     sessionStateMapper = { state, sessionId ->
-        val hand = state.hands[sessionId] ?: return@createSessionAwareRemoteServer null
+        val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
         PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
     },
     scope = scope,
@@ -1275,7 +1275,7 @@ interface SessionAwareAction<A : Action> {
 **구현:**
 
 ```kotlin
-val server = createRemoteServer(
+val server = createSharedStateServer(
     initialState = ChatState(),
     reducer = chatReducer,
     stateMapper = { state -> SyncState(state) },
@@ -1291,7 +1291,7 @@ webSocket("/chat") {
 ```
 
 **평가: ✅ 완전 구현 가능**
-- `createRemoteServer` + `stateMapper`로 직접 지원
+- `createSharedStateServer` + `stateMapper`로 직접 지원
 - 상태 변경 → 모든 클라이언트에 동일한 액션 broadcast
 - `handleClient()`가 세션 등록/해제/리스닝을 자동 처리
 
@@ -1311,7 +1311,7 @@ class RoomManager {
     private val rooms = mutableMapOf<String, RemoteServer<GameState, GameAction>>()
 
     fun createRoom(roomId: String): RemoteServer<GameState, GameAction> {
-        val server = createRemoteServer(
+        val server = createSharedStateServer(
             initialState = GameState(),
             reducer = gameReducer,
             stateMapper = { state -> SyncGameState(state) },
@@ -1349,11 +1349,11 @@ class RoomManager {
 **구현:**
 
 ```kotlin
-val server = createSessionAwareRemoteServer(
+val server = createSessionAwareSharedStateServer(
     initialState = PokerState(),
     reducer = pokerReducer,
     sessionStateMapper = { state, sessionId ->
-        val hand = state.hands[sessionId] ?: return@createSessionAwareRemoteServer null
+        val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
         PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
     },
     scope = applicationScope,
@@ -1361,7 +1361,7 @@ val server = createSessionAwareRemoteServer(
 ```
 
 **평가: ✅ 완전 구현 가능**
-- `createSessionAwareRemoteServer` + `sessionStateMapper`로 직접 지원
+- `createSessionAwareSharedStateServer` + `sessionStateMapper`로 직접 지원
 - 상태 변경마다 `sendPerSession()`이 각 세션에 mapper 결과를 전송
 - mapper가 null 반환 시 해당 세션 스킵 (관전자 등)
 
@@ -1382,7 +1382,7 @@ webSocket("/personal") {
     val conn = KtorWebSocketServerConnection(this)
         .typedJson<PersonalAction>() as TypedServerConnection<PersonalAction>
 
-    val server = createRemoteServer(
+    val server = createSharedStateServer(
         initialState = PersonalState(userId = sessionId),
         reducer = personalReducer,
         stateMapper = { state -> SyncPersonalState(state) },
@@ -1495,7 +1495,7 @@ data class CompositeState(
     val game: GameState?,
 ) : State
 
-val server = createSessionAwareRemoteServer(
+val server = createSessionAwareSharedStateServer(
     initialState = CompositeState(lobby = LobbyState(), game = null),
     reducer = compositeReducer,
     sessionStateMapper = { state, sessionId -> /* 세션별 projection */ },
@@ -1532,9 +1532,9 @@ val server = createSessionAwareRemoteServer(
 
 | Pattern | Use Case | PR #95 API | 구현 복잡도 | 비고 |
 |---------|----------|-----------|------------|------|
-| **A. Central Store** | 채팅, 대시보드 | ✅ `createRemoteServer` | 낮음 | 직접 지원 |
+| **A. Central Store** | 채팅, 대시보드 | ✅ `createSharedStateServer` | 낮음 | 직접 지원 |
 | **B. Room Store** | 게임 방, 채널 | ✅ `RemoteServer` × N | 중간 | RoomManager 앱 구현 |
-| **C. Per-Client View** | 포커, 권한별 뷰 | ✅ `createSessionAwareRemoteServer` | 낮음 | 직접 지원 |
+| **C. Per-Client View** | 포커, 권한별 뷰 | ✅ `createSessionAwareSharedStateServer` | 낮음 | 직접 지원 |
 | **D. Per-Client Store** | 개인화 피드 | ✅ `RemoteServer` per conn | 중간 | 비효율적, Pattern C 권장 |
 | **E. Combined (멀티 Store 구독)** | 로비 + 게임 동시 | ⚠️ 제한적 | 높음 | 다중 WS 또는 Composite Store |
 
@@ -1547,7 +1547,7 @@ val server = createSessionAwareRemoteServer(
 ✓ RemoteServer facade
   → 앱 개발자에게 깔끔한 API 제공 (handleClient, broadcast, sendToClient)
 
-✓ createSessionAwareRemoteServer
+✓ createSessionAwareSharedStateServer
   → Per-Client View 패턴을 직접 지원. 포커, 마피아 게임 등 핵심 사용 사례 커버.
 
 ✓ InternalRemoveSession 제거

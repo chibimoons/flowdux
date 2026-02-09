@@ -528,7 +528,7 @@ class UserSessionManager(
             val user = userRepository.getUser(userId)
             val subscription = userRepository.getSubscription(userId)
 
-            createRemoteServer(
+            createSharedStateServer(
                 initialState = UserSessionState(
                     user = user,
                     subscription = subscription,

@@ -9,6 +9,8 @@ import io.flowdux.remote.ClientSharedAction
 import io.flowdux.remote.ServerSharedAction
 import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.middleware.InternalAddSession
+import io.flowdux.remote.server.middleware.InternalRemoveSession
+import io.flowdux.remote.server.middleware.InternalSendToClient
 import io.flowdux.remote.server.middleware.InternalStartListening
 import io.flowdux.remote.server.middleware.SingleClientSyncMiddleware
 import kotlinx.coroutines.channels.Channel
@@ -74,9 +76,21 @@ fun <S : State, A : Action> Store<S, A>.dispatchStartListening() {
 @Suppress("UNCHECKED_CAST")
 fun <S : State, A : Action> Store<S, A>.dispatchAddSession(
     sessionId: String,
-    connection: TypedServerConnection<A>,
+    connection: TypedServerConnection<*>,
 ) {
     dispatch(InternalAddSession(sessionId, connection) as A)
+}
+
+/** Dispatch [InternalRemoveSession] via unchecked cast (type-erased at runtime). */
+@Suppress("UNCHECKED_CAST")
+fun <S : State, A : Action> Store<S, A>.dispatchRemoveSession(sessionId: String) {
+    dispatch(InternalRemoveSession(sessionId) as A)
+}
+
+/** Dispatch [InternalSendToClient] via unchecked cast (type-erased at runtime). */
+@Suppress("UNCHECKED_CAST")
+fun <S : State, A : Action> Store<S, A>.dispatchSendToClient(sessionId: String, action: Action) {
+    dispatch(InternalSendToClient(sessionId, action) as A)
 }
 
 // -- Session-Aware Test Fixtures --

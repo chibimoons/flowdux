@@ -204,7 +204,7 @@ curl -X POST http://localhost:8080/maintenance/false
   *** SYSTEM: 서버 점검 예정 ***
 ```
 
-이 기능은 `RemoteServer.broadcast()`를 사용하여 구현됩니다. 자세한 내용은 [Remote 가이드](./remote.md#2-server-setup)를 참조하세요.
+이 기능은 `SharedStateServer.broadcast()`를 사용하여 구현됩니다. 자세한 내용은 [Remote 가이드](./remote.md#2-server-setup)를 참조하세요.
 
 ---
 
@@ -414,9 +414,9 @@ curl -X POST http://localhost:8080/winner
 
 ## 관련 문서
 
+- [Server Patterns Overview](./server-patterns.md) — 패턴 선택 가이드 (Single Client, Shared State, Room, Per-Client)
 - [Remote (WebSocket)](./remote.md) — 클라이언트-서버 설정 가이드
 - [Scaling Architecture](./scaling.md) — 병렬 브로드캐스트, 대규모 연결
-- [Room Store Pattern](./room-store.md) — 다중 방 관리 패턴 상세
-- [Per-Client Store Pattern](./per-client-store.md) — 비공개 상태 관리 패턴
+- [Room Pattern](./pattern-room.md) — 다중 방 관리 패턴 상세
+- [Per-Client Pattern](./pattern-per-client.md) — 비공개 상태 관리 패턴
 - [FlowDux Remote vs Raw WebSocket](./flowdux-remote-vs-raw.md) — Use Case별 비교 및 선택 가이드
-- [Server Architecture Patterns](../design/server-architecture-patterns.md) — 아키텍처 패턴 설계 문서

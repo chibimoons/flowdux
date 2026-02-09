@@ -30,10 +30,10 @@ flowchart TB
 
 ### Default (Sequential Broadcast)
 
-Existing code works without changes:
+The default configuration uses sequential broadcast:
 
 ```kotlin
-val server = createRemoteServer(
+val server = createSharedStateServer(
     initialState = ChatState(),
     reducer = chatReducer,
     stateMapper = { SyncState(it) },
@@ -45,7 +45,7 @@ val server = createRemoteServer(
 For high-throughput scenarios with many concurrent clients:
 
 ```kotlin
-val server = createRemoteServer(
+val server = createSharedStateServer(
     initialState = ChatState(),
     reducer = chatReducer,
     stateMapper = { SyncState(it) },
@@ -110,7 +110,7 @@ Thread-safe in-memory implementation using Mutex:
 ```kotlin
 val registry = InMemorySessionRegistry<ChatAction>()
 
-val server = createRemoteServer(
+val server = createSharedStateServer(
     initialState = ChatState(),
     reducer = chatReducer,
     stateMapper = { SyncState(it) },
@@ -171,7 +171,7 @@ Usage:
 ```kotlin
 val redisRegistry = RedisSessionRegistry<ChatAction>(redisClient, codec)
 
-val server = createRemoteServer(
+val server = createSharedStateServer(
     initialState = ChatState(),
     reducer = chatReducer,
     stateMapper = { SyncState(it) },
@@ -214,35 +214,25 @@ Parallel (concurrency = 4):
 
 Individual connection failures are isolated and don't affect other sends.
 
-## RemoteServer API
+## SharedStateServer API
 
-Access to new scaling components:
+Convenient methods for broadcasting:
 
 ```kotlin
-val server = createRemoteServer(...)
+val server = createSharedStateServer(...)
 
-// New properties
-val registry: SessionRegistry<A> = server.sessionRegistry
-val broadcaster: SessionBroadcaster<A> = server.broadcaster
-
-// Direct access to broadcaster
+// Broadcast to all clients
 server.broadcast(SyncState(state))
+
+// Send to specific client
 server.sendToClient(sessionId, PrivateMessage(text))
+
+// Read-only session info
+val count = server.sessionCount()
+val ids = server.sessionIds()
 ```
 
-### Migration from session Property
-
-The `session` property is deprecated:
-
-```kotlin
-// Old (deprecated)
-server.session.broadcast(action)
-
-// New
-server.broadcast(action)
-// or
-server.broadcaster.broadcast(action)
-```
+> **Note:** Session management is handled internally via internal actions. For direct registry access, keep a reference to the `SessionRegistry` you pass to `createSharedStateServer()`.
 
 ## Complete Example
 
@@ -254,7 +244,7 @@ fun main() {
     val broadcastConfig = BroadcastConfig(concurrency = 32)
     val sessionRegistry = InMemorySessionRegistry<ChatAction>()
 
-    val server = createRemoteServer(
+    val server = createSharedStateServer(
         initialState = ChatState(),
         reducer = chatReducer,
         stateMapper = { SharedChatAction.SyncState(it) },
@@ -321,5 +311,6 @@ Test endpoints:
 
 ## Next Steps
 
+- [Server Patterns Overview](./server-patterns.md) — Pattern selection guide
 - [Remote State Sync](./remote.md) — Basic client-server setup
-- [Room Store Pattern](./room-store.md) — Multi-room management
+- [Room Pattern](./pattern-room.md) — Multi-room management

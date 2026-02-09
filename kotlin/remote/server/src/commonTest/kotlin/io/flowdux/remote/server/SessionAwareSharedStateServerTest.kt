@@ -2,6 +2,7 @@ package io.flowdux.remote.server
 
 import io.flowdux.Middleware
 import io.flowdux.remote.server.connection.TypedServerConnection
+import io.flowdux.remote.server.pattern.createSessionAwareSharedStateServer
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.emptyFlow
@@ -11,7 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class SessionAwareRemoteServerSessionTest {
+class SessionAwareSharedStateServerTest {
 
     @Test
     fun `state changes trigger per-session mapping for all connected clients`() = runTest {
@@ -25,12 +26,12 @@ class SessionAwareRemoteServerSessionTest {
             }
         }.build()
 
-        val server = createSessionAwareRemoteServer(
+        val server = createSessionAwareSharedStateServer(
             initialState = PokerState(),
             reducer = pokerReducer,
             processors = processors,
             sessionStateMapper = { state, sessionId ->
-                val hand = state.hands[sessionId] ?: return@createSessionAwareRemoteServer null
+                val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
                 PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
             },
             errorProcessor = pokerErrorProcessor,
@@ -78,11 +79,11 @@ class SessionAwareRemoteServerSessionTest {
     fun `client connect and disconnect works correctly`() = runTest {
         val connAlice = MockTypedServerConnection<PokerAction>()
 
-        val server = createSessionAwareRemoteServer(
+        val server = createSessionAwareSharedStateServer(
             initialState = PokerState(),
             reducer = pokerReducer,
             sessionStateMapper = { state, sessionId ->
-                val hand = state.hands[sessionId] ?: return@createSessionAwareRemoteServer null
+                val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
                 PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
             },
             errorProcessor = pokerErrorProcessor,
@@ -119,12 +120,12 @@ class SessionAwareRemoteServerSessionTest {
             }
         }.build()
 
-        val server = createSessionAwareRemoteServer(
+        val server = createSessionAwareSharedStateServer(
             initialState = PokerState(),
             reducer = pokerReducer,
             processors = processors,
             sessionStateMapper = { state, sessionId ->
-                val hand = state.hands[sessionId] ?: return@createSessionAwareRemoteServer null
+                val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
                 PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
             },
             errorProcessor = pokerErrorProcessor,
@@ -163,12 +164,12 @@ class SessionAwareRemoteServerSessionTest {
             }
         }.build()
 
-        val server = createSessionAwareRemoteServer(
+        val server = createSessionAwareSharedStateServer(
             initialState = PokerState(),
             reducer = pokerReducer,
             processors = processors,
             sessionStateMapper = { state, sessionId ->
-                val hand = state.hands[sessionId] ?: return@createSessionAwareRemoteServer null
+                val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
                 PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
             },
             errorProcessor = pokerErrorProcessor,
@@ -216,12 +217,12 @@ class SessionAwareRemoteServerSessionTest {
             on<PokerAction.DealCards> { _, action -> emit(action) }
         }.build()
 
-        val server = createSessionAwareRemoteServer(
+        val server = createSessionAwareSharedStateServer(
             initialState = PokerState(),
             reducer = pokerReducer,
             processors = processors,
             sessionStateMapper = { state, sessionId ->
-                val hand = state.hands[sessionId] ?: return@createSessionAwareRemoteServer null
+                val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
                 PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
             },
             errorProcessor = pokerErrorProcessor,

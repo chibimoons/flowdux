@@ -417,7 +417,7 @@ fun main() {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // 모든 클라이언트를 위한 하나의 서버 — 공유 상태
-    val server = createRemoteServer(
+    val server = createSharedStateServer(
         initialState = ServerChatState(),
         reducer = serverChatReducer,
         processors = chatProcessors(),
@@ -448,7 +448,7 @@ fun main() {
 }
 ```
 
-`createRemoteServer`가 단일 Store, 세션 레지스트리, 상태 브로드캐스트를 결합한 `RemoteServer` 파사드를 생성합니다. 각 WebSocket 연결이 `handleClient`를 호출하면 액션 수신과 상태 업데이트 브로드캐스트 모두에 등록됩니다. 어떤 클라이언트가 액션을 디스패치하면 Store가 처리하고 새 상태를 *모든* 연결된 클라이언트에 브로드캐스트합니다.
+`createSharedStateServer`가 단일 Store, 세션 레지스트리, 상태 브로드캐스트를 결합한 `SharedStateServer`를 생성합니다. 각 WebSocket 연결이 `handleClient`를 호출하면 액션 수신과 상태 업데이트 브로드캐스트 모두에 등록됩니다. 어떤 클라이언트가 액션을 디스패치하면 Store가 처리하고 새 상태를 *모든* 연결된 클라이언트에 브로드캐스트합니다.
 
 클라이언트 코드는 전혀 바뀌지 않습니다. 여전히 액션을 디스패치하고 상태 업데이트를 받습니다. 서버에 클라이언트가 하나인지 천 개인지 알지도, 신경 쓰지도 않습니다.
 
@@ -498,7 +498,7 @@ on<ActionError> { state, action ->
 
 - `SingleClientSyncMiddleware` / `SyncMiddleware` — 직렬화와 WebSocket 전송 처리
 - `serve {}` — 상태 변경 관찰 및 클라이언트에 푸시
-- `createRemoteServer` — 공유 Store에 다중 클라이언트 연결을 관리하는 `RemoteServer` 파사드 생성
+- `createSharedStateServer` — 공유 Store에 다중 클라이언트 연결을 관리하는 `SharedStateServer` 생성
 - `TypedConnection` — 와이어 프로토콜에 대한 타입 안전 추상화
 - `ActionCodec` — 플러거블 직렬화 (`kotlinx.serialization` JSON 포함)
 

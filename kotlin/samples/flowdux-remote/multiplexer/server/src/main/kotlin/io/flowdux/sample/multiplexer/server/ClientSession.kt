@@ -1,6 +1,8 @@
 package io.flowdux.sample.multiplexer.server
 
 import io.flowdux.remote.multiplexer.ServerConnectionMultiplexer
+import io.flowdux.remote.server.pattern.RoomServer
+import io.flowdux.remote.server.pattern.SharedStateServer
 import io.flowdux.sample.multiplexer.ChatAction
 import io.flowdux.sample.multiplexer.SharedChatAction
 import kotlinx.coroutines.CompletableDeferred
@@ -13,12 +15,12 @@ import kotlinx.coroutines.launch
  *
  * When a client sends a JoinRoom action for a new room, this session:
  * 1. Creates a virtual connection for that room via the multiplexer
- * 2. Registers the client with the room's RemoteServer
+ * 2. Registers the client with the room's SharedStateServer
  * 3. Starts handling actions for that room
  */
 class ClientSession(
     val sessionId: String,
-    private val roomManager: RoomManager,
+    private val roomServer: RoomServer<SharedStateServer<ServerRoomState, ChatAction>>,
 ) {
     // Track which rooms this client has joined and their handler jobs
     private val roomJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
@@ -73,13 +75,13 @@ class ClientSession(
 
         println("[ClientSession $sessionId] Joining room: $roomId")
 
-        // Get or create the room
-        val room = roomManager.getOrCreateRoom(roomId)
+        // Get or create the room using RoomServer
+        val room = roomServer.getOrCreateRoom(roomId)
 
         // Create a virtual connection for this room through the multiplexer
         val virtualConnection = multiplexer.getOrCreateRoom(roomId)
 
-        // Register with the room's RemoteServer (launches handler in background)
+        // Register with the room's SharedStateServer (launches handler in background)
         // Track the job so we can cancel it when leaving the room
         // The upcast is needed because SharedChatAction extends ChatAction
         @Suppress("UNCHECKED_CAST")
