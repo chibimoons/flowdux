@@ -216,33 +216,23 @@ Individual connection failures are isolated and don't affect other sends.
 
 ## SharedStateServer API
 
-Access to new scaling components:
+Convenient methods for broadcasting:
 
 ```kotlin
 val server = createSharedStateServer(...)
 
-// New properties
-val registry: SessionRegistry<A> = server.sessionRegistry
-val broadcaster: SessionBroadcaster<A> = server.broadcaster
-
-// Direct access to broadcaster
+// Broadcast to all clients
 server.broadcast(SyncState(state))
+
+// Send to specific client
 server.sendToClient(sessionId, PrivateMessage(text))
+
+// Read-only session info
+val count = server.sessionCount()
+val ids = server.sessionIds()
 ```
 
-### Migration from session Property
-
-The `session` property is deprecated:
-
-```kotlin
-// Old (deprecated)
-server.session.broadcast(action)
-
-// New
-server.broadcast(action)
-// or
-server.broadcaster.broadcast(action)
-```
+> **Note:** Session management is handled internally via internal actions. For direct registry access, keep a reference to the `SessionRegistry` you pass to `createSharedStateServer()`.
 
 ## Complete Example
 

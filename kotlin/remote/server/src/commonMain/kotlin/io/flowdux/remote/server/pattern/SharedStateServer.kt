@@ -12,18 +12,20 @@ import io.flowdux.StoreLogger
 import io.flowdux.remote.server.ClientHandler
 import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.middleware.InternalAddSession
-import io.flowdux.remote.server.serveState
+import io.flowdux.remote.server.middleware.InternalRemoveSession
+import io.flowdux.remote.server.middleware.InternalSendToClient
+import io.flowdux.remote.server.middleware.InternalStartServing
+import io.flowdux.remote.server.middleware.InternalStartServingPerSession
+import io.flowdux.remote.server.middleware.MultiClientSyncMiddleware
 import io.flowdux.remote.server.session.BroadcastConfig
 import io.flowdux.remote.server.session.InMemorySessionRegistry
 import io.flowdux.remote.server.session.SessionBroadcaster
 import io.flowdux.remote.server.session.SessionRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 
 /**
  * A server for 1:1:N pattern (1 Server : 1 Store : N Clients).
@@ -52,7 +54,6 @@ import kotlinx.coroutines.launch
  *     reducer = serverReducer,
  *     processors = myProcessors,
  *     stateMapper = { state -> SyncState(state) },
- *     scope = applicationScope,
  * )
  * ```
  *
@@ -80,23 +81,13 @@ import kotlinx.coroutines.launch
  */
 class SharedStateServer<S : State, A : Action> internal constructor(
     /**
-     * The session registry managing client connections.
+     * The session registry managing client connections (read-only access).
      */
-    val sessionRegistry: SessionRegistry<A>,
-    /**
-     * The broadcaster for sending actions to clients.
-     */
-    val broadcaster: SessionBroadcaster<A>,
+    private val sessionRegistry: SessionRegistry<A>,
     /**
      * The underlying store.
      */
     val store: Store<S, A>,
-    internal val serveJob: Job,
-    /**
-     * Optional scope job to cancel when [close] is called.
-     * Used when the factory function creates a default scope.
-     */
-    private val ownedScopeJob: Job? = null,
 ) : ClientHandler<A> {
     /** Current server state as a reactive flow. */
     val state: StateFlow<S> get() = store.state
@@ -113,9 +104,9 @@ class SharedStateServer<S : State, A : Action> internal constructor(
     /**
      * Handle a client connection.
      *
-     * Dispatches [InternalAddSession] to start listening for incoming messages,
-     * registers the session in [SessionRegistry], suspends until cancelled,
-     * then cleans up the session.
+     * Dispatches [InternalAddSession] to register the session and start listening
+     * for incoming messages. Suspends until cancelled, then dispatches [InternalRemoveSession]
+     * to clean up the session.
      *
      * @param sessionId Unique identifier for this client session.
      * @param connection Typed connection for sending/receiving actions.
@@ -126,11 +117,10 @@ class SharedStateServer<S : State, A : Action> internal constructor(
         connection: TypedServerConnection<A>,
     ) {
         store.dispatch(InternalAddSession(sessionId, connection) as A)
-        sessionRegistry.addSession(sessionId, connection)
         try {
             awaitCancellation()
         } finally {
-            sessionRegistry.removeSession(sessionId)
+            store.dispatch(InternalRemoveSession(sessionId) as A)
         }
     }
 
@@ -138,28 +128,24 @@ class SharedStateServer<S : State, A : Action> internal constructor(
      * Send an action to a specific client by session ID.
      * No-op if the session does not exist.
      */
+    @Suppress("UNCHECKED_CAST")
     suspend fun sendToClient(sessionId: String, action: A) {
-        broadcaster.sendToClient(sessionId, action)
+        store.dispatch(InternalSendToClient(sessionId, action) as A)
     }
 
     /**
      * Send an action to all connected clients.
      *
-     * Uses parallel sending if configured with [BroadcastConfig.concurrency] > 1.
+     * The action should be a [ClientSharedAction] to be broadcast properly.
      */
     suspend fun broadcast(action: A) {
-        broadcaster.broadcast(action)
+        store.dispatch(action)
     }
 
     /**
      * Close the server, stopping state broadcasting and closing the store.
-     *
-     * If the server was created with a default scope (no explicit scope parameter),
-     * that scope is also cancelled.
      */
     override fun close() {
-        serveJob.cancel()
-        ownedScopeJob?.cancel()
         store.close()
     }
 }
@@ -175,8 +161,9 @@ class SharedStateServer<S : State, A : Action> internal constructor(
  * @param broadcastConfig Configuration for broadcast behavior.
  * @param errorProcessor Error processor for the store.
  * @param logger Logger for the store.
- * @param scope Coroutine scope for the store and state broadcasting.
+ * @param scope Coroutine scope for the store.
  */
+@Suppress("UNCHECKED_CAST")
 fun <S : State, A : Action> createSharedStateServer(
     initialState: S,
     reducer: Reducer<S, A>,
@@ -200,11 +187,12 @@ fun <S : State, A : Action> createSharedStateServer(
         scope = scope,
     )
 
-    return createSharedStateServer(
+    // Start state broadcasting via internal action
+    store.dispatch(InternalStartServing(store.state, stateMapper as (Any) -> Action) as A)
+
+    return SharedStateServer(
+        sessionRegistry = sessionRegistry,
         store = store,
-        broadcaster = broadcaster,
-        stateMapper = stateMapper,
-        scope = scope,
     )
 }
 
@@ -227,63 +215,28 @@ fun <S : State, A : Action> createSharedStateServer(
  *
  * val server = createSharedStateServer(
  *     store = store,
- *     broadcaster = broadcaster,
+ *     registry = registry,
  *     stateMapper = { state -> SyncState(state) },
- *     scope = scope,
  * )
  * ```
  *
  * @param store The store to use for state management. Should be created with
  *              [createMultiClientStore] or configured with [MultiClientSyncMiddleware].
- * @param broadcaster The broadcaster for sending actions to clients. Must be the same
- *                    instance used when creating the store.
- * @param stateMapper Maps server state to an action that will be broadcast to all clients.
- * @param scope Coroutine scope for state broadcasting. The caller is responsible for
- *              managing the lifecycle of this scope.
- */
-fun <S : State, A : Action> createSharedStateServer(
-    store: Store<S, A>,
-    broadcaster: SessionBroadcaster<A>,
-    stateMapper: (S) -> A,
-    scope: CoroutineScope,
-): SharedStateServer<S, A> {
-    val serveJob = scope.launch {
-        store.serveState(stateMapper)
-    }
-
-    return SharedStateServer(
-        sessionRegistry = broadcaster.registry,
-        broadcaster = broadcaster,
-        store = store,
-        serveJob = serveJob,
-    )
-}
-
-/**
- * Create a [SharedStateServer] from an existing [Store] with a default scope.
- *
- * The created scope is automatically cancelled when [SharedStateServer.close] is called.
- *
- * @param store The store to use for state management.
- * @param broadcaster The broadcaster for sending actions to clients.
+ * @param registry The session registry for managing client connections.
  * @param stateMapper Maps server state to an action that will be broadcast to all clients.
  */
+@Suppress("UNCHECKED_CAST")
 fun <S : State, A : Action> createSharedStateServer(
     store: Store<S, A>,
-    broadcaster: SessionBroadcaster<A>,
+    registry: SessionRegistry<A>,
     stateMapper: (S) -> A,
 ): SharedStateServer<S, A> {
-    val ownedScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    val serveJob = ownedScope.launch {
-        store.serveState(stateMapper)
-    }
+    // Start state broadcasting via internal action
+    store.dispatch(InternalStartServing(store.state, stateMapper as (Any) -> Action) as A)
 
     return SharedStateServer(
-        sessionRegistry = broadcaster.registry,
-        broadcaster = broadcaster,
+        sessionRegistry = registry,
         store = store,
-        serveJob = serveJob,
-        ownedScopeJob = ownedScope.coroutineContext[Job],
     )
 }
 
@@ -302,8 +255,9 @@ fun <S : State, A : Action> createSharedStateServer(
  * @param broadcastConfig Configuration for broadcast behavior.
  * @param errorProcessor Error processor for the store.
  * @param logger Logger for the store.
- * @param scope Coroutine scope for the store and state broadcasting.
+ * @param scope Coroutine scope for the store.
  */
+@Suppress("UNCHECKED_CAST")
 fun <S : State, A : Action> createSessionAwareSharedStateServer(
     initialState: S,
     reducer: Reducer<S, A>,
@@ -327,11 +281,17 @@ fun <S : State, A : Action> createSessionAwareSharedStateServer(
         scope = scope,
     )
 
-    return createSessionAwareSharedStateServer(
+    // Start per-session state broadcasting via internal action
+    store.dispatch(
+        InternalStartServingPerSession(
+            store.state,
+            sessionStateMapper as (Any, String) -> Action?,
+        ) as A,
+    )
+
+    return SharedStateServer(
+        sessionRegistry = sessionRegistry,
         store = store,
-        broadcaster = broadcaster,
-        sessionStateMapper = sessionStateMapper,
-        scope = scope,
     )
 }
 
@@ -343,61 +303,25 @@ fun <S : State, A : Action> createSessionAwareSharedStateServer(
  * allowing each client to receive a different view of the state.
  *
  * @param store The store to use for state management.
- * @param broadcaster The broadcaster for sending actions to clients.
+ * @param registry The session registry for managing client connections.
  * @param sessionStateMapper Maps state and session ID to an action for that session.
- * @param scope Coroutine scope for state broadcasting. The caller is responsible for
- *              managing the lifecycle of this scope.
  */
+@Suppress("UNCHECKED_CAST")
 fun <S : State, A : Action> createSessionAwareSharedStateServer(
     store: Store<S, A>,
-    broadcaster: SessionBroadcaster<A>,
+    registry: SessionRegistry<A>,
     sessionStateMapper: (S, String) -> A?,
-    scope: CoroutineScope,
 ): SharedStateServer<S, A> {
-    val serveJob = scope.launch {
-        store.state.collect { state ->
-            broadcaster.sendPerSession { sessionId ->
-                sessionStateMapper(state, sessionId)
-            }
-        }
-    }
-
-    return SharedStateServer(
-        sessionRegistry = broadcaster.registry,
-        broadcaster = broadcaster,
-        store = store,
-        serveJob = serveJob,
+    // Start per-session state broadcasting via internal action
+    store.dispatch(
+        InternalStartServingPerSession(
+            store.state,
+            sessionStateMapper as (Any, String) -> Action?,
+        ) as A,
     )
-}
-
-/**
- * Create a [SharedStateServer] from an existing [Store] with per-session state mapping and a default scope.
- *
- * The created scope is automatically cancelled when [SharedStateServer.close] is called.
- *
- * @param store The store to use for state management.
- * @param broadcaster The broadcaster for sending actions to clients.
- * @param sessionStateMapper Maps state and session ID to an action for that session.
- */
-fun <S : State, A : Action> createSessionAwareSharedStateServer(
-    store: Store<S, A>,
-    broadcaster: SessionBroadcaster<A>,
-    sessionStateMapper: (S, String) -> A?,
-): SharedStateServer<S, A> {
-    val ownedScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    val serveJob = ownedScope.launch {
-        store.state.collect { state ->
-            broadcaster.sendPerSession { sessionId ->
-                sessionStateMapper(state, sessionId)
-            }
-        }
-    }
 
     return SharedStateServer(
-        sessionRegistry = broadcaster.registry,
-        broadcaster = broadcaster,
+        sessionRegistry = registry,
         store = store,
-        serveJob = serveJob,
-        ownedScopeJob = ownedScope.coroutineContext[Job],
     )
 }

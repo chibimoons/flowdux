@@ -136,6 +136,7 @@ class SharedStateServerTest {
         conn2.sentActions.clear()
 
         server.sendToClient("client-1", ServerAction.Add(5))
+        delay(100)
 
         assertEquals(1, conn1.sentActions.size)
         assertEquals(ServerAction.Add(5), conn1.sentActions[0])
@@ -167,6 +168,7 @@ class SharedStateServerTest {
         conn2.sentActions.clear()
 
         server.broadcast(ServerAction.Add(7))
+        delay(100)
 
         assertEquals(1, conn1.sentActions.size)
         assertEquals(1, conn2.sentActions.size)
@@ -256,6 +258,7 @@ class SharedStateServerTest {
         conn3.sentActions.clear()
 
         server.broadcast(ServerAction.Add(42))
+        delay(100)
 
         assertEquals(1, conn1.sentActions.size)
         assertEquals(1, conn2.sentActions.size)
@@ -300,6 +303,7 @@ class SharedStateServerTest {
         conn2.sentActions.clear()
 
         server.broadcast(ServerAction.Add(99))
+        delay(100)
 
         assertEquals(1, conn1.sentActions.size)
         assertEquals(1, conn2.sentActions.size)
