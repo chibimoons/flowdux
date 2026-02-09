@@ -322,4 +322,4 @@ Test endpoints:
 ## Next Steps
 
 - [Remote State Sync](./remote.md) — Basic client-server setup
-- [Room Store Pattern](./room-store.md) — Multi-room management
+- [Room Store Pattern](./pattern-room.md) — Multi-room management
