@@ -197,6 +197,57 @@ class SharedStateServerTest {
     }
 
     @Test
+    fun `ClientSharedAction emitted from processor is broadcast to all clients`() = runTest {
+        val conn1 = MockTypedServerConnection<ServerAction>()
+        val conn2 = MockTypedServerConnection<ServerAction>()
+
+        // Processor that emits a ClientSharedAction
+        val processors = Middleware.ActionProcessorBuilder<ServerState, ServerAction>().apply {
+            on<ServerAction.TriggerEmitClientAction> { _, action ->
+                // emit(ClientSharedAction) - should be auto-forwarded and broadcast
+                emit(ServerAction.Add(action.value))
+                // Also emit local action to verify processor runs
+                emit(ServerAction.InternalReset(1))
+            }
+        }.build()
+
+        val server = createSharedStateServer(
+            initialState = ServerState(),
+            reducer = serverReducer,
+            processors = processors,
+            stateMapper = { ServerAction.SyncState(it) },
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        val job1 = backgroundScope.launch { server.handleClient("client-1", conn1) }
+        val job2 = backgroundScope.launch { server.handleClient("client-2", conn2) }
+        delay(100)
+
+        // Clear any initial SyncState
+        conn1.sentActions.clear()
+        conn2.sentActions.clear()
+
+        // Trigger the processor via client action
+        conn1.simulateClientAction(ServerAction.TriggerEmitClientAction(42))
+        delay(100)
+
+        // Local state should be updated by InternalReset(1)
+        assertEquals(1, server.currentState.count)
+
+        // ClientSharedAction (Add(42)) should be broadcast to all clients
+        val addActions1 = conn1.sentActions.filterIsInstance<ServerAction.Add>()
+        val addActions2 = conn2.sentActions.filterIsInstance<ServerAction.Add>()
+        assertEquals(1, addActions1.size, "emit(ClientSharedAction) should be sent to client 1")
+        assertEquals(1, addActions2.size, "emit(ClientSharedAction) should be sent to client 2")
+        assertEquals(42, addActions1[0].value)
+        assertEquals(42, addActions2[0].value)
+
+        job1.cancel()
+        job2.cancel()
+    }
+
+    @Test
     fun `processors are invoked for matching actions`() = runTest {
         val conn = MockTypedServerConnection<ServerAction>()
 

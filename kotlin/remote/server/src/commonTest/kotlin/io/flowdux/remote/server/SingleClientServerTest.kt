@@ -131,6 +131,48 @@ class SingleClientServerTest {
     }
 
     @Test
+    fun `ClientSharedAction emitted from processor is sent to client`() = runTest {
+        val connection = MockTypedServerConnection<ServerAction>()
+
+        // Processor that emits a ClientSharedAction
+        val processors = Middleware.ActionProcessorBuilder<ServerState, ServerAction>().apply {
+            on<ServerAction.TriggerEmitClientAction> { _, action ->
+                // emit(ClientSharedAction) - should be auto-forwarded to client
+                emit(ServerAction.Add(action.value))
+                // Also emit local action to verify processor runs
+                emit(ServerAction.InternalReset(1))
+            }
+        }.build()
+
+        val server = createSingleClientServer(
+            initialState = ServerState(),
+            reducer = serverReducer,
+            connection = connection,
+            processors = processors,
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        // Start listening
+        server.dispatchStartListening()
+        delay(100)
+
+        // Trigger the processor
+        server.dispatch(ServerAction.TriggerEmitClientAction(42))
+        delay(100)
+
+        // Local state should be updated by InternalReset(1)
+        assertEquals(1, server.state.value.count)
+
+        // ClientSharedAction (Add(42)) should be sent to client
+        val addActions = connection.sentActions.filterIsInstance<ServerAction.Add>()
+        assertEquals(1, addActions.size, "emit(ClientSharedAction) should be sent to client")
+        assertEquals(42, addActions[0].value)
+
+        server.close()
+    }
+
+    @Test
     fun `non-ClientSharedAction passes through to reducer`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
 
