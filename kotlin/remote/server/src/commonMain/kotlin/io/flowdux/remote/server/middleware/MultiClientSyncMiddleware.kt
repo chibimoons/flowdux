@@ -85,6 +85,55 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
 
     override val name: String = "MultiClientSyncMiddleware"
 
+    /**
+     * Broadcast an action directly to all clients, bypassing the middleware pipeline.
+     *
+     * Use this method when you need to send a [ClientSharedAction] from within a processor.
+     * Actions emitted via [FlowCollector.emit] do not go through the middleware pipeline again,
+     * so [ClientSharedAction]s emitted from processors would go directly to the Reducer
+     * instead of being broadcast to clients.
+     *
+     * Example:
+     * ```kotlin
+     * override val processors = buildProcessors {
+     *     on<SomeAction> { _, action ->
+     *         broadcastToClients(SyncState(score = 100))  // Broadcast to all clients
+     *         emit(LocalStateUpdate(...))                  // Goes to Reducer
+     *     }
+     * }
+     * ```
+     *
+     * @param action The action to broadcast to all clients.
+     */
+    @Suppress("UNCHECKED_CAST")
+    protected suspend fun broadcastToClients(action: ClientSharedAction) {
+        broadcaster.broadcast(action as A)
+    }
+
+    /**
+     * Send an action directly to a specific client, bypassing the middleware pipeline.
+     *
+     * Use this method when you need to send a [ClientSharedAction] to a specific session
+     * from within a processor.
+     *
+     * Example:
+     * ```kotlin
+     * override val processors = buildProcessors {
+     *     on<SomeAction> { state, action ->
+     *         sendToClient(action.sessionId, PersonalizedState(...))  // Sent to specific client
+     *         emit(LocalStateUpdate(...))                              // Goes to Reducer
+     *     }
+     * }
+     * ```
+     *
+     * @param sessionId The target session ID.
+     * @param action The action to send to the client.
+     */
+    @Suppress("UNCHECKED_CAST")
+    protected suspend fun sendToClient(sessionId: String, action: ClientSharedAction) {
+        broadcaster.sendToClient(sessionId, action as A)
+    }
+
     @Suppress("UNCHECKED_CAST")
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
         // 0. InternalAddSession: register session and emit listener FlowHolderAction

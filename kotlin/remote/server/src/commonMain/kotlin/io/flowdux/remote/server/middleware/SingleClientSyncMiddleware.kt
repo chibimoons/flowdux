@@ -57,12 +57,28 @@ open class SingleClientSyncMiddleware<S : State, A : Action>(
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     /**
-     * Send an action to the client.
+     * Send an action directly to the client, bypassing the middleware pipeline.
      *
-     * Call this from within a processor to send a custom message to the client.
+     * Use this method when you need to send a [ClientSharedAction] from within a processor.
+     * Actions emitted via [FlowCollector.emit] do not go through the middleware pipeline again,
+     * so [ClientSharedAction]s emitted from processors would go directly to the Reducer
+     * instead of being sent to the client.
+     *
+     * Example:
+     * ```kotlin
+     * override val processors = buildProcessors {
+     *     on<SomeAction> { _, action ->
+     *         sendToClient(SyncState(score = 100))  // Sent to client
+     *         emit(LocalStateUpdate(...))           // Goes to Reducer
+     *     }
+     * }
+     * ```
+     *
+     * @param action The action to send to the client.
      */
-    protected suspend fun sendToClient(action: A) {
-        connection.send(action)
+    @Suppress("UNCHECKED_CAST")
+    protected suspend fun sendToClient(action: ClientSharedAction) {
+        connection.send(action as A)
     }
 
     @Suppress("UNCHECKED_CAST")
