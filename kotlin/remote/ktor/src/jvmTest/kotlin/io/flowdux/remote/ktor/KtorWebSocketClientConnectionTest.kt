@@ -33,7 +33,7 @@ class KtorWebSocketClientConnectionTest {
         }.start(wait = false)
 
         try {
-            val port = server.resolvedConnectors().first().port
+            val port = server.engine.resolvedConnectors().first().port
             val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
             assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
 
@@ -62,7 +62,7 @@ class KtorWebSocketClientConnectionTest {
         }.start(wait = false)
 
         try {
-            val port = server.resolvedConnectors().first().port
+            val port = server.engine.resolvedConnectors().first().port
             val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
 
             val connectJob = launch(Dispatchers.Default) { connection.connect() }
@@ -98,7 +98,7 @@ class KtorWebSocketClientConnectionTest {
         }.start(wait = false)
 
         try {
-            val port = server.resolvedConnectors().first().port
+            val port = server.engine.resolvedConnectors().first().port
             val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
 
             val connectJob = launch(Dispatchers.Default) { connection.connect() }
@@ -137,7 +137,7 @@ class KtorWebSocketClientConnectionTest {
         }.start(wait = false)
 
         try {
-            val port = server.resolvedConnectors().first().port
+            val port = server.engine.resolvedConnectors().first().port
             val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
 
             val connectJob = launch(Dispatchers.Default) { connection.connect() }
@@ -171,7 +171,7 @@ class KtorWebSocketClientConnectionTest {
         }.start(wait = false)
 
         try {
-            val port = server.resolvedConnectors().first().port
+            val port = server.engine.resolvedConnectors().first().port
             val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
 
             // Launch 10 coroutines that all call connect() concurrently
