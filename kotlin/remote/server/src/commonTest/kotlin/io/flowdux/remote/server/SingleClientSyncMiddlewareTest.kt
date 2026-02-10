@@ -185,4 +185,40 @@ class SingleClientSyncMiddlewareTest {
         // Nothing sent to client
         assertTrue(connection.sentActions.isEmpty())
     }
+
+    // -- Tests for sendToClient helper method --
+
+    @Test
+    fun `sendToClient sends action to client without going through middleware pipeline`() = runTest {
+        val connection = MockTypedServerConnection<ServerAction>()
+        val middleware = SendToClientTestMiddleware(connection)
+
+        val store = createStore(
+            initialState = ServerState(),
+            reducer = serverReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        // Start listening
+        store.dispatchStartListening()
+        delay(100)
+
+        // TriggerClientSend should:
+        // 1. Call sendToClient(Add(5)) -> sent to client
+        // 2. emit(InternalReset(1)) -> local state update
+        store.dispatch(ServerAction.TriggerClientSend(5))
+        delay(100)
+
+        // Local state should be updated by InternalReset(1), not by Add(5)
+        assertEquals(1, store.state.value.count)
+
+        // Verify Add was sent to client
+        assertEquals(1, connection.sentActions.size)
+        assertTrue(connection.sentActions[0] is ServerAction.Add)
+        assertEquals(5, (connection.sentActions[0] as ServerAction.Add).value)
+
+        store.close()
+    }
 }

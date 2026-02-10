@@ -1,8 +1,8 @@
 package io.flowdux.sample.chat.multiroomclient
 
 import io.flowdux.Store
-import io.flowdux.createStore
 import io.flowdux.remote.TypedClientConnection
+import io.flowdux.remote.createClientStore
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.serialization.typedJson
 import io.flowdux.sample.chat.ChatAction
@@ -189,9 +189,9 @@ private fun createChatStore(roomId: String): Store<ClientChatState, ChatAction> 
         path = "/room/$roomId",
     ).typedJson<SharedChatAction>() as TypedClientConnection<ChatAction>
 
-    return createStore(
+    return createClientStore(
         initialState = ClientChatState(roomId = roomId),
+        syncMiddleware = ChatRemoteMiddleware(connection),
         reducer = clientChatReducer,
-        middlewares = listOf(ChatRemoteMiddleware(connection)),
     )
 }

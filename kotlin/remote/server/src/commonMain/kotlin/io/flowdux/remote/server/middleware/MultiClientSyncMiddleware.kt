@@ -13,6 +13,7 @@ import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.session.SessionBroadcaster
 import io.flowdux.sequential
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -84,6 +85,62 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
 ) : Middleware<S, A> {
 
     override val name: String = "MultiClientSyncMiddleware"
+
+    /**
+     * Broadcast an action directly to all clients, bypassing the middleware pipeline.
+     *
+     * Use this method when you need to send a [ClientSharedAction] from within a processor.
+     * Actions emitted via [FlowCollector.emit] do not go through the middleware pipeline again,
+     * so [ClientSharedAction]s emitted from processors would go directly to the Reducer
+     * instead of being broadcast to clients.
+     *
+     * Example:
+     * ```kotlin
+     * val middleware = MultiClientSyncMiddleware(
+     *     processors = buildProcessors {
+     *         on<ScoreChanged> { state, action ->
+     *             middleware.broadcastToClients(ScoreUpdate(state.score))  // Broadcast
+     *             emit(action)                                              // Update state
+     *         }
+     *     },
+     *     broadcaster = broadcaster,
+     * )
+     * ```
+     *
+     * @param action The action to broadcast to all clients.
+     */
+    @Suppress("UNCHECKED_CAST")
+    suspend fun broadcastToClients(action: ClientSharedAction) {
+        broadcaster.broadcast(action as A)
+    }
+
+    /**
+     * Send an action directly to a specific client, bypassing the middleware pipeline.
+     *
+     * Use this method when you need to send a [ClientSharedAction] to a specific session
+     * from within a processor.
+     *
+     * Example:
+     * ```kotlin
+     * val middleware = MultiClientSyncMiddleware(
+     *     processors = buildProcessors {
+     *         on<RequestScore> { state, action ->
+     *             val score = state.scores[action.sessionId] ?: 0
+     *             middleware.sendToClient(action.sessionId, YourScore(score))  // Send
+     *             emit(action)                                                  // Update state
+     *         }
+     *     },
+     *     broadcaster = broadcaster,
+     * )
+     * ```
+     *
+     * @param sessionId The target session ID.
+     * @param action The action to send to the client.
+     */
+    @Suppress("UNCHECKED_CAST")
+    suspend fun sendToClient(sessionId: String, action: ClientSharedAction) {
+        broadcaster.sendToClient(sessionId, action as A)
+    }
 
     @Suppress("UNCHECKED_CAST")
     override fun process(getState: () -> S, action: A): Flow<A> = flow {

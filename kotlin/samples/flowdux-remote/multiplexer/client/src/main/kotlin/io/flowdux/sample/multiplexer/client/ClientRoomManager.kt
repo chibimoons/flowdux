@@ -1,8 +1,8 @@
 package io.flowdux.sample.multiplexer.client
 
 import io.flowdux.Store
-import io.flowdux.createStore
 import io.flowdux.remote.TypedClientConnection
+import io.flowdux.remote.createClientStore
 import io.flowdux.remote.multiplexer.ClientConnectionMultiplexer
 import io.flowdux.sample.multiplexer.ChatAction
 import io.flowdux.sample.multiplexer.SharedChatAction
@@ -123,10 +123,10 @@ class ClientRoomManager(
         roomId: String,
         connection: TypedClientConnection<ChatAction>,
     ): Store<ClientRoomState, ChatAction> {
-        return createStore(
+        return createClientStore(
             initialState = ClientRoomState(roomId = roomId),
+            syncMiddleware = RoomRemoteMiddleware(connection),
             reducer = clientRoomReducer,
-            middlewares = listOf(RoomRemoteMiddleware(connection)),
         )
     }
 }
