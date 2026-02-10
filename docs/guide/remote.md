@@ -79,6 +79,35 @@ kotlin {
 
 **Important:** Using different Kotlin versions between your project and FlowDux may cause compilation errors on JS/iOS targets due to metadata incompatibility.
 
+## 작성해야 할 파일 (Quick Reference)
+
+FlowDux Remote를 사용하려면 다음 파일들을 작성해야 합니다:
+
+```
+shared/                           # 클라이언트/서버 공유 모듈
+├── State.kt                      # @Serializable 상태 클래스
+└── Actions.kt                    # @Serializable 공유 액션 (ServerSharedAction/ClientSharedAction)
+
+server/                           # 서버 모듈
+├── Main.kt                       # Ktor 서버, WebSocket 라우팅, 팩토리 함수 호출
+├── Reducer.kt                    # 서버 상태 변경 로직
+└── Processors.kt                 # (선택) 클라이언트 액션 → 서버 내부 액션 변환
+
+client/                           # 클라이언트 모듈
+├── Main.kt                       # 연결 생성, Store 생성, 상태 관찰
+├── Reducer.kt                    # SyncState 처리
+└── RemoteMiddleware.kt           # SyncMiddleware 상속 (Connect/Disconnect 처리)
+```
+
+### 패턴별 서버 팩토리 함수
+
+| 패턴 | 팩토리 함수 | 가이드 |
+|------|------------|--------|
+| Single Client | `createSingleClientServer()` | [pattern-single-client.md](./pattern-single-client.md) |
+| Shared State | `createSharedStateServer()` | [pattern-shared-state.md](./pattern-shared-state.md) |
+| Room | `createSharedStateRoomServer()` | [pattern-room.md](./pattern-room.md) |
+| Per-Client | `createPerClientServer()` | [pattern-per-client.md](./pattern-per-client.md) |
+
 ## 1. Define Shared Actions
 
 Actions shared between client and server use direction markers.

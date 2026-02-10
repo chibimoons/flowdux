@@ -2,6 +2,45 @@
 
 Room 패턴은 그룹(방) 단위로 상태를 관리하고 메시지를 라우팅하는 구조입니다. 각 방은 독립된 Store를 가지며, 방 간 상태는 완전히 격리됩니다.
 
+## 작성해야 할 파일
+
+```
+shared/                           # 공유 모듈
+├── State.kt                      # 방 상태 (ChatRoomState, ChatState, 변환 함수)
+└── Actions.kt                    # SharedChatAction, ServerChatAction
+
+server/                           # 서버 모듈
+├── Main.kt                       # createSharedStateRoomServer() + WebSocket 라우팅
+├── Reducer.kt                    # 방 리듀서
+└── Processors.kt                 # 액션 변환 로직
+
+client/                           # 클라이언트 모듈
+├── Main.kt                       # connectToRoom() 함수, Store 생성
+├── Reducer.kt                    # 클라이언트 리듀서
+└── RemoteMiddleware.kt           # SyncMiddleware 상속
+```
+
+### 각 파일의 역할
+
+| 파일 | 필수 | 설명 |
+|------|:----:|------|
+| `shared/State.kt` | ✅ | `ChatRoomState` (서버), `ChatState` (클라이언트), `toChatState()` |
+| `shared/Actions.kt` | ✅ | `SharedChatAction` + `ServerChatAction` |
+| `server/Main.kt` | ✅ | `createSharedStateRoomServer()`, `/room/{roomId}` 라우팅 |
+| `server/Reducer.kt` | ✅ | 방 상태 변경 로직 |
+| `server/Processors.kt` | ✅ | `ServerSharedAction` → 내부 액션 변환 |
+| `client/Main.kt` | ✅ | `connectToRoom(roomId)` 함수, 방별 Store 생성 |
+| `client/Reducer.kt` | ✅ | `SyncState` 처리 |
+| `client/RemoteMiddleware.kt` | ✅ | Connect/Disconnect 처리 |
+
+### Single Client 패턴과의 차이점
+
+| 항목 | Single Client | Room |
+|------|---------------|------|
+| 서버 팩토리 | `createSingleClientServer()` | `createSharedStateRoomServer()` |
+| Store 수 | 클라이언트당 1개 | 방당 1개 (N 클라이언트 공유) |
+| 라우팅 | `/ws` | `/room/{roomId}` |
+
 ## 개요
 
 ```
@@ -217,6 +256,39 @@ routing {
 ```
 
 ## 클라이언트 구현
+
+### Client Middleware
+
+```kotlin
+import io.flowdux.ActionProcessorMap
+import io.flowdux.remote.SyncMiddleware
+import io.flowdux.remote.TypedClientConnection
+
+// 로컬 전용 액션
+sealed interface ClientChatAction : ChatAction {
+    data object Connect : ClientChatAction
+    data object Disconnect : ClientChatAction
+}
+
+class ChatRemoteMiddleware(
+    connection: TypedClientConnection<ChatAction>,
+) : SyncMiddleware<ClientChatState, ChatAction>(
+    connection = connection,
+) {
+    override val name: String = "ChatRemoteMiddleware"
+
+    override val processors: ActionProcessorMap<ClientChatState, ChatAction> = buildProcessors {
+        on<ClientChatAction.Connect> { _, _ ->
+            startConnection()
+        }
+        on<ClientChatAction.Disconnect> { _, _ ->
+            stopConnection()
+        }
+    }
+}
+```
+
+### Client Usage
 
 ```kotlin
 // 특정 방에 연결
