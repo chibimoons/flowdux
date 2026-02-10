@@ -9,14 +9,14 @@ Time travel debugging is available as a separate module.
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("io.github.chibimoons:flowdux-timetravel:1.12.0")
+            implementation("io.github.chibimoons:flowdux-timetravel:1.14.0")
         }
     }
 }
 
 // build.gradle.kts (JVM / Android)
 dependencies {
-    implementation("io.github.chibimoons:flowdux-timetravel:1.12.0")
+    implementation("io.github.chibimoons:flowdux-timetravel:1.14.0")
 }
 ```
 
