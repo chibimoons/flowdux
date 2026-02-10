@@ -9,8 +9,8 @@ import io.flowdux.Reducer
 import io.flowdux.State
 import io.flowdux.Store
 import io.flowdux.StoreLogger
-import io.flowdux.createStore
 import io.flowdux.remote.server.connection.TypedServerConnection
+import io.flowdux.remote.server.createServerStore
 import io.flowdux.remote.server.middleware.SingleClientSyncMiddleware
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -89,10 +89,10 @@ fun <S : State, A : Action> createSingleClientStore(
         }
     }
 
-    return createStore(
+    return createServerStore(
         initialState = initialState,
+        syncMiddleware = middleware,
         reducer = reducer,
-        middlewares = listOf(middleware),
         errorProcessor = errorProcessor,
         logger = logger,
         scope = scope,
