@@ -67,9 +67,9 @@ open class SingleClientSyncMiddleware<S : State, A : Action>(
      * Example:
      * ```kotlin
      * override val processors = buildProcessors {
-     *     on<SomeAction> { _, action ->
-     *         sendToClient(SyncState(score = 100))  // Sent to client
-     *         emit(LocalStateUpdate(...))           // Goes to Reducer
+     *     on<ScoreChanged> { state, action ->
+     *         sendToClient(ScoreUpdate(state.score))  // Sent to client
+     *         emit(action)                            // Updates server state
      *     }
      * }
      * ```

@@ -147,9 +147,9 @@ open class SyncMiddleware<S : State, A : Action>(
      * Example:
      * ```kotlin
      * override val processors = buildProcessors {
-     *     on<SomeAction> { _, action ->
-     *         sendToServer(MyServerAction("hello"))  // Sent to server
-     *         emit(LocalStateUpdate(...))            // Goes to Reducer
+     *     on<SendMessage> { _, action ->
+     *         sendToServer(ChatMessage(action.text))  // Sent to server
+     *         emit(MessageSent(action.text))          // Updates local state
      *     }
      * }
      * ```

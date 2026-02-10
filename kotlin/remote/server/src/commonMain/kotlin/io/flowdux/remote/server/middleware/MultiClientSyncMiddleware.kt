@@ -96,9 +96,9 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
      * Example:
      * ```kotlin
      * override val processors = buildProcessors {
-     *     on<SomeAction> { _, action ->
-     *         broadcastToClients(SyncState(score = 100))  // Broadcast to all clients
-     *         emit(LocalStateUpdate(...))                  // Goes to Reducer
+     *     on<ScoreChanged> { state, action ->
+     *         broadcastToClients(ScoreUpdate(state.score))  // Broadcast to all clients
+     *         emit(action)                                   // Updates server state
      *     }
      * }
      * ```
@@ -119,9 +119,10 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
      * Example:
      * ```kotlin
      * override val processors = buildProcessors {
-     *     on<SomeAction> { state, action ->
-     *         sendToClient(action.sessionId, PersonalizedState(...))  // Sent to specific client
-     *         emit(LocalStateUpdate(...))                              // Goes to Reducer
+     *     on<RequestScore> { state, action ->
+     *         val score = state.scores[action.sessionId] ?: 0
+     *         sendToClient(action.sessionId, YourScore(score))  // Sent to specific client
+     *         emit(action)                                       // Updates server state
      *     }
      * }
      * ```
