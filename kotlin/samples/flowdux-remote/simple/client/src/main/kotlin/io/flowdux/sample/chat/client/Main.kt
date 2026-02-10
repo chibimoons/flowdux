@@ -1,7 +1,7 @@
 package io.flowdux.sample.chat.client
 
 import io.flowdux.Store
-import io.flowdux.createStore
+import io.flowdux.remote.createClientStore
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.serialization.typedJson
 import io.flowdux.remote.serialization.upcast
@@ -83,9 +83,9 @@ private fun createChatStore(): Store<ClientChatState, ChatAction> {
         port = 8080,
         path = "/chat",
     ).typedJson<SharedChatAction>().upcast<SharedChatAction, ChatAction>()
-    return createStore(
+    return createClientStore(
         initialState = ClientChatState(),
+        syncMiddleware = ChatRemoteMiddleware(connection),
         reducer = clientChatReducer,
-        middlewares = listOf(ChatRemoteMiddleware(connection)),
     )
 }

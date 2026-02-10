@@ -2,8 +2,8 @@ package io.flowdux.sample.poker.server
 
 import io.flowdux.State
 import io.flowdux.Store
-import io.flowdux.createStore
 import io.flowdux.buildReducer
+import io.flowdux.remote.server.createServerStore
 import io.flowdux.remote.server.middleware.SingleClientSyncMiddleware
 import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.serve
@@ -29,10 +29,10 @@ class PlayerSession(
 ) {
     private val middleware = PlayerRemoteMiddleware(connection)
 
-    val store: Store<PlayerState, PokerAction> = createStore(
+    val store: Store<PlayerState, PokerAction> = createServerStore(
         initialState = PlayerState(playerId = playerId),
+        syncMiddleware = middleware,
         reducer = playerReducer,
-        middlewares = listOf(middleware),
     )
 
     /**
