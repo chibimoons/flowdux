@@ -56,15 +56,6 @@ open class SingleClientSyncMiddleware<S : State, A : Action>(
     override val name: String = "SingleClientSyncMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
-    /**
-     * Send an action to the client.
-     *
-     * Call this from within a processor to send a custom message to the client.
-     */
-    protected suspend fun sendToClient(action: A) {
-        connection.send(action)
-    }
-
     @Suppress("UNCHECKED_CAST")
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
         // 0. InternalStartListening: emitted by serve(), triggers client listener

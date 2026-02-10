@@ -8,6 +8,13 @@ import io.flowdux.FlowHolderAction
 import io.flowdux.Middleware
 import io.flowdux.State
 import io.flowdux.concurrent
+import io.flowdux.remote.usecase.ConnectionConfig
+import io.flowdux.remote.usecase.ConnectionEvent
+import io.flowdux.remote.usecase.ConnectionResult
+import io.flowdux.remote.usecase.ConnectionUseCase
+import io.flowdux.remote.usecase.ConnectionUseCaseImpl
+import io.flowdux.remote.usecase.HealthCheckResult
+import io.flowdux.remote.usecase.ReconnectState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +55,16 @@ import kotlinx.coroutines.sync.withLock
  * override val processors = buildProcessors {
  *     on<ConnectAction> { _, _ -> startConnection() }
  *     on<DisconnectAction> { _, _ -> stopConnection() }
+ *     on<ReconnectAction> { _, _ ->
+ *         startReconnection { state ->
+ *             when (state) {
+ *                 is ReconnectState.Attempting -> MyAction.ReconnectAttempting(state.attempt)
+ *                 is ReconnectState.Connected -> MyAction.ReconnectSuccess
+ *                 is ReconnectState.Failed -> MyAction.ReconnectFailed(state.attempts)
+ *                 else -> null
+ *             }
+ *         }
+ *     }
  * }
  * ```
  *
@@ -60,7 +77,11 @@ import kotlinx.coroutines.sync.withLock
  * receive messages as soon as the connection completes. The connection implementation should handle
  * this by buffering or suspending until connected.
  *
- * @param connection The [TypedClientConnection] for communicating with the server.
+ * **UseCase Pattern:** The middleware can be constructed with either a [TypedClientConnection]
+ * (for backward compatibility) or a [ConnectionUseCase] (for advanced features like
+ * exponential backoff reconnection and health checks).
+ *
+ * @param connectionUseCase The [ConnectionUseCase] for managing connection lifecycle.
  * @param scope Coroutine scope for background tasks. If not provided, an internal scope is created.
  *              The scope must have a [Job] in its context for proper cleanup. The scope is reusable
  *              across multiple connect/disconnect cycles.
@@ -68,14 +89,53 @@ import kotlinx.coroutines.sync.withLock
  *        When provided, connection failures will be dispatched through the store.
  */
 open class SyncMiddleware<S : State, A : Action>(
-    private val connection: TypedClientConnection<A>,
+    private val connectionUseCase: ConnectionUseCase,
     scope: CoroutineScope? = null,
     private val onConnectionError: ((Throwable) -> A)? = null,
 ) : Middleware<S, A> {
 
+    /**
+     * Secondary constructor for backward compatibility.
+     *
+     * @param connection The [TypedClientConnection] for communicating with the server.
+     * @param scope Coroutine scope for background tasks.
+     * @param onConnectionError Optional callback to convert connection errors to actions.
+     */
+    constructor(
+        connection: TypedClientConnection<A>,
+        scope: CoroutineScope? = null,
+        onConnectionError: ((Throwable) -> A)? = null,
+    ) : this(
+        connectionUseCase = ConnectionUseCaseImpl(connection),
+        scope = scope,
+        onConnectionError = onConnectionError,
+    )
+
+    /**
+     * Constructor with custom connection configuration.
+     *
+     * @param connection The [TypedClientConnection] for communicating with the server.
+     * @param config Configuration for reconnection and health checks.
+     * @param scope Coroutine scope for background tasks.
+     * @param onConnectionError Optional callback to convert connection errors to actions.
+     */
+    constructor(
+        connection: TypedClientConnection<A>,
+        config: ConnectionConfig,
+        scope: CoroutineScope? = null,
+        onConnectionError: ((Throwable) -> A)? = null,
+    ) : this(
+        connectionUseCase = ConnectionUseCaseImpl(connection, config),
+        scope = scope,
+        onConnectionError = onConnectionError,
+    )
+
     private val actualScope: CoroutineScope = scope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val connectionMutex = Mutex()
     private var connectionJob: Job? = null
+    private var reconnectJob: Job? = null
+    private var healthCheckJob: Job? = null
+    private var monitorJob: Job? = null
     private var listenerEmitted: Boolean = false
     private val errorChannel = Channel<A>(Channel.BUFFERED)
 
@@ -85,6 +145,11 @@ open class SyncMiddleware<S : State, A : Action>(
 
     override val name: String = "SyncMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
+
+    /**
+     * Access to the connection use case for advanced operations.
+     */
+    protected val useCase: ConnectionUseCase get() = connectionUseCase
 
     /**
      * Start the remote connection and emit a server listener [FlowHolderAction].
@@ -106,12 +171,11 @@ open class SyncMiddleware<S : State, A : Action>(
         connectionMutex.withLock {
             connectionJob?.cancel()
             connectionJob = actualScope.launch {
-                try {
-                    connection.connect()
-                } catch (e: CancellationException) {
-                    throw e // Propagate cancellation
-                } catch (e: Exception) {
-                    onConnectionError?.invoke(e)?.let { errorChannel.send(it) }
+                when (val result = connectionUseCase.connect()) {
+                    is ConnectionResult.Success -> { /* Connected successfully */ }
+                    is ConnectionResult.Failure -> {
+                        onConnectionError?.invoke(result.error)?.let { errorChannel.send(it) }
+                    }
                 }
             }
             if (!listenerEmitted) {
@@ -130,16 +194,100 @@ open class SyncMiddleware<S : State, A : Action>(
      */
     protected suspend fun stopConnection() {
         connectionMutex.withLock {
-            connection.disconnect()
+            connectionUseCase.disconnect()
             connectionJob?.cancel()
             connectionJob = null
+            reconnectJob?.cancel()
+            reconnectJob = null
+            healthCheckJob?.cancel()
+            healthCheckJob = null
+            monitorJob?.cancel()
+            monitorJob = null
         }
     }
 
+    /**
+     * Start reconnection with exponential backoff.
+     *
+     * Call this from within a processor to attempt reconnection.
+     * The reconnection uses the configuration provided to the ConnectionUseCase.
+     *
+     * @param onStateChange Optional callback to convert reconnect states to actions.
+     *        Return null to skip emitting an action for a particular state.
+     */
+    @Suppress("UNCHECKED_CAST")
+    protected suspend fun FlowCollector<A>.startReconnection(
+        onStateChange: ((ReconnectState) -> A?)? = null,
+    ) {
+        connectionMutex.withLock {
+            reconnectJob?.cancel()
+            reconnectJob = actualScope.launch {
+                connectionUseCase.reconnect().collect { state ->
+                    onStateChange?.invoke(state)?.let { action ->
+                        errorChannel.send(action)
+                    }
+                }
+            }
+            if (!listenerEmitted) {
+                listenerEmitted = true
+                emit(ServerListenerAction() as A)
+            }
+        }
+    }
+
+    /**
+     * Start health check monitoring.
+     *
+     * Call this from within a processor to start periodic health checks.
+     * Health checks run in the background and continue until [stopConnection] is called.
+     *
+     * @param sendPing Function to send a ping and wait for pong response.
+     * @param onResult Callback to convert health check results to actions.
+     *        Return null to skip emitting an action for a particular result.
+     */
+    protected fun startHealthCheck(
+        sendPing: suspend () -> Unit,
+        onResult: ((HealthCheckResult) -> A?)? = null,
+    ): Job {
+        healthCheckJob?.cancel()
+        healthCheckJob = actualScope.launch {
+            connectionUseCase.startHealthCheck(sendPing).collect { result ->
+                onResult?.invoke(result)?.let { action ->
+                    errorChannel.send(action)
+                }
+            }
+        }
+        return healthCheckJob!!
+    }
+
+    /**
+     * Start connection state monitoring.
+     *
+     * Call this from within a processor to monitor connection state changes.
+     * Monitoring runs in the background and continues until [stopConnection] is called.
+     *
+     * @param onEvent Callback to convert connection events to actions.
+     *        Return null to skip emitting an action for a particular event.
+     */
+    protected fun monitorConnection(
+        onEvent: ((ConnectionEvent) -> A?)? = null,
+    ): Job {
+        monitorJob?.cancel()
+        monitorJob = actualScope.launch {
+            connectionUseCase.monitorState().collect { event ->
+                onEvent?.invoke(event)?.let { action ->
+                    errorChannel.send(action)
+                }
+            }
+        }
+        return monitorJob!!
+    }
+
+    @Suppress("UNCHECKED_CAST")
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
         // 1. ServerSharedAction: send to server, do NOT emit locally
         if (action is ServerSharedAction) {
-            connection.send(action)
+            connectionUseCase.send(action)
             return@flow
         }
 
@@ -159,7 +307,7 @@ open class SyncMiddleware<S : State, A : Action>(
         override val strategy: ExecutionStrategy get() = concurrent()
 
         override fun toFlowAction(): Flow<Action> = merge(
-            connection.incoming.map { it },
+            connectionUseCase.incoming.map { it },
             errorChannel.receiveAsFlow(),
         )
     }
