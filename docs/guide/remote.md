@@ -39,15 +39,15 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // Shared action markers (ServerSharedAction, ClientSharedAction)
-            implementation("io.github.chibimoons:flowdux-remote-core:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-core:1.14.0")
             // Client middleware (SyncMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-client:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-client:1.14.0")
             // Server middleware (SingleClientSyncMiddleware, MultiClientSyncMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-server:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-server:1.14.0")
             // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-            implementation("io.github.chibimoons:flowdux-remote-serialization:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-serialization:1.14.0")
             // Ktor WebSocket transport (JVM, iOS, JS — WASM not supported)
-            implementation("io.github.chibimoons:flowdux-remote-ktor:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.14.0")
         }
     }
 }
