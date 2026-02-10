@@ -10,6 +10,7 @@ import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -136,7 +137,10 @@ class SessionUseCaseImpl<A : Action>(
 
     private val mutex = Mutex()
     private val sessionActivity = mutableMapOf<String, ComparableTimeMark>()
-    private val eventFlow = MutableSharedFlow<SessionEvent>(extraBufferCapacity = 64)
+    private val eventFlow = MutableSharedFlow<SessionEvent>(
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
 
     override suspend fun addSession(sessionId: String, connection: TypedServerConnection<A>) {
         mutex.withLock {
@@ -147,11 +151,13 @@ class SessionUseCaseImpl<A : Action>(
     }
 
     override suspend fun removeSession(sessionId: String) {
-        mutex.withLock {
+        val removed = mutex.withLock {
             registry.removeSession(sessionId)
-            sessionActivity.remove(sessionId)
+            sessionActivity.remove(sessionId) != null
         }
-        eventFlow.emit(SessionEvent.Removed(sessionId))
+        if (removed) {
+            eventFlow.emit(SessionEvent.Removed(sessionId))
+        }
     }
 
     override suspend fun sessionIds(): Set<String> {

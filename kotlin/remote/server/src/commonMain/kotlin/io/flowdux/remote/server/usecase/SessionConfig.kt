@@ -10,18 +10,14 @@ import kotlin.time.Duration.Companion.seconds
  * @property idleTimeout Duration after which an inactive session is considered idle.
  *   Sessions that have not received any messages for this duration may be cleaned up.
  * @property cleanupInterval Interval between automatic cleanup runs for idle sessions.
- * @property pingInterval Interval between server-initiated ping messages to clients.
- *   Used to detect dead connections and keep connections alive.
  */
 data class SessionConfig(
     val idleTimeout: Duration = 5.minutes,
     val cleanupInterval: Duration = 1.minutes,
-    val pingInterval: Duration = 30.seconds,
 ) {
     init {
         require(idleTimeout > Duration.ZERO) { "idleTimeout must be positive" }
         require(cleanupInterval > Duration.ZERO) { "cleanupInterval must be positive" }
-        require(pingInterval > Duration.ZERO) { "pingInterval must be positive" }
         require(cleanupInterval <= idleTimeout) {
             "cleanupInterval should be <= idleTimeout for effective cleanup"
         }
@@ -35,14 +31,12 @@ data class SessionConfig(
         val Aggressive = SessionConfig(
             idleTimeout = 1.minutes,
             cleanupInterval = 30.seconds,
-            pingInterval = 15.seconds,
         )
 
         /** Conservative configuration for long-lived connections. */
         val LongLived = SessionConfig(
             idleTimeout = 30.minutes,
             cleanupInterval = 5.minutes,
-            pingInterval = 60.seconds,
         )
     }
 }
@@ -68,9 +62,16 @@ sealed interface SessionEvent {
     /**
      * A session has become idle (no activity for some time).
      *
+     * NOTE: This event is currently not emitted by the session monitoring logic
+     * and is reserved for future use.
+     *
      * @property sessionId The ID of the idle session.
      * @property duration How long the session has been idle.
      */
+    @Deprecated(
+        message = "SessionEvent.Idle is not currently emitted by monitorSessions() and is reserved for future use.",
+        level = DeprecationLevel.WARNING,
+    )
     data class Idle(val sessionId: String, val duration: Duration) : SessionEvent
 
     /**

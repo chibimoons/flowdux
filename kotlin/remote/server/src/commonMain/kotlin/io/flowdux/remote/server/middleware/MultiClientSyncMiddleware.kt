@@ -21,14 +21,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -135,7 +132,6 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
     private val actualScope: CoroutineScope = scope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var monitorJob: Job? = null
     private var cleanupJob: Job? = null
-    private val eventChannel = Channel<A>(Channel.BUFFERED)
 
     override val name: String = "MultiClientSyncMiddleware"
 
@@ -147,21 +143,21 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
     /**
      * Start session monitoring.
      *
-     * Listens for session events and converts them to actions.
+     * Listens for session events and notifies the callback.
      * Monitoring runs in the background and continues until cancelled.
      *
-     * @param onEvent Callback to convert session events to actions.
-     *        Return null to skip emitting an action for a particular event.
+     * Note: If you need to dispatch actions based on session events, use the callback
+     * to dispatch actions through your own mechanism (e.g., store.dispatch).
+     *
+     * @param onEvent Callback invoked for each session event.
      */
     fun startMonitoring(
-        onEvent: ((SessionEvent) -> A?)? = null,
+        onEvent: (suspend (SessionEvent) -> Unit)? = null,
     ): Job {
         monitorJob?.cancel()
         monitorJob = actualScope.launch {
             sessionUseCase.monitorSessions().collect { event ->
-                onEvent?.invoke(event)?.let { action ->
-                    eventChannel.send(action)
-                }
+                onEvent?.invoke(event)
             }
         }
         return monitorJob!!
@@ -173,7 +169,11 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
      * Periodically cleans up idle sessions according to the configuration.
      * Cleanup runs in the background and continues until cancelled.
      *
-     * @param config Session configuration (uses the one provided during construction by default).
+     * Note: The config parameter controls the cleanup interval only.
+     * The idle timeout used for determining which sessions to clean up
+     * is defined in the SessionUseCase's configuration.
+     *
+     * @param config Session configuration for cleanup interval.
      * @param onCleanup Optional callback after each cleanup run.
      */
     fun startAutoCleanup(
@@ -272,16 +272,13 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
      * Uses [FlowActionDelivery.Dispatch] so received actions go through the full middleware pipeline.
      * Uses [concurrent] strategy to allow multiple listeners in parallel.
      */
-    private inner class SessionListenerAction(
-        private val connection: TypedServerConnection<A>,
+    private class SessionListenerAction(
+        private val connection: TypedServerConnection<*>,
     ) : FlowHolderAction {
         override val delivery: FlowActionDelivery get() = FlowActionDelivery.Dispatch
         override val strategy: ExecutionStrategy get() = concurrent()
 
-        override fun toFlowAction(): Flow<Action> = merge(
-            connection.incoming.map { it },
-            eventChannel.receiveAsFlow(),
-        )
+        override fun toFlowAction(): Flow<Action> = connection.incoming.map { it }
     }
 
     /**

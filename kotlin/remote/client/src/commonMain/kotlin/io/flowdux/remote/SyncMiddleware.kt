@@ -15,7 +15,6 @@ import io.flowdux.remote.usecase.ConnectionUseCase
 import io.flowdux.remote.usecase.ConnectionUseCaseImpl
 import io.flowdux.remote.usecase.HealthCheckResult
 import io.flowdux.remote.usecase.ReconnectState
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -137,10 +136,10 @@ open class SyncMiddleware<S : State, A : Action>(
     private var healthCheckJob: Job? = null
     private var monitorJob: Job? = null
     private var listenerEmitted: Boolean = false
-    private val errorChannel = Channel<A>(Channel.BUFFERED)
+    private val internalActionChannel = Channel<A>(Channel.BUFFERED)
 
     init {
-        actualScope.coroutineContext[Job]?.invokeOnCompletion { errorChannel.close() }
+        actualScope.coroutineContext[Job]?.invokeOnCompletion { internalActionChannel.close() }
     }
 
     override val name: String = "SyncMiddleware"
@@ -174,7 +173,7 @@ open class SyncMiddleware<S : State, A : Action>(
                 when (val result = connectionUseCase.connect()) {
                     is ConnectionResult.Success -> { /* Connected successfully */ }
                     is ConnectionResult.Failure -> {
-                        onConnectionError?.invoke(result.error)?.let { errorChannel.send(it) }
+                        onConnectionError?.invoke(result.error)?.let { internalActionChannel.send(it) }
                     }
                 }
             }
@@ -224,7 +223,7 @@ open class SyncMiddleware<S : State, A : Action>(
             reconnectJob = actualScope.launch {
                 connectionUseCase.reconnect().collect { state ->
                     onStateChange?.invoke(state)?.let { action ->
-                        errorChannel.send(action)
+                        internalActionChannel.send(action)
                     }
                 }
             }
@@ -253,7 +252,7 @@ open class SyncMiddleware<S : State, A : Action>(
         healthCheckJob = actualScope.launch {
             connectionUseCase.startHealthCheck(sendPing).collect { result ->
                 onResult?.invoke(result)?.let { action ->
-                    errorChannel.send(action)
+                    internalActionChannel.send(action)
                 }
             }
         }
@@ -276,7 +275,7 @@ open class SyncMiddleware<S : State, A : Action>(
         monitorJob = actualScope.launch {
             connectionUseCase.monitorState().collect { event ->
                 onEvent?.invoke(event)?.let { action ->
-                    errorChannel.send(action)
+                    internalActionChannel.send(action)
                 }
             }
         }
@@ -308,7 +307,7 @@ open class SyncMiddleware<S : State, A : Action>(
 
         override fun toFlowAction(): Flow<Action> = merge(
             connectionUseCase.incoming.map { it },
-            errorChannel.receiveAsFlow(),
+            internalActionChannel.receiveAsFlow(),
         )
     }
 }
