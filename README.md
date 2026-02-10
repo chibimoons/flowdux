@@ -31,7 +31,7 @@ Add the dependency to your KMP project's `build.gradle.kts`:
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("io.github.chibimoons:flowdux:1.12.0")
+            implementation("io.github.chibimoons:flowdux:1.13.0")
         }
     }
 }
@@ -45,7 +45,7 @@ If your project is not KMP, add the dependency directly:
 
 ```kotlin
 dependencies {
-    implementation("io.github.chibimoons:flowdux:1.12.0")
+    implementation("io.github.chibimoons:flowdux:1.13.0")
 }
 ```
 
@@ -58,15 +58,15 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // Shared action markers (ServerSharedAction, ClientSharedAction)
-            implementation("io.github.chibimoons:flowdux-remote-core:1.12.0")
+            implementation("io.github.chibimoons:flowdux-remote-core:1.13.0")
             // Client middleware (SyncMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-client:1.12.0")
+            implementation("io.github.chibimoons:flowdux-remote-client:1.13.0")
             // Server middleware (SingleClientSyncMiddleware, MultiClientSyncMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-server:1.12.0")
+            implementation("io.github.chibimoons:flowdux-remote-server:1.13.0")
             // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-            implementation("io.github.chibimoons:flowdux-remote-serialization:1.12.0")
+            implementation("io.github.chibimoons:flowdux-remote-serialization:1.13.0")
             // Ktor WebSocket transport (JVM, iOS, JS — WASM not supported)
-            implementation("io.github.chibimoons:flowdux-remote-ktor:1.12.0")
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.13.0")
         }
     }
 }
@@ -219,7 +219,7 @@ if (!store.isClosed) {
 | [Architecture](docs/guide/architecture.md) | Store pipeline, middleware chain, action flow |
 | [Execution Strategies](docs/guide/execution-strategies.md) | takeLatest, debounce, throttle, retry, groups, chaining |
 | [Remote (WebSocket)](docs/guide/remote.md) | Client-server state sync, shared actions, setup guide |
-| [Room Store Pattern](docs/guide/room-store.md) | Multi-room management, session-aware broadcasting |
+| [Server Patterns](docs/guide/server-patterns.md) | Pattern selection guide (Single Client, Shared State, Room, Per-Client) |
 | [Time Travel](docs/guide/timetravel.md) | Undo/redo, state history, branching |
 | [Sample Apps](docs/guide/samples.md) | How to run each sample |
 | [Dart/Flutter](dart/flowdux/README.md) | Dart API, Flutter widgets, stream integration |
@@ -228,7 +228,7 @@ if (!store.isClosed) {
 
 ### Kotlin Version
 
-FlowDux 1.12.0 is built with **Kotlin 2.2.10**. For best compatibility, use the same Kotlin version in your project:
+FlowDux 1.13.0 is built with **Kotlin 2.2.10**. For best compatibility, use the same Kotlin version in your project:
 
 ```kotlin
 plugins {
