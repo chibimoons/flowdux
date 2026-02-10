@@ -27,13 +27,20 @@ class KtorWebSocketServerConnection(
         .filterIsInstance<Frame.Text>()
         .map { it.readText() }
 
+    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
     override suspend fun send(message: String) {
         try {
             session.outgoing.send(Frame.Text(message))
         } catch (_: ClosedSendChannelException) {
             // Session already closed; ignore silently
         } catch (e: CancellationException) {
-            throw e // Propagate coroutine cancellation
+            // Check if this is external coroutine cancellation or just session closure
+            // Note: isClosedForSend is marked as DelicateCoroutinesApi but is the correct
+            // way to distinguish between session closure and external cancellation
+            if (!session.outgoing.isClosedForSend) {
+                throw e // Propagate external coroutine cancellation
+            }
+            // Session was closed; ignore silently (same as ClosedSendChannelException)
         }
     }
 }
