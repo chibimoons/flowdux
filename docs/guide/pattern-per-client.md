@@ -2,6 +2,50 @@
 
 Per-Client 패턴은 서버가 각 클라이언트별로 독립된 비공개 상태를 관리하는 구조입니다. 클라이언트마다 다른 정보를 보여줘야 할 때 사용합니다.
 
+## 작성해야 할 파일
+
+**Simple (Per-Client만 사용):**
+```
+shared/                           # 공유 모듈
+├── State.kt                      # PlayerState + 관련 data classes
+└── Actions.kt                    # SharedAction (SyncHand 등)
+
+server/                           # 서버 모듈
+├── Main.kt                       # createPerClientServer() + WebSocket 라우팅
+└── Reducer.kt                    # 플레이어 상태 리듀서
+
+client/                           # 클라이언트 모듈
+├── Main.kt                       # 연결, Store 생성
+├── Reducer.kt                    # SyncHand 처리
+└── RemoteMiddleware.kt           # SyncMiddleware 상속
+```
+
+**Hybrid (Room Store + Per-Client Store):**
+```
+shared/                           # 공유 모듈
+├── State.kt                      # PublicTableState, PlayerState, ClientPokerState
+└── Actions.kt                    # SyncTableState (공개) + SyncHand (비공개)
+
+server/                           # 서버 모듈
+├── Main.kt                       # WebSocket 라우팅
+├── PokerTable.kt                 # Room Store (createSharedStateServer)
+├── PlayerSession.kt              # Per-Client Store (createSingleClientServer)
+└── Reducer.kt                    # 테이블 리듀서 + 플레이어 리듀서
+
+client/                           # 클라이언트 모듈
+├── Main.kt                       # 연결, Store 생성
+├── Reducer.kt                    # SyncTableState + SyncHand 모두 처리
+└── RemoteMiddleware.kt           # SyncMiddleware 상속
+```
+
+### Hybrid 모드 파일 역할
+
+| 파일 | 역할 |
+|------|------|
+| `server/PokerTable.kt` | 공개 상태 관리 (커뮤니티 카드, 팟 등) |
+| `server/PlayerSession.kt` | 비공개 상태 관리 (플레이어 손패) |
+| `client/Reducer.kt` | 두 종류의 Sync 액션 모두 처리 |
+
 ## When to Use
 
 | Use Case | What's Private |
@@ -213,6 +257,38 @@ webSocket("/poker/{playerId}") {
 
 ## Client Implementation
 
+### Client Middleware
+
+```kotlin
+import io.flowdux.ActionProcessorMap
+import io.flowdux.remote.SyncMiddleware
+import io.flowdux.remote.TypedClientConnection
+
+sealed interface LocalPokerAction : PokerAction {
+    data object Connect : LocalPokerAction
+    data object Disconnect : LocalPokerAction
+}
+
+class PokerRemoteMiddleware(
+    connection: TypedClientConnection<PokerAction>,
+) : SyncMiddleware<ClientPokerState, PokerAction>(
+    connection = connection,
+) {
+    override val name: String = "PokerRemoteMiddleware"
+
+    override val processors: ActionProcessorMap<ClientPokerState, PokerAction> = buildProcessors {
+        on<LocalPokerAction.Connect> { _, _ ->
+            startConnection()
+        }
+        on<LocalPokerAction.Disconnect> { _, _ ->
+            stopConnection()
+        }
+    }
+}
+```
+
+### Client State & Reducer
+
 The client receives both public and private state through the same connection:
 
 ```kotlin
@@ -237,6 +313,40 @@ val clientReducer = buildReducer<ClientPokerState, PokerAction> {
     on<SharedPokerAction.SyncHand> { state, action ->
         state.copy(myHand = action.cards)
     }
+}
+```
+
+### Client Usage
+
+```kotlin
+suspend fun main() {
+    val playerId = "Alice"
+
+    val connection = KtorWebSocketClientConnection.create(
+        host = "localhost",
+        port = 8080,
+        path = "/poker/$playerId",
+    ).typedJson<SharedPokerAction>()
+     .upcast<SharedPokerAction, PokerAction>()
+
+    val store = createStore(
+        initialState = ClientPokerState(),
+        reducer = clientReducer,
+        middlewares = listOf(PokerRemoteMiddleware(connection)),
+    )
+
+    // 연결
+    store.dispatch(LocalPokerAction.Connect)
+
+    // 상태 관찰 (공개 + 비공개 모두 수신)
+    store.state.collect { state ->
+        println("Community: ${state.communityCards}")
+        println("My Hand: ${state.myHand}")  // 본인 손패만 보임
+        println("Pot: ${state.pot}")
+    }
+
+    // 베팅
+    store.dispatch(SharedPokerAction.PlaceBet(100))
 }
 ```
 
