@@ -17,7 +17,7 @@ import kotlinx.coroutines.SupervisorJob
 /**
  * Creates a client-side Store with automatic [ServerSharedAction] re-dispatch support.
  *
- * This function sets up a [ClientDeliveryMiddleware] that ensures [ServerSharedAction]s
+ * This function sets up a [ServerSharedActionForwarder] that ensures [ServerSharedAction]s
  * emitted from middleware processors are automatically re-dispatched through the full
  * pipeline, allowing [SyncMiddleware] to intercept and send them to the server.
  *
@@ -64,10 +64,10 @@ fun <S : State, A : Action> createClientStore(
     concurrency: Int = 16,
 ): Store<S, A> {
     lateinit var store: Store<S, A>
-    val deliveryMiddleware = ClientDeliveryMiddleware<S, A> { store.dispatch(it) }
+    val forwarder = ServerSharedActionForwarder<S, A> { store.dispatch(it) }
 
-    // Order: additionalMiddlewares -> syncMiddleware -> deliveryMiddleware
-    val allMiddlewares = additionalMiddlewares + syncMiddleware + deliveryMiddleware
+    // Order: additionalMiddlewares -> syncMiddleware -> forwarder
+    val allMiddlewares = additionalMiddlewares + syncMiddleware + forwarder
 
     store = createStore(
         initialState = initialState,

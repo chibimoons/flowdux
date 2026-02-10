@@ -10,7 +10,7 @@ import io.flowdux.State
 import io.flowdux.Store
 import io.flowdux.StoreLogger
 import io.flowdux.createStore
-import io.flowdux.remote.server.middleware.ServerDeliveryMiddleware
+import io.flowdux.remote.server.middleware.ClientSharedActionForwarder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,7 +19,7 @@ import kotlinx.coroutines.SupervisorJob
  * Creates a server-side Store with automatic [ClientSharedAction][io.flowdux.remote.ClientSharedAction]
  * re-dispatch support.
  *
- * This function sets up a [ServerDeliveryMiddleware] that ensures [ClientSharedAction]s
+ * This function sets up a [ClientSharedActionForwarder] that ensures [ClientSharedAction]s
  * emitted from middleware processors are automatically re-dispatched through the full
  * pipeline, allowing sync middlewares to intercept and send them to the client(s).
  *
@@ -66,10 +66,10 @@ fun <S : State, A : Action> createServerStore(
     concurrency: Int = 16,
 ): Store<S, A> {
     lateinit var store: Store<S, A>
-    val deliveryMiddleware = ServerDeliveryMiddleware<S, A> { store.dispatch(it) }
+    val forwarder = ClientSharedActionForwarder<S, A> { store.dispatch(it) }
 
-    // Order: additionalMiddlewares -> syncMiddleware -> deliveryMiddleware
-    val allMiddlewares = additionalMiddlewares + syncMiddleware + deliveryMiddleware
+    // Order: additionalMiddlewares -> syncMiddleware -> forwarder
+    val allMiddlewares = additionalMiddlewares + syncMiddleware + forwarder
 
     store = createStore(
         initialState = initialState,

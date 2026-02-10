@@ -9,10 +9,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ClientDeliveryMiddlewareTest {
+class ServerSharedActionForwarderTest {
 
     @Test
-    fun `ServerSharedAction emitted from processor is automatically sent to server`() = runTest {
+    fun serverSharedAction_emitted_from_processor_is_automatically_sent_to_server() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
         val middleware = EmitServerActionTestMiddleware(
             connection = connection,
@@ -52,7 +52,7 @@ class ClientDeliveryMiddlewareTest {
     }
 
     @Test
-    fun `non-ServerSharedAction emitted from processor passes through normally`() = runTest {
+    fun non_serverSharedAction_emitted_from_processor_passes_through_normally() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
         val middleware = EmitServerActionTestMiddleware(
             connection = connection,
@@ -85,7 +85,7 @@ class ClientDeliveryMiddlewareTest {
     }
 
     @Test
-    fun `ClientSharedAction from server is NOT re-dispatched (prevents infinite loop)`() = runTest {
+    fun clientSharedAction_from_server_is_not_re_dispatched_prevents_infinite_loop() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
         val middleware = TestSyncMiddleware(
             connection = connection,
@@ -120,7 +120,7 @@ class ClientDeliveryMiddlewareTest {
     }
 
     @Test
-    fun `multiple ServerSharedActions emitted are all sent to server`() = runTest {
+    fun multiple_serverSharedActions_emitted_are_all_sent_to_server() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
 
         // Custom middleware that emits multiple ServerSharedActions
