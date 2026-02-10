@@ -2,6 +2,37 @@
 
 Shared State 패턴은 여러 클라이언트가 하나의 Store를 공유하는 구조입니다. 모든 클라이언트가 동일한 상태를 실시간으로 봅니다.
 
+## 작성해야 할 파일
+
+```
+shared/                           # 공유 모듈
+├── State.kt                      # 서버 상태 + 클라이언트 상태 + 변환 함수
+└── Actions.kt                    # SharedAction, ServerAction 정의
+
+server/                           # 서버 모듈
+├── Main.kt                       # createSharedStateServer() + WebSocket 라우팅
+├── Reducer.kt                    # 서버 리듀서
+└── Processors.kt                 # 클라이언트 → 서버 액션 변환
+
+client/                           # 클라이언트 모듈
+├── Main.kt                       # 연결, Store 생성, 상태 관찰
+├── Reducer.kt                    # 클라이언트 리듀서
+└── RemoteMiddleware.kt           # SyncMiddleware 상속
+```
+
+### 각 파일의 역할
+
+| 파일 | 필수 | 설명 |
+|------|:----:|------|
+| `shared/State.kt` | ✅ | `ChatState` (서버), `ClientChatState` (클라이언트), `toClientState()` 변환 |
+| `shared/Actions.kt` | ✅ | `SharedChatAction` + `ServerChatAction` |
+| `server/Main.kt` | ✅ | `createSharedStateServer()`, WebSocket 라우팅 |
+| `server/Reducer.kt` | ✅ | 서버 액션 → 상태 변경 |
+| `server/Processors.kt` | ✅ | `ServerSharedAction` → `ServerChatAction` 변환 |
+| `client/Main.kt` | ✅ | 연결, Store 생성 |
+| `client/Reducer.kt` | ✅ | `SyncState` 처리 |
+| `client/RemoteMiddleware.kt` | ✅ | Connect/Disconnect 처리 |
+
 ## 개요
 
 ```
@@ -205,11 +236,41 @@ fun chatProcessors() = Middleware.ActionProcessorBuilder<ChatState, ChatAction>(
 }.build()
 ```
 
-### Client
+### Client Middleware
+
+```kotlin
+import io.flowdux.ActionProcessorMap
+import io.flowdux.remote.SyncMiddleware
+import io.flowdux.remote.TypedClientConnection
+
+// 로컬 전용 액션
+sealed interface LocalChatAction : ChatAction {
+    data object Connect : LocalChatAction
+    data object Disconnect : LocalChatAction
+}
+
+class ChatRemoteMiddleware(
+    connection: TypedClientConnection<ChatAction>,
+) : SyncMiddleware<ClientChatState, ChatAction>(
+    connection = connection,
+) {
+    override val name: String = "ChatRemoteMiddleware"
+
+    override val processors: ActionProcessorMap<ClientChatState, ChatAction> = buildProcessors {
+        on<LocalChatAction.Connect> { _, _ ->
+            startConnection()  // 내장: 연결 및 메시지 리스닝
+        }
+        on<LocalChatAction.Disconnect> { _, _ ->
+            stopConnection()   // 내장: 정상 종료
+        }
+    }
+}
+```
+
+### Client Usage
 
 ```kotlin
 import io.flowdux.createStore
-import io.flowdux.remote.SyncMiddleware
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 
 suspend fun main() {
@@ -223,10 +284,11 @@ suspend fun main() {
     val store = createStore(
         initialState = ClientChatState(),
         reducer = clientChatReducer,
-        middlewares = listOf(SyncMiddleware(connection)),
+        middlewares = listOf(ChatRemoteMiddleware(connection)),
     )
 
-    connection.connect()
+    // 연결
+    store.dispatch(LocalChatAction.Connect)
 
     // 방 입장
     store.dispatch(SharedChatAction.JoinRoom("Alice"))
