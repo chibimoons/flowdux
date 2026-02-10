@@ -9,7 +9,7 @@ import io.flowdux.Reducer
 import io.flowdux.State
 import io.flowdux.Store
 import io.flowdux.StoreLogger
-import io.flowdux.createStore
+import io.flowdux.remote.server.createServerStore
 import io.flowdux.remote.server.middleware.MultiClientSyncMiddleware
 import io.flowdux.remote.server.session.SessionBroadcaster
 import kotlinx.coroutines.CoroutineScope
@@ -68,9 +68,9 @@ fun <S : State, A : Action> createMultiClientStore(
 ): Store<S, A> {
     val middleware = MultiClientSyncMiddleware<S, A>(processors, broadcaster)
 
-    return createStore(
+    return createServerStore(
         initialState = initialState,
-        middlewares = listOf(middleware),
+        syncMiddleware = middleware,
         reducer = reducer,
         errorProcessor = errorProcessor,
         logger = logger,
