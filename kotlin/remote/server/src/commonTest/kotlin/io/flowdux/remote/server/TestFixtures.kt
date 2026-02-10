@@ -94,7 +94,7 @@ class SendToClientTestMiddleware(
 
 /**
  * Middleware subclass that uses emit() for ClientSharedAction.
- * Works with ServerDeliveryMiddleware to auto-dispatch.
+ * Works with ClientSharedActionForwarder (via createServerStore) to auto-dispatch.
  */
 class EmitClientActionTestMiddleware(
     connection: TypedServerConnection<ServerAction>,
@@ -104,7 +104,7 @@ class EmitClientActionTestMiddleware(
     override val processors = buildProcessors {
         on<ServerAction.TriggerEmitClientAction> { _, action ->
             // Use emit() instead of sendToClient()
-            // With ServerDeliveryMiddleware, this will be auto re-dispatched
+            // With ClientSharedActionForwarder, this will be auto re-dispatched
             emit(ServerAction.Add(action.value))
             // Also emit a local action to verify processor runs
             emit(ServerAction.InternalReset(1))

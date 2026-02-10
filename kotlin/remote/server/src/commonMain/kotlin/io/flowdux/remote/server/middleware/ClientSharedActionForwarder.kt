@@ -6,7 +6,7 @@ import io.flowdux.Middleware
 import io.flowdux.State
 import io.flowdux.remote.ClientSharedAction
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 
 /**
@@ -35,7 +35,7 @@ internal class ClientSharedActionForwarder<S : State, A : Action>(
     override fun process(getState: () -> S, action: A): Flow<A> {
         if (action is ClientSharedAction) {
             dispatch(action)
-            return flow { }
+            return emptyFlow()
         }
         return flowOf(action)
     }

@@ -11,6 +11,7 @@ import io.flowdux.concurrent
 import io.flowdux.remote.ClientSharedAction
 import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 

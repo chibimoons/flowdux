@@ -106,7 +106,7 @@ class SendToServerTestMiddleware(
 
 /**
  * Test middleware that uses emit() for ServerSharedAction.
- * Works with ClientDeliveryMiddleware to auto-dispatch.
+ * Works with ServerSharedActionForwarder (via createClientStore) to auto-dispatch.
  */
 class EmitServerActionTestMiddleware(
     connection: TypedClientConnection<TestAction>,

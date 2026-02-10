@@ -13,6 +13,7 @@ import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.session.SessionBroadcaster
 import io.flowdux.sequential
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -95,18 +96,21 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
      *
      * Example:
      * ```kotlin
-     * override val processors = buildProcessors {
-     *     on<ScoreChanged> { state, action ->
-     *         broadcastToClients(ScoreUpdate(state.score))  // Broadcast to all clients
-     *         emit(action)                                   // Updates server state
-     *     }
-     * }
+     * val middleware = MultiClientSyncMiddleware(
+     *     processors = buildProcessors {
+     *         on<ScoreChanged> { state, action ->
+     *             middleware.broadcastToClients(ScoreUpdate(state.score))  // Broadcast
+     *             emit(action)                                              // Update state
+     *         }
+     *     },
+     *     broadcaster = broadcaster,
+     * )
      * ```
      *
      * @param action The action to broadcast to all clients.
      */
     @Suppress("UNCHECKED_CAST")
-    protected suspend fun broadcastToClients(action: ClientSharedAction) {
+    suspend fun broadcastToClients(action: ClientSharedAction) {
         broadcaster.broadcast(action as A)
     }
 
@@ -118,20 +122,23 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
      *
      * Example:
      * ```kotlin
-     * override val processors = buildProcessors {
-     *     on<RequestScore> { state, action ->
-     *         val score = state.scores[action.sessionId] ?: 0
-     *         sendToClient(action.sessionId, YourScore(score))  // Sent to specific client
-     *         emit(action)                                       // Updates server state
-     *     }
-     * }
+     * val middleware = MultiClientSyncMiddleware(
+     *     processors = buildProcessors {
+     *         on<RequestScore> { state, action ->
+     *             val score = state.scores[action.sessionId] ?: 0
+     *             middleware.sendToClient(action.sessionId, YourScore(score))  // Send
+     *             emit(action)                                                  // Update state
+     *         }
+     *     },
+     *     broadcaster = broadcaster,
+     * )
      * ```
      *
      * @param sessionId The target session ID.
      * @param action The action to send to the client.
      */
     @Suppress("UNCHECKED_CAST")
-    protected suspend fun sendToClient(sessionId: String, action: ClientSharedAction) {
+    suspend fun sendToClient(sessionId: String, action: ClientSharedAction) {
         broadcaster.sendToClient(sessionId, action as A)
     }
 

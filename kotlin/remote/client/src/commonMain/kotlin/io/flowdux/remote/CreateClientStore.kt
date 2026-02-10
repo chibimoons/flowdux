@@ -55,7 +55,7 @@ import kotlinx.coroutines.SupervisorJob
  */
 fun <S : State, A : Action> createClientStore(
     initialState: S,
-    syncMiddleware: Middleware<S, A>,
+    syncMiddleware: SyncMiddleware<S, A>,
     additionalMiddlewares: List<Middleware<S, A>> = emptyList(),
     reducer: Reducer<S, A>,
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
