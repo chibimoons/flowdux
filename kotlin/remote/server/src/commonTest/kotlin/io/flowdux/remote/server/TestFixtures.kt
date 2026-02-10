@@ -32,6 +32,9 @@ sealed interface ServerAction : Action {
 
     // Server-internal only (passes through SRM, reaches reducer)
     data class InternalReset(val value: Int) : ServerAction
+
+    /** Triggers sendToClient helper from within a processor */
+    data class TriggerClientSend(val value: Int) : ServerAction
 }
 
 val serverReducer = Reducer<ServerState, ServerAction> { state, action ->
@@ -42,6 +45,7 @@ val serverReducer = Reducer<ServerState, ServerAction> { state, action ->
         is ServerAction.Increment -> state.copy(count = state.count + 1)
         is ServerAction.SyncState -> state // intercepted by SRM, never reaches reducer
         is ServerAction.InternalReset -> state.copy(count = action.value)
+        is ServerAction.TriggerClientSend -> state // handled by processor, not reducer
     }
 }
 
@@ -62,6 +66,24 @@ class ProcessorEmittingMiddleware(
     override val processors = buildProcessors {
         on<ServerAction.ClientAdd> { _, action ->
             emit(ServerAction.Add(action.value))
+        }
+    }
+}
+
+/**
+ * Middleware subclass that uses sendToClient helper method in processor.
+ */
+class SendToClientTestMiddleware(
+    connection: TypedServerConnection<ServerAction>,
+) : SingleClientSyncMiddleware<ServerState, ServerAction>(
+    connection = connection,
+) {
+    override val processors = buildProcessors {
+        on<ServerAction.TriggerClientSend> { _, action ->
+            // Use sendToClient helper to send directly to client
+            sendToClient(ServerAction.Add(action.value))
+            // Also emit a local action to verify processor runs
+            emit(ServerAction.InternalReset(1))
         }
     }
 }

@@ -546,4 +546,46 @@ class SyncMiddlewareTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    // -- Tests for sendToServer helper method --
+
+    @Test
+    fun `sendToServer sends action to server without going through middleware pipeline`() = runTest {
+        val connection = MockTypedClientConnection<TestAction>()
+        val middleware = SendToServerTestMiddleware(
+            connection = connection,
+            scope = backgroundScope,
+        )
+
+        val store = createStore(
+            initialState = TestState(),
+            reducer = testReducer,
+            middlewares = listOf(middleware),
+            errorProcessor = testErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        store.state.test {
+            assertEquals(TestState(), awaitItem()) // initial state
+
+            store.dispatch(TestAction.Connect)
+            delay(100)
+
+            // TriggerServerSend should:
+            // 1. Call sendToServer(ServerAdd(5)) -> sent to server
+            // 2. emit(Add(1)) -> local state update
+            store.dispatch(TestAction.TriggerServerSend(5))
+            delay(100)
+
+            // Local state should be updated by Add(1), not by ServerAdd(5)
+            assertEquals(TestState(count = 1), awaitItem())
+
+            // Verify ServerAdd was sent to server
+            assertEquals(1, connection.sentActions.size)
+            assertTrue(connection.sentActions[0] is TestAction.ServerAdd)
+            assertEquals(5, (connection.sentActions[0] as TestAction.ServerAdd).value)
+
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

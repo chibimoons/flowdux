@@ -30,6 +30,9 @@ sealed interface TestAction : Action {
     object LocalIncrement : TestAction
     object Connect : TestAction
     object Disconnect : TestAction
+
+    /** Triggers sendToServer helper from within a processor */
+    data class TriggerServerSend(val value: Int) : TestAction
 }
 
 val testReducer = Reducer<TestState, TestAction> { state, action ->
@@ -42,6 +45,7 @@ val testReducer = Reducer<TestState, TestAction> { state, action ->
         is TestAction.LocalIncrement -> state.copy(count = state.count + 1)
         is TestAction.Connect -> state
         is TestAction.Disconnect -> state
+        is TestAction.TriggerServerSend -> state // handled by processor, not reducer
     }
 }
 
@@ -66,6 +70,32 @@ class TestSyncMiddleware(
         }
         on<TestAction.Disconnect> { _, _ ->
             stopConnection()
+        }
+    }
+}
+
+/**
+ * Test middleware that uses sendToServer helper method in processor.
+ */
+class SendToServerTestMiddleware(
+    connection: TypedClientConnection<TestAction>,
+    scope: CoroutineScope? = null,
+) : SyncMiddleware<TestState, TestAction>(
+    connection = connection,
+    scope = scope,
+) {
+    override val processors: ActionProcessorMap<TestState, TestAction> = buildProcessors {
+        on<TestAction.Connect> { _, _ ->
+            startConnection()
+        }
+        on<TestAction.Disconnect> { _, _ ->
+            stopConnection()
+        }
+        on<TestAction.TriggerServerSend> { _, action ->
+            // Use sendToServer helper to send directly to server
+            sendToServer(TestAction.ServerAdd(action.value))
+            // Also emit a local action to verify processor runs
+            emit(TestAction.Add(1))
         }
     }
 }
