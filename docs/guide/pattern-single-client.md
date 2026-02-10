@@ -2,6 +2,39 @@
 
 Single Client 패턴은 각 클라이언트가 독립된 Store를 가지는 가장 단순한 구조입니다.
 
+## 작성해야 할 파일
+
+이 패턴을 구현하려면 다음 파일들을 작성해야 합니다:
+
+```
+shared/                           # 공유 모듈
+├── State.kt                      # 상태 정의 (UserState + 관련 data classes)
+└── Actions.kt                    # 공유 액션 (@Serializable sealed interface)
+
+server/                           # 서버 모듈
+├── Main.kt                       # 서버 엔트리 (Ktor, WebSocket 라우팅)
+├── Reducer.kt                    # 서버 리듀서
+└── Processors.kt                 # (선택) 미들웨어 프로세서
+
+client/                           # 클라이언트 모듈
+├── Main.kt                       # 클라이언트 엔트리 (연결, Store 생성)
+├── Reducer.kt                    # 클라이언트 리듀서 (SyncState 처리)
+└── RemoteMiddleware.kt           # SyncMiddleware 상속 (Connect/Disconnect 처리)
+```
+
+### 각 파일의 역할
+
+| 파일 | 필수 | 설명 |
+|------|:----:|------|
+| `shared/State.kt` | ✅ | `@Serializable` 상태 클래스 |
+| `shared/Actions.kt` | ✅ | `ServerSharedAction`, `ClientSharedAction` 마커가 붙은 액션 |
+| `server/Main.kt` | ✅ | `createSingleClientServer()` + WebSocket 라우팅 |
+| `server/Reducer.kt` | ✅ | 서버 상태 변경 로직 |
+| `server/Processors.kt` | ⬜ | 클라이언트 액션 → 서버 내부 액션 변환 |
+| `client/Main.kt` | ✅ | 연결 생성, Store 생성, 상태 관찰 |
+| `client/Reducer.kt` | ✅ | `SyncState` → 상태 적용 |
+| `client/RemoteMiddleware.kt` | ✅ | `SyncMiddleware` 상속, Connect/Disconnect 처리 |
+
 ## 개요
 
 ```
@@ -173,11 +206,43 @@ val userReducer = buildReducer<UserState, UserAction> {
 }
 ```
 
-### Client
+### Client Middleware
+
+클라이언트는 `SyncMiddleware`를 상속한 미들웨어를 작성해야 합니다:
+
+```kotlin
+import io.flowdux.ActionProcessorMap
+import io.flowdux.remote.SyncMiddleware
+import io.flowdux.remote.TypedClientConnection
+
+// 로컬 전용 액션 (네트워크로 전송되지 않음)
+sealed interface LocalUserAction : UserAction {
+    data object Connect : LocalUserAction
+    data object Disconnect : LocalUserAction
+}
+
+class UserRemoteMiddleware(
+    connection: TypedClientConnection<UserAction>,
+) : SyncMiddleware<UserState, UserAction>(
+    connection = connection,
+) {
+    override val name: String = "UserRemoteMiddleware"
+
+    override val processors: ActionProcessorMap<UserState, UserAction> = buildProcessors {
+        on<LocalUserAction.Connect> { _, _ ->
+            startConnection()  // 내장: 연결 및 메시지 리스닝 시작
+        }
+        on<LocalUserAction.Disconnect> { _, _ ->
+            stopConnection()   // 내장: 정상 종료
+        }
+    }
+}
+```
+
+### Client Usage
 
 ```kotlin
 import io.flowdux.createStore
-import io.flowdux.remote.SyncMiddleware
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.serialization.typedJson
 import io.flowdux.remote.serialization.upcast
@@ -193,11 +258,11 @@ suspend fun main() {
     val store = createStore(
         initialState = UserState(),
         reducer = clientUserReducer,
-        middlewares = listOf(SyncMiddleware(connection)),
+        middlewares = listOf(UserRemoteMiddleware(connection)),
     )
 
     // 연결
-    connection.connect()
+    store.dispatch(LocalUserAction.Connect)
 
     // 상태 관찰
     store.state.collect { state ->
