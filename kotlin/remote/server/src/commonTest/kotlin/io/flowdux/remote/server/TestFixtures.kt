@@ -35,6 +35,9 @@ sealed interface ServerAction : Action {
 
     /** Triggers sendToClient helper from within a processor */
     data class TriggerClientSend(val value: Int) : ServerAction
+
+    /** Triggers emit(ClientSharedAction) to test auto-dispatch */
+    data class TriggerEmitClientAction(val value: Int) : ServerAction
 }
 
 val serverReducer = Reducer<ServerState, ServerAction> { state, action ->
@@ -46,6 +49,7 @@ val serverReducer = Reducer<ServerState, ServerAction> { state, action ->
         is ServerAction.SyncState -> state // intercepted by SRM, never reaches reducer
         is ServerAction.InternalReset -> state.copy(count = action.value)
         is ServerAction.TriggerClientSend -> state // handled by processor, not reducer
+        is ServerAction.TriggerEmitClientAction -> state // handled by processor, not reducer
     }
 }
 
@@ -82,6 +86,26 @@ class SendToClientTestMiddleware(
         on<ServerAction.TriggerClientSend> { _, action ->
             // Use sendToClient helper to send directly to client
             sendToClient(ServerAction.Add(action.value))
+            // Also emit a local action to verify processor runs
+            emit(ServerAction.InternalReset(1))
+        }
+    }
+}
+
+/**
+ * Middleware subclass that uses emit() for ClientSharedAction.
+ * Works with ServerDeliveryMiddleware to auto-dispatch.
+ */
+class EmitClientActionTestMiddleware(
+    connection: TypedServerConnection<ServerAction>,
+) : SingleClientSyncMiddleware<ServerState, ServerAction>(
+    connection = connection,
+) {
+    override val processors = buildProcessors {
+        on<ServerAction.TriggerEmitClientAction> { _, action ->
+            // Use emit() instead of sendToClient()
+            // With ServerDeliveryMiddleware, this will be auto re-dispatched
+            emit(ServerAction.Add(action.value))
             // Also emit a local action to verify processor runs
             emit(ServerAction.InternalReset(1))
         }

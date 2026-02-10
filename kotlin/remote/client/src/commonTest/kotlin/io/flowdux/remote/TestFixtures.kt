@@ -33,6 +33,9 @@ sealed interface TestAction : Action {
 
     /** Triggers sendToServer helper from within a processor */
     data class TriggerServerSend(val value: Int) : TestAction
+
+    /** Triggers emit(ServerSharedAction) to test auto-dispatch */
+    data class TriggerEmitServerAction(val value: Int) : TestAction
 }
 
 val testReducer = Reducer<TestState, TestAction> { state, action ->
@@ -46,6 +49,7 @@ val testReducer = Reducer<TestState, TestAction> { state, action ->
         is TestAction.Connect -> state
         is TestAction.Disconnect -> state
         is TestAction.TriggerServerSend -> state // handled by processor, not reducer
+        is TestAction.TriggerEmitServerAction -> state // handled by processor, not reducer
     }
 }
 
@@ -94,6 +98,34 @@ class SendToServerTestMiddleware(
         on<TestAction.TriggerServerSend> { _, action ->
             // Use sendToServer helper to send directly to server
             sendToServer(TestAction.ServerAdd(action.value))
+            // Also emit a local action to verify processor runs
+            emit(TestAction.Add(1))
+        }
+    }
+}
+
+/**
+ * Test middleware that uses emit() for ServerSharedAction.
+ * Works with ClientDeliveryMiddleware to auto-dispatch.
+ */
+class EmitServerActionTestMiddleware(
+    connection: TypedClientConnection<TestAction>,
+    scope: CoroutineScope? = null,
+) : SyncMiddleware<TestState, TestAction>(
+    connection = connection,
+    scope = scope,
+) {
+    override val processors: ActionProcessorMap<TestState, TestAction> = buildProcessors {
+        on<TestAction.Connect> { _, _ ->
+            startConnection()
+        }
+        on<TestAction.Disconnect> { _, _ ->
+            stopConnection()
+        }
+        on<TestAction.TriggerEmitServerAction> { _, action ->
+            // Use emit() instead of sendToServer()
+            // With ClientDeliveryMiddleware, this will be auto re-dispatched
+            emit(TestAction.ServerAdd(action.value))
             // Also emit a local action to verify processor runs
             emit(TestAction.Add(1))
         }
