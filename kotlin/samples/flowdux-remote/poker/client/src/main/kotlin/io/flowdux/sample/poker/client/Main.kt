@@ -1,7 +1,7 @@
 package io.flowdux.sample.poker.client
 
 import io.flowdux.Store
-import io.flowdux.createStore
+import io.flowdux.remote.createClientStore
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.serialization.typedJson
 import io.flowdux.remote.serialization.upcast
@@ -162,9 +162,9 @@ private fun createPokerStore(playerId: String): Store<ClientPokerState, PokerAct
         path = "/poker/$playerId",
     ).typedJson<SharedPokerAction>().upcast<SharedPokerAction, PokerAction>()
 
-    return createStore(
+    return createClientStore(
         initialState = ClientPokerState(playerId = playerId),
+        syncMiddleware = PokerRemoteMiddleware(connection),
         reducer = clientPokerReducer,
-        middlewares = listOf(PokerRemoteMiddleware(connection)),
     )
 }

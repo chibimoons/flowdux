@@ -11,6 +11,7 @@ import io.flowdux.concurrent
 import io.flowdux.remote.ClientSharedAction
 import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 
@@ -57,18 +58,28 @@ open class SingleClientSyncMiddleware<S : State, A : Action>(
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     /**
-     * Send an action directly to the connected client.
+     * Send an action directly to the client, bypassing the middleware pipeline.
      *
-     * @param action The action to send.
-     * @deprecated Use dispatch(ClientSharedAction) instead. The middleware intercepts
-     *   ClientSharedAction and sends it to the client automatically.
+     * Use this method when you need to send a [ClientSharedAction] from within a processor.
+     * Actions emitted via [FlowCollector.emit] do not go through the middleware pipeline again,
+     * so [ClientSharedAction]s emitted from processors would go directly to the Reducer
+     * instead of being sent to the client.
+     *
+     * Example:
+     * ```kotlin
+     * override val processors = buildProcessors {
+     *     on<ScoreChanged> { state, action ->
+     *         sendToClient(ScoreUpdate(state.score))  // Sent to client
+     *         emit(action)                            // Updates server state
+     *     }
+     * }
+     * ```
+     *
+     * @param action The action to send to the client.
      */
-    @Deprecated(
-        message = "Use dispatch(ClientSharedAction) instead. The middleware automatically sends ClientSharedAction to the client.",
-        level = DeprecationLevel.WARNING,
-    )
-    protected suspend fun sendToClient(action: A) {
-        connection.send(action)
+    @Suppress("UNCHECKED_CAST")
+    protected suspend fun sendToClient(action: ClientSharedAction) {
+        connection.send(action as A)
     }
 
     @Suppress("UNCHECKED_CAST")

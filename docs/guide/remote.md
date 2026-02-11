@@ -39,15 +39,15 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // Shared action markers (ServerSharedAction, ClientSharedAction)
-            implementation("io.github.chibimoons:flowdux-remote-core:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-core:1.14.0")
             // Client middleware (SyncMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-client:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-client:1.14.0")
             // Server middleware (SingleClientSyncMiddleware, MultiClientSyncMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-server:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-server:1.14.0")
             // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-            implementation("io.github.chibimoons:flowdux-remote-serialization:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-serialization:1.14.0")
             // Ktor WebSocket transport (JVM, iOS, JS — WASM not supported)
-            implementation("io.github.chibimoons:flowdux-remote-ktor:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.14.0")
         }
     }
 }
@@ -188,7 +188,7 @@ sealed interface ServerChatAction : ChatAction {
 
 ## 2. Server Setup
 
-Use the pattern-based API for easy setup:
+Use the pattern-based API for easy setup. For manual store creation, use `createServerStore` from `io.flowdux.remote.server` for automatic `ClientSharedAction` re-dispatch.
 
 ```kotlin
 import io.flowdux.remote.server.pattern.createSingleClientServer
@@ -281,6 +281,22 @@ val serverChatReducer = buildReducer<ServerChatState, ChatAction> {
 
 ## 3. Client Setup
 
+### Client Store Creation
+
+Use `createClientStore` for automatic `ServerSharedAction` re-dispatch:
+
+```kotlin
+import io.flowdux.remote.createClientStore
+
+val store = createClientStore(
+    initialState = ClientChatState(),
+    syncMiddleware = ChatRemoteMiddleware(connection),
+    reducer = clientChatReducer,
+)
+```
+
+**Benefit:** When you `emit(ServerSharedAction)` from a middleware processor, it will be automatically re-dispatched through the full pipeline and sent to the server. Without `createClientStore`, you would need to use `sendToServer()` helper method explicitly.
+
 ### Client Middleware
 
 The client needs a middleware to manage WebSocket connection and message routing:
@@ -335,7 +351,7 @@ val clientChatReducer = buildReducer<ClientChatState, ChatAction> {
 ### Client Usage
 
 ```kotlin
-import io.flowdux.createStore
+import io.flowdux.remote.createClientStore
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.serialization.typedJson
 import io.flowdux.remote.serialization.upcast
@@ -348,10 +364,11 @@ fun main() = runBlocking {
     ).typedJson<SharedChatAction>()
      .upcast<SharedChatAction, ChatAction>()
 
-    val store = createStore(
+    // Use createClientStore for automatic ServerSharedAction re-dispatch
+    val store = createClientStore(
         initialState = ClientChatState(),
+        syncMiddleware = ChatRemoteMiddleware(connection),
         reducer = clientChatReducer,
-        middlewares = listOf(ChatRemoteMiddleware(connection)),
     )
 
     // Observe state changes
