@@ -23,7 +23,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -88,7 +87,7 @@ import kotlinx.coroutines.sync.withLock
  *        When provided, connection failures will be dispatched through the store.
  */
 open class SyncMiddleware<S : State, A : Action>(
-    private val connectionUseCase: ConnectionUseCase,
+    private val connectionUseCase: ConnectionUseCase<A>,
     scope: CoroutineScope? = null,
     private val onConnectionError: ((Throwable) -> A)? = null,
 ) : Middleware<S, A> {
@@ -148,7 +147,7 @@ open class SyncMiddleware<S : State, A : Action>(
     /**
      * Access to the connection use case for advanced operations.
      */
-    protected val useCase: ConnectionUseCase get() = connectionUseCase
+    protected val useCase: ConnectionUseCase<A> get() = connectionUseCase
 
     /**
      * Start the remote connection and emit a server listener [FlowHolderAction].
@@ -244,19 +243,21 @@ open class SyncMiddleware<S : State, A : Action>(
      * @param onResult Callback to convert health check results to actions.
      *        Return null to skip emitting an action for a particular result.
      */
-    protected fun startHealthCheck(
+    protected suspend fun startHealthCheck(
         sendPing: suspend () -> Unit,
         onResult: ((HealthCheckResult) -> A?)? = null,
     ): Job {
-        healthCheckJob?.cancel()
-        healthCheckJob = actualScope.launch {
-            connectionUseCase.startHealthCheck(sendPing).collect { result ->
-                onResult?.invoke(result)?.let { action ->
-                    internalActionChannel.send(action)
+        return connectionMutex.withLock {
+            healthCheckJob?.cancel()
+            healthCheckJob = actualScope.launch {
+                connectionUseCase.startHealthCheck(sendPing).collect { result ->
+                    onResult?.invoke(result)?.let { action ->
+                        internalActionChannel.send(action)
+                    }
                 }
             }
+            healthCheckJob!!
         }
-        return healthCheckJob!!
     }
 
     /**
@@ -268,21 +269,22 @@ open class SyncMiddleware<S : State, A : Action>(
      * @param onEvent Callback to convert connection events to actions.
      *        Return null to skip emitting an action for a particular event.
      */
-    protected fun monitorConnection(
+    protected suspend fun monitorConnection(
         onEvent: ((ConnectionEvent) -> A?)? = null,
     ): Job {
-        monitorJob?.cancel()
-        monitorJob = actualScope.launch {
-            connectionUseCase.monitorState().collect { event ->
-                onEvent?.invoke(event)?.let { action ->
-                    internalActionChannel.send(action)
+        return connectionMutex.withLock {
+            monitorJob?.cancel()
+            monitorJob = actualScope.launch {
+                connectionUseCase.monitorState().collect { event ->
+                    onEvent?.invoke(event)?.let { action ->
+                        internalActionChannel.send(action)
+                    }
                 }
             }
+            monitorJob!!
         }
-        return monitorJob!!
     }
 
-    @Suppress("UNCHECKED_CAST")
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
         // 1. ServerSharedAction: send to server, do NOT emit locally
         if (action is ServerSharedAction) {
@@ -306,7 +308,7 @@ open class SyncMiddleware<S : State, A : Action>(
         override val strategy: ExecutionStrategy get() = concurrent()
 
         override fun toFlowAction(): Flow<Action> = merge(
-            connectionUseCase.incoming.map { it },
+            connectionUseCase.incoming,
             internalActionChannel.receiveAsFlow(),
         )
     }

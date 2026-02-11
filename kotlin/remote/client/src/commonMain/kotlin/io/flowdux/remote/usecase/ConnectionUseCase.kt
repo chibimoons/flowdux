@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -42,7 +41,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * }
  * ```
  */
-interface ConnectionUseCase {
+interface ConnectionUseCase<A : Action> {
     /**
      * Current connection state as a reactive flow.
      */
@@ -51,7 +50,7 @@ interface ConnectionUseCase {
     /**
      * Incoming actions from the server, already decoded.
      */
-    val incoming: Flow<Action>
+    val incoming: Flow<A>
 
     /**
      * Attempt to establish a connection.
@@ -70,7 +69,7 @@ interface ConnectionUseCase {
      *
      * @param action The action to send.
      */
-    suspend fun send(action: Action)
+    suspend fun send(action: A)
 
     /**
      * Attempt to reconnect with exponential backoff according to the configuration.
@@ -123,7 +122,7 @@ class ConnectionUseCaseImpl<A : Action>(
     private val config: ConnectionConfig = ConnectionConfig(),
     private val random: Random = Random.Default,
     private val timeSource: TimeSource = TimeSource.Monotonic,
-) : ConnectionUseCase {
+) : ConnectionUseCase<A> {
 
     private val _reconnectState = MutableStateFlow<ReconnectState>(ReconnectState.Idle)
     val reconnectState: StateFlow<ReconnectState> = _reconnectState.asStateFlow()
@@ -131,9 +130,8 @@ class ConnectionUseCaseImpl<A : Action>(
     override val connectionState: StateFlow<ConnectionState>
         get() = connection.connectionState
 
-    @Suppress("UNCHECKED_CAST")
-    override val incoming: Flow<Action>
-        get() = connection.incoming.map { it as Action }
+    override val incoming: Flow<A>
+        get() = connection.incoming
 
     override suspend fun connect(): ConnectionResult {
         return try {
@@ -150,9 +148,8 @@ class ConnectionUseCaseImpl<A : Action>(
         connection.disconnect()
     }
 
-    @Suppress("UNCHECKED_CAST")
-    override suspend fun send(action: Action) {
-        connection.send(action as A)
+    override suspend fun send(action: A) {
+        connection.send(action)
     }
 
     override fun reconnect(): Flow<ReconnectState> = flow {
@@ -279,7 +276,7 @@ class ConnectionUseCaseImpl<A : Action>(
  * @param onStateChange Callback for each state change.
  * @return The job that can be cancelled to stop reconnection.
  */
-fun ConnectionUseCase.startReconnectionJob(
+fun <A : Action> ConnectionUseCase<A>.startReconnectionJob(
     scope: CoroutineScope,
     onStateChange: suspend (ReconnectState) -> Unit,
 ): Job = scope.launch {
@@ -296,7 +293,7 @@ fun ConnectionUseCase.startReconnectionJob(
  * @param onResult Callback for each health check result.
  * @return The job that can be cancelled to stop health checks.
  */
-fun ConnectionUseCase.startHealthCheckJob(
+fun <A : Action> ConnectionUseCase<A>.startHealthCheckJob(
     scope: CoroutineScope,
     sendPing: suspend () -> Unit,
     onResult: suspend (HealthCheckResult) -> Unit,
@@ -313,7 +310,7 @@ fun ConnectionUseCase.startHealthCheckJob(
  * @param onEvent Callback for each connection event.
  * @return The job that can be cancelled to stop monitoring.
  */
-fun ConnectionUseCase.startMonitoringJob(
+fun <A : Action> ConnectionUseCase<A>.startMonitoringJob(
     scope: CoroutineScope,
     onEvent: suspend (ConnectionEvent) -> Unit,
 ): Job = scope.launch {
