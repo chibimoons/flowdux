@@ -56,6 +56,21 @@ open class SingleClientSyncMiddleware<S : State, A : Action>(
     override val name: String = "SingleClientSyncMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
+    /**
+     * Send an action directly to the client, bypassing the middleware pipeline.
+     *
+     * @param action The action to send to the client.
+     */
+    @Deprecated(
+        message = "No longer needed. Emit ClientSharedAction from a processor and use " +
+            "createServerStore() for automatic re-dispatch through the pipeline.",
+        level = DeprecationLevel.WARNING,
+    )
+    @Suppress("UNCHECKED_CAST")
+    protected suspend fun sendToClient(action: ClientSharedAction) {
+        connection.send(action as A)
+    }
+
     @Suppress("UNCHECKED_CAST")
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
         // 0. InternalStartListening: emitted by serve(), triggers client listener

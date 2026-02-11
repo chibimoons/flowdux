@@ -121,6 +121,37 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
 
     override val name: String = "MultiClientSyncMiddleware"
 
+    /**
+     * Broadcast an action directly to all clients, bypassing the middleware pipeline.
+     *
+     * @param action The action to broadcast to all clients.
+     */
+    @Deprecated(
+        message = "No longer needed. Emit ClientSharedAction from a processor and use " +
+            "createServerStore() for automatic re-dispatch through the pipeline.",
+        level = DeprecationLevel.WARNING,
+    )
+    @Suppress("UNCHECKED_CAST")
+    suspend fun broadcastToClients(action: ClientSharedAction) {
+        broadcaster.broadcast(action as A)
+    }
+
+    /**
+     * Send an action directly to a specific client, bypassing the middleware pipeline.
+     *
+     * @param sessionId The target session ID.
+     * @param action The action to send to the client.
+     */
+    @Deprecated(
+        message = "No longer needed. Emit ClientSharedAction from a processor and use " +
+            "createServerStore() for automatic re-dispatch through the pipeline.",
+        level = DeprecationLevel.WARNING,
+    )
+    @Suppress("UNCHECKED_CAST")
+    suspend fun sendToClient(sessionId: String, action: ClientSharedAction) {
+        broadcaster.sendToClient(sessionId, action as A)
+    }
+
     @Suppress("UNCHECKED_CAST")
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
         // 1. InternalSendToClient: send action to specific client
