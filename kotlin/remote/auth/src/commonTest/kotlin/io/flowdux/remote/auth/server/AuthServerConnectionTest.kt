@@ -7,6 +7,7 @@ import io.flowdux.remote.auth.MockServerConnection
 import io.flowdux.remote.auth.TestPrincipal
 import io.flowdux.remote.auth.acceptAllVerifier
 import io.flowdux.remote.auth.rejectAllVerifier
+import io.flowdux.remote.auth.throwingVerifier
 import io.flowdux.remote.auth.tokenVerifier
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -198,6 +199,26 @@ class AuthServerConnectionTest {
         assertTrue(result.reason.contains("Malformed auth message"))
 
         // Verify auth_error was sent back
+        assertTrue(mock.sentMessages.any { it.contains("auth_error") })
+    }
+
+    @Test
+    fun verifierThrows_returnsFailureAndSendsAuthError() = runTest {
+        val mock = MockServerConnection()
+        val authConn = AuthServerConnection(
+            delegate = mock,
+            verifier = throwingVerifier,
+        )
+
+        mock.simulateIncoming(AuthProtocol.encodeAuthRequest("any-token"))
+
+        val result = authConn.awaitAuth(backgroundScope)
+
+        assertIs<AuthResult.Failure>(result)
+        assertTrue(result.reason.contains("Verifier error"))
+        assertTrue(result.reason.contains("JWT decode failed"))
+
+        // Verify auth_error was sent back (not a crash)
         assertTrue(mock.sentMessages.any { it.contains("auth_error") })
     }
 

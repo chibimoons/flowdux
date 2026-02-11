@@ -111,3 +111,8 @@ fun tokenVerifier(validToken: String) = AuthVerifier<TestPrincipal> { token ->
         AuthResult.Failure("Invalid token")
     }
 }
+
+/** Verifier that throws an exception (simulates JWT library crash). */
+val throwingVerifier = AuthVerifier<TestPrincipal> { _ ->
+    throw RuntimeException("JWT decode failed")
+}

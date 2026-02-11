@@ -14,6 +14,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class AuthClientConnectionTest {
@@ -92,7 +93,8 @@ class AuthClientConnectionTest {
             authConn.connect()
         }
 
-        assertEquals("Authentication rejected by server", ex.message)
+        assertTrue(ex.message!!.contains("Authentication rejected by server"))
+        assertTrue(ex.message!!.contains("Invalid credentials"))
     }
 
     @Test
@@ -195,6 +197,22 @@ class AuthClientConnectionTest {
         assertEquals("hello", mock.sentMessages.last())
 
         connectJob.cancel()
+    }
+
+    @Test
+    fun authError_reasonIncludedInException() = runTest {
+        val mock = MockClientConnection()
+        val authConn = AuthClientConnection(
+            delegate = mock,
+            credentialProvider = CredentialProvider { "bad-token" },
+        )
+
+        launch {
+            mock.simulateIncoming(AuthProtocol.encodeAuthError("Token expired at 2025-01-01"))
+        }
+
+        val ex = assertFailsWith<AuthenticationException> { authConn.connect() }
+        assertTrue(ex.message!!.contains("Token expired at 2025-01-01"))
     }
 
     @Test

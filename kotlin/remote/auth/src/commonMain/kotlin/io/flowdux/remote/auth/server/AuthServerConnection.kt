@@ -92,7 +92,15 @@ class AuthServerConnection<P : AuthPrincipal>(
                     return@withTimeoutOrNull AuthResult.Failure(reason)
                 }
 
-                when (val result = verifier.verify(token)) {
+                val result = try {
+                    verifier.verify(token)
+                } catch (e: Exception) {
+                    val reason = "Verifier error: ${e.message}"
+                    delegate.send(AuthProtocol.encodeAuthError(reason))
+                    return@withTimeoutOrNull AuthResult.Failure(reason)
+                }
+
+                when (result) {
                     is AuthResult.Success -> {
                         _principal.complete(result.principal)
                         delegate.send(AuthProtocol.encodeAuthSuccess())

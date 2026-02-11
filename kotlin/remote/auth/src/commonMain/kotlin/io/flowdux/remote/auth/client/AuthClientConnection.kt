@@ -47,6 +47,9 @@ class AuthClientConnection(
     private val messageChannel = Channel<String>(Channel.UNLIMITED)
     override val incoming: Flow<String> = messageChannel.receiveAsFlow()
 
+    /** Captured auth error reason from the server (if auth failed). */
+    private var authErrorReason: String? = null
+
     override suspend fun send(message: String) {
         // Gate sends until auth handshake completes
         _connectionState.first { it != ConnectionState.CONNECTING }
@@ -76,11 +79,12 @@ class AuthClientConnection(
                     delegate.incoming.collect { raw ->
                         if (AuthProtocol.isAuthMessage(raw)) {
                             try {
-                                when (AuthProtocol.decodeAuthResponse(raw)) {
+                                when (val response = AuthProtocol.decodeAuthResponse(raw)) {
                                     is AuthProtocolResponse.Success ->
                                         _connectionState.value = ConnectionState.CONNECTED
 
                                     is AuthProtocolResponse.Error -> {
+                                        authErrorReason = response.reason
                                         _connectionState.value = ConnectionState.DISCONNECTED
                                         delegate.disconnect()
                                     }
@@ -110,7 +114,8 @@ class AuthClientConnection(
                 }
 
                 if (_connectionState.value != ConnectionState.CONNECTED) {
-                    throw AuthenticationException("Authentication rejected by server")
+                    val reason = authErrorReason ?: "unknown reason"
+                    throw AuthenticationException("Authentication rejected by server: $reason")
                 }
 
                 // 6. Stay alive until connection closes
