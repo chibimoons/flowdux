@@ -219,6 +219,8 @@ if (!store.isClosed) {
 | [Architecture](docs/guide/architecture.md) | Store pipeline, middleware chain, action flow |
 | [Execution Strategies](docs/guide/execution-strategies.md) | takeLatest, debounce, throttle, retry, groups, chaining |
 | [Remote (WebSocket)](docs/guide/remote.md) | Client-server state sync, shared actions, setup guide |
+| [Remote Authentication](docs/guide/remote-authentication.md) | In-band WebSocket auth handshake, AuthVerifier, AuthPrincipal |
+| [JWT Integration](docs/guide/jwt-integration.md) | HS256, Firebase Auth, Supabase Auth integration guide |
 | [Server Patterns](docs/guide/server-patterns.md) | Pattern selection guide (Single Client, Shared State, Room, Per-Client) |
 | [Time Travel](docs/guide/timetravel.md) | Undo/redo, state history, branching |
 | [Sample Apps](docs/guide/samples.md) | How to run each sample |

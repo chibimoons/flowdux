@@ -2,9 +2,13 @@
 
 ## Overview
 
-FlowDux는 인증을 프레임워크 내부에서 처리하지 않는다.
-인증은 Ktor 라우팅 레벨(FlowDux 진입 전)에서 처리하고,
-인증된 userId를 sessionId로 넘기는 구조다.
+이 문서는 **Ktor 라우팅 레벨**에서 인증을 처리하는 패턴을 다룬다.
+Ktor가 인증을 끝내고, 인증된 userId를 sessionId로 넘기는 구조다.
+
+> **In-Band 인증 모듈**: FlowDux는 `flowdux-remote-auth` 모듈을 통해
+> WebSocket 연결 후 첫 메시지로 토큰을 교환하는 **인밴드 인증**도 지원한다.
+> Transport에 독립적이며, 브라우저에서도 완전히 동작한다.
+> 자세한 내용은 [Remote Authentication](./remote-authentication.md)를 참조.
 
 ```
 인증 (Ktor 영역)  →  세션 관리 (FlowDux 영역)
@@ -247,3 +251,11 @@ webSocket("/ws") {
 FlowDux는 인증을 몰라도 된다.
 Ktor가 인증을 끝내고, 인증된 userId를 sessionId로 넘기면
 FlowDux는 그 세션이 인증된 유저라고 신뢰한다.
+
+---
+
+## 관련 문서
+
+- [Remote Authentication](./remote-authentication.md) — `flowdux-remote-auth` 모듈 (인밴드 인증)
+- [JWT Integration Guide](./jwt-integration.md) — HS256, Firebase Auth, Supabase Auth 통합
+- [Remote (WebSocket)](./remote.md) — 기본 클라이언트-서버 설정 가이드
