@@ -20,7 +20,8 @@ import kotlinx.coroutines.SupervisorJob
  * Create a [Store] configured for multi-client communication.
  *
  * The store is pre-configured with [MultiClientSyncMiddleware] that:
- * - Listens for incoming actions from multiple client connections (via [InternalAddSession])
+ * - Routes [InternalSendToClient] to specific clients
+ * - Broadcasts [ClientSharedAction]s to all connected clients
  * - Processes [ServerSharedAction]s through the provided processors
  * - Passes actions to the reducer for state updates
  *

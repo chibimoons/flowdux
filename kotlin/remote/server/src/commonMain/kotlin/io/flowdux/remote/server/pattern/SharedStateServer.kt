@@ -11,11 +11,10 @@ import io.flowdux.Store
 import io.flowdux.StoreLogger
 import io.flowdux.remote.server.ClientHandler
 import io.flowdux.remote.server.connection.TypedServerConnection
-import io.flowdux.remote.server.middleware.InternalAddSession
+import io.flowdux.remote.server.middleware.InternalPerSessionStateServing
 import io.flowdux.remote.server.middleware.InternalSendToClient
-import io.flowdux.remote.server.middleware.InternalStartServing
-import io.flowdux.remote.server.middleware.InternalStartServingPerSession
-import io.flowdux.remote.server.middleware.MultiClientSyncMiddleware
+import io.flowdux.remote.server.middleware.InternalSessionListener
+import io.flowdux.remote.server.middleware.InternalStateServing
 import io.flowdux.remote.server.session.BroadcastConfig
 import io.flowdux.remote.server.session.InMemorySessionRegistry
 import io.flowdux.remote.server.session.SessionBroadcaster
@@ -103,9 +102,9 @@ class SharedStateServer<S : State, A : Action> internal constructor(
     /**
      * Handle a client connection.
      *
-     * Dispatches [InternalAddSession] to register the session and start listening
-     * for incoming messages. Suspends until cancelled, then removes the session
-     * from the registry directly to ensure cleanup even if the store is closed.
+     * Registers the session in the registry and dispatches [InternalSessionListener]
+     * to start listening for incoming messages. Suspends until cancelled, then removes
+     * the session from the registry directly to ensure cleanup even if the store is closed.
      *
      * @param sessionId Unique identifier for this client session.
      * @param connection Typed connection for sending/receiving actions.
@@ -115,7 +114,8 @@ class SharedStateServer<S : State, A : Action> internal constructor(
         sessionId: String,
         connection: TypedServerConnection<A>,
     ) {
-        store.dispatch(InternalAddSession(sessionId, connection) as A)
+        sessionRegistry.addSession(sessionId, connection)
+        store.dispatch(InternalSessionListener(connection) as A)
         try {
             awaitCancellation()
         } finally {
@@ -187,8 +187,8 @@ fun <S : State, A : Action> createSharedStateServer(
         scope = scope,
     )
 
-    // Start state broadcasting via internal action
-    store.dispatch(InternalStartServing(store.state, stateMapper as (Any) -> Action) as A)
+    // Start state broadcasting via FlowHolderAction directly
+    store.dispatch(InternalStateServing(store.state, stateMapper as (Any) -> Action) as A)
 
     return SharedStateServer(
         sessionRegistry = sessionRegistry,
@@ -231,8 +231,8 @@ fun <S : State, A : Action> createSharedStateServer(
     registry: SessionRegistry<A>,
     stateMapper: (S) -> A,
 ): SharedStateServer<S, A> {
-    // Start state broadcasting via internal action
-    store.dispatch(InternalStartServing(store.state, stateMapper as (Any) -> Action) as A)
+    // Start state broadcasting via FlowHolderAction directly
+    store.dispatch(InternalStateServing(store.state, stateMapper as (Any) -> Action) as A)
 
     return SharedStateServer(
         sessionRegistry = registry,
@@ -281,11 +281,12 @@ fun <S : State, A : Action> createSessionAwareSharedStateServer(
         scope = scope,
     )
 
-    // Start per-session state broadcasting via internal action
+    // Start per-session state broadcasting via FlowHolderAction directly
     store.dispatch(
-        InternalStartServingPerSession(
+        InternalPerSessionStateServing(
             store.state,
             sessionStateMapper as (Any, String) -> Action?,
+            sessionRegistry,
         ) as A,
     )
 
@@ -312,11 +313,12 @@ fun <S : State, A : Action> createSessionAwareSharedStateServer(
     registry: SessionRegistry<A>,
     sessionStateMapper: (S, String) -> A?,
 ): SharedStateServer<S, A> {
-    // Start per-session state broadcasting via internal action
+    // Start per-session state broadcasting via FlowHolderAction directly
     store.dispatch(
-        InternalStartServingPerSession(
+        InternalPerSessionStateServing(
             store.state,
             sessionStateMapper as (Any, String) -> Action?,
+            registry,
         ) as A,
     )
 

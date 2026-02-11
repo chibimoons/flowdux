@@ -8,9 +8,8 @@ import io.flowdux.Store
 import io.flowdux.remote.ClientSharedAction
 import io.flowdux.remote.ServerSharedAction
 import io.flowdux.remote.server.connection.TypedServerConnection
-import io.flowdux.remote.server.middleware.InternalAddSession
-import io.flowdux.remote.server.middleware.InternalRemoveSession
 import io.flowdux.remote.server.middleware.InternalSendToClient
+import io.flowdux.remote.server.middleware.InternalSessionListener
 import io.flowdux.remote.server.middleware.InternalStartListening
 import io.flowdux.remote.server.middleware.SingleClientSyncMiddleware
 import kotlinx.coroutines.channels.Channel
@@ -33,9 +32,6 @@ sealed interface ServerAction : Action {
     // Server-internal only (passes through SRM, reaches reducer)
     data class InternalReset(val value: Int) : ServerAction
 
-    /** Triggers sendToClient helper from within a processor */
-    data class TriggerClientSend(val value: Int) : ServerAction
-
     /** Triggers emit(ClientSharedAction) to test auto-dispatch */
     data class TriggerEmitClientAction(val value: Int) : ServerAction
 }
@@ -48,7 +44,6 @@ val serverReducer = Reducer<ServerState, ServerAction> { state, action ->
         is ServerAction.Increment -> state.copy(count = state.count + 1)
         is ServerAction.SyncState -> state // intercepted by SRM, never reaches reducer
         is ServerAction.InternalReset -> state.copy(count = action.value)
-        is ServerAction.TriggerClientSend -> state // handled by processor, not reducer
         is ServerAction.TriggerEmitClientAction -> state // handled by processor, not reducer
     }
 }
@@ -75,26 +70,9 @@ class ProcessorEmittingMiddleware(
 }
 
 /**
- * Middleware subclass that uses sendToClient helper method in processor.
- */
-class SendToClientTestMiddleware(
-    connection: TypedServerConnection<ServerAction>,
-) : SingleClientSyncMiddleware<ServerState, ServerAction>(
-    connection = connection,
-) {
-    override val processors = buildProcessors {
-        on<ServerAction.TriggerClientSend> { _, action ->
-            // Use sendToClient helper to send directly to client
-            sendToClient(ServerAction.Add(action.value))
-            // Also emit a local action to verify processor runs
-            emit(ServerAction.InternalReset(1))
-        }
-    }
-}
-
-/**
- * Middleware subclass that uses emit() for ClientSharedAction.
- * Works with ClientSharedActionForwarder (via createServerStore) to auto-dispatch.
+ * Middleware subclass that emits a [ClientSharedAction] from a processor.
+ * With [ClientSharedActionForwarder] (via createServerStore), the emitted action
+ * is auto re-dispatched through the middleware pipeline and sent to the client.
  */
 class EmitClientActionTestMiddleware(
     connection: TypedServerConnection<ServerAction>,
@@ -103,8 +81,7 @@ class EmitClientActionTestMiddleware(
 ) {
     override val processors = buildProcessors {
         on<ServerAction.TriggerEmitClientAction> { _, action ->
-            // Use emit() instead of sendToClient()
-            // With ClientSharedActionForwarder, this will be auto re-dispatched
+            // ClientSharedActionForwarder will auto re-dispatch this to the client
             emit(ServerAction.Add(action.value))
             // Also emit a local action to verify processor runs
             emit(ServerAction.InternalReset(1))
@@ -118,19 +95,12 @@ fun <S : State, A : Action> Store<S, A>.dispatchStartListening() {
     dispatch(InternalStartListening() as A)
 }
 
-/** Dispatch [InternalAddSession] via unchecked cast (type-erased at runtime). */
+/** Dispatch [InternalSessionListener] via unchecked cast (type-erased at runtime). */
 @Suppress("UNCHECKED_CAST")
-fun <S : State, A : Action> Store<S, A>.dispatchAddSession(
-    sessionId: String,
+fun <S : State, A : Action> Store<S, A>.dispatchSessionListener(
     connection: TypedServerConnection<*>,
 ) {
-    dispatch(InternalAddSession(sessionId, connection) as A)
-}
-
-/** Dispatch [InternalRemoveSession] via unchecked cast (type-erased at runtime). */
-@Suppress("UNCHECKED_CAST")
-fun <S : State, A : Action> Store<S, A>.dispatchRemoveSession(sessionId: String) {
-    dispatch(InternalRemoveSession(sessionId) as A)
+    dispatch(InternalSessionListener(connection) as A)
 }
 
 /** Dispatch [InternalSendToClient] via unchecked cast (type-erased at runtime). */

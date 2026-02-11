@@ -31,9 +31,6 @@ sealed interface TestAction : Action {
     object Connect : TestAction
     object Disconnect : TestAction
 
-    /** Triggers sendToServer helper from within a processor */
-    data class TriggerServerSend(val value: Int) : TestAction
-
     /** Triggers emit(ServerSharedAction) to test auto-dispatch */
     data class TriggerEmitServerAction(val value: Int) : TestAction
 }
@@ -48,7 +45,6 @@ val testReducer = Reducer<TestState, TestAction> { state, action ->
         is TestAction.LocalIncrement -> state.copy(count = state.count + 1)
         is TestAction.Connect -> state
         is TestAction.Disconnect -> state
-        is TestAction.TriggerServerSend -> state // handled by processor, not reducer
         is TestAction.TriggerEmitServerAction -> state // handled by processor, not reducer
     }
 }
@@ -79,34 +75,9 @@ class TestSyncMiddleware(
 }
 
 /**
- * Test middleware that uses sendToServer helper method in processor.
- */
-class SendToServerTestMiddleware(
-    connection: TypedClientConnection<TestAction>,
-    scope: CoroutineScope? = null,
-) : SyncMiddleware<TestState, TestAction>(
-    connection = connection,
-    scope = scope,
-) {
-    override val processors: ActionProcessorMap<TestState, TestAction> = buildProcessors {
-        on<TestAction.Connect> { _, _ ->
-            startConnection()
-        }
-        on<TestAction.Disconnect> { _, _ ->
-            stopConnection()
-        }
-        on<TestAction.TriggerServerSend> { _, action ->
-            // Use sendToServer helper to send directly to server
-            sendToServer(TestAction.ServerAdd(action.value))
-            // Also emit a local action to verify processor runs
-            emit(TestAction.Add(1))
-        }
-    }
-}
-
-/**
- * Test middleware that uses emit() for ServerSharedAction.
- * Works with ServerSharedActionForwarder (via createClientStore) to auto-dispatch.
+ * Test middleware that emits a [ServerSharedAction] from a processor.
+ * With [ServerSharedActionForwarder] (via createClientStore), the emitted action
+ * is auto re-dispatched through the middleware pipeline and sent to the server.
  */
 class EmitServerActionTestMiddleware(
     connection: TypedClientConnection<TestAction>,
@@ -123,8 +94,7 @@ class EmitServerActionTestMiddleware(
             stopConnection()
         }
         on<TestAction.TriggerEmitServerAction> { _, action ->
-            // Use emit() instead of sendToServer()
-            // With ClientDeliveryMiddleware, this will be auto re-dispatched
+            // ServerSharedActionForwarder will auto re-dispatch this to the server
             emit(TestAction.ServerAdd(action.value))
             // Also emit a local action to verify processor runs
             emit(TestAction.Add(1))
