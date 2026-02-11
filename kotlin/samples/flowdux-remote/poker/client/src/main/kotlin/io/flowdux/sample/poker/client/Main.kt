@@ -3,8 +3,7 @@ package io.flowdux.sample.poker.client
 import io.flowdux.Store
 import io.flowdux.remote.createClientStore
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
-import io.flowdux.remote.serialization.typedJson
-import io.flowdux.remote.serialization.upcast
+import io.flowdux.remote.serialization.typedJsonAs
 import io.flowdux.sample.poker.GamePhase
 import io.flowdux.sample.poker.PokerAction
 import io.flowdux.sample.poker.SharedPokerAction
@@ -160,7 +159,7 @@ private fun createPokerStore(playerId: String): Store<ClientPokerState, PokerAct
         host = "localhost",
         port = 8080,
         path = "/poker/$playerId",
-    ).typedJson<SharedPokerAction>().upcast<SharedPokerAction, PokerAction>()
+    ).typedJsonAs<SharedPokerAction, PokerAction>()
 
     return createClientStore(
         initialState = ClientPokerState(playerId = playerId),

@@ -194,8 +194,7 @@ Use the pattern-based API for easy setup. For manual store creation, use `create
 import io.flowdux.remote.server.pattern.createSingleClientServer
 import io.flowdux.remote.server.serve
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
-import io.flowdux.remote.serialization.typedJson
-import io.flowdux.remote.serialization.upcast
+import io.flowdux.remote.serialization.typedJsonAs
 
 fun main() {
     embeddedServer(CIO, port = 8080) {
@@ -206,8 +205,7 @@ fun main() {
                 println("Client connected")
 
                 val connection = KtorWebSocketServerConnection(this)
-                    .typedJson<SharedChatAction>()
-                    .upcast<SharedChatAction, ChatAction>()
+                    .typedJsonAs<SharedChatAction, ChatAction>()
 
                 // createSingleClientServer handles middleware setup internally
                 val server = createSingleClientServer(
@@ -353,16 +351,14 @@ val clientChatReducer = buildReducer<ClientChatState, ChatAction> {
 ```kotlin
 import io.flowdux.remote.createClientStore
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
-import io.flowdux.remote.serialization.typedJson
-import io.flowdux.remote.serialization.upcast
+import io.flowdux.remote.serialization.typedJsonAs
 
 fun main() = runBlocking {
     val connection = KtorWebSocketClientConnection.create(
         host = "localhost",
         port = 8080,
         path = "/chat",
-    ).typedJson<SharedChatAction>()
-     .upcast<SharedChatAction, ChatAction>()
+    ).typedJsonAs<SharedChatAction, ChatAction>()
 
     // Use createClientStore for automatic ServerSharedAction re-dispatch
     val store = createClientStore(

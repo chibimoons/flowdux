@@ -58,7 +58,7 @@ routing {
         // ── 인증 완료 ────────────────────────────
 
         val connection = KtorWebSocketServerConnection(this)
-            .typedJson<SharedAction>() as TypedServerConnection<GameAction>
+            .typedJsonAs<SharedAction, GameAction>()
 
         server.handleClient(user.id, connection)
     }
@@ -87,7 +87,7 @@ routing {
         }
 
         val connection = KtorWebSocketServerConnection(this)
-            .typedJson<SharedAction>() as TypedServerConnection<GameAction>
+            .typedJsonAs<SharedAction, GameAction>()
 
         server.handleClient(user.id, connection)
     }
@@ -128,7 +128,7 @@ routing {
 
         // auth 메시지는 이미 소비됨 → FlowDux에 들어가지 않음
         val connection = KtorWebSocketServerConnection(this)
-            .typedJson<SharedAction>() as TypedServerConnection<GameAction>
+            .typedJsonAs<SharedAction, GameAction>()
 
         server.handleClient(user.id, connection)
     }
@@ -159,7 +159,7 @@ routing {
         }
 
         val connection = KtorWebSocketServerConnection(this)
-            .typedJson<SharedAction>() as TypedServerConnection<GameAction>
+            .typedJsonAs<SharedAction, GameAction>()
 
         server.handleClient(user.id, connection)
     }
@@ -209,7 +209,7 @@ webSocket("/ws") {
     }
 
     val connection = KtorWebSocketServerConnection(this)
-        .typedJson<SharedAction>() as TypedServerConnection<GameAction>
+        .typedJsonAs<SharedAction, GameAction>()
 
     // 토큰 만료 감시 (FlowDux와 독립)
     val tokenWatcher = launch {

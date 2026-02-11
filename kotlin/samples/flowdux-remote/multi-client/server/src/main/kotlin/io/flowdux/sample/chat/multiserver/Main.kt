@@ -2,8 +2,7 @@ package io.flowdux.sample.chat.multiserver
 
 import io.flowdux.Middleware
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
-import io.flowdux.remote.serialization.typedJson
-import io.flowdux.remote.serialization.upcast
+import io.flowdux.remote.serialization.typedJsonAs
 import io.flowdux.remote.server.pattern.createSharedStateServer
 import io.flowdux.sample.chat.ChatAction
 import io.flowdux.sample.chat.ChatState
@@ -80,8 +79,7 @@ fun main() {
                 println("[Server] Client connected: $sessionId")
 
                 val connection = KtorWebSocketServerConnection(this)
-                    .typedJson<SharedChatAction>()
-                    .upcast<SharedChatAction, ChatAction>()
+                    .typedJsonAs<SharedChatAction, ChatAction>()
 
                 try {
                     server.handleClient(sessionId, connection)
