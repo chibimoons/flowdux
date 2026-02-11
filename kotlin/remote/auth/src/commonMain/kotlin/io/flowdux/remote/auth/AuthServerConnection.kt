@@ -62,6 +62,7 @@ class AuthServerConnection<P : AuthPrincipal>(
      *              Typically the caller's scope (e.g., Ktor's WebSocket session scope).
      * @return [AuthResult] with the verified principal or failure reason.
      */
+    @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun awaitAuth(scope: CoroutineScope): AuthResult<P> {
         // Bridge delegate.incoming into rawChannel
         val bridgeJob = scope.launch {
@@ -69,42 +70,56 @@ class AuthServerConnection<P : AuthPrincipal>(
             rawChannel.close()
         }
 
-        return withTimeoutOrNull(config.handshakeTimeout) {
-            val firstMessage = rawChannel.receive()
+        val result = try {
+            withTimeoutOrNull(config.handshakeTimeout) {
+                val firstMessage = rawChannel.receiveCatching().getOrNull()
+                    ?: return@withTimeoutOrNull AuthResult.Failure("Connection closed before auth")
 
-            if (!AuthProtocol.isAuthMessage(firstMessage)) {
-                val reason = "Expected auth message, got: ${firstMessage.take(50)}"
-                delegate.send(AuthProtocol.encodeAuthError(reason))
-                bridgeJob.cancel()
-                return@withTimeoutOrNull AuthResult.Failure(reason)
-            }
+                if (!AuthProtocol.isAuthMessage(firstMessage)) {
+                    val reason = "Expected auth message, got: ${firstMessage.take(50)}"
+                    delegate.send(AuthProtocol.encodeAuthError(reason))
+                    return@withTimeoutOrNull AuthResult.Failure(reason)
+                }
 
-            val token = AuthProtocol.decodeAuthRequest(firstMessage)
-            when (val result = verifier.verify(token)) {
-                is AuthResult.Success -> {
-                    _principal.complete(result.principal)
-                    delegate.send(AuthProtocol.encodeAuthSuccess())
-                    // Start forwarding remaining messages (filtering auth protocol)
-                    scope.launch {
-                        for (raw in rawChannel) {
-                            if (!AuthProtocol.isAuthMessage(raw)) {
-                                messageChannel.send(raw)
+                val token = try {
+                    AuthProtocol.decodeAuthRequest(firstMessage)
+                } catch (e: Exception) {
+                    val reason = "Malformed auth message: ${e.message}"
+                    delegate.send(AuthProtocol.encodeAuthError(reason))
+                    return@withTimeoutOrNull AuthResult.Failure(reason)
+                }
+
+                when (val result = verifier.verify(token)) {
+                    is AuthResult.Success -> {
+                        _principal.complete(result.principal)
+                        delegate.send(AuthProtocol.encodeAuthSuccess())
+                        // Start forwarding remaining messages (filtering auth protocol)
+                        scope.launch {
+                            for (raw in rawChannel) {
+                                if (!AuthProtocol.isAuthMessage(raw)) {
+                                    messageChannel.send(raw)
+                                }
                             }
+                            messageChannel.close()
                         }
-                        messageChannel.close()
+                        result
                     }
-                    result
-                }
 
-                is AuthResult.Failure -> {
-                    delegate.send(AuthProtocol.encodeAuthError(result.reason))
-                    bridgeJob.cancel()
-                    result
+                    is AuthResult.Failure -> {
+                        delegate.send(AuthProtocol.encodeAuthError(result.reason))
+                        result
+                    }
                 }
+            } ?: AuthResult.Failure("Auth handshake timed out")
+        } finally {
+            // On failure/timeout, clean up channels so consumers don't hang
+            if (!_principal.isCompleted) {
+                bridgeJob.cancel()
+                rawChannel.close()
+                messageChannel.close()
             }
-        } ?: run {
-            bridgeJob.cancel()
-            AuthResult.Failure("Auth handshake timed out")
         }
+
+        return result
     }
 }

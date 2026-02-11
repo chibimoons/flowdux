@@ -2,6 +2,7 @@ package io.flowdux.remote.auth
 
 import app.cash.turbine.turbineScope
 import io.flowdux.remote.ConnectionState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
@@ -104,5 +105,111 @@ class AuthClientConnectionTest {
         }
 
         assertEquals("Auth handshake timed out", ex.message)
+    }
+
+    @Test
+    fun preAuthMessages_areNotForwarded() = runTest {
+        val mock = MockClientConnection()
+        val authConn = AuthClientConnection(
+            delegate = mock,
+            credentialProvider = CredentialProvider { "token" },
+        )
+
+        val connectJob = launch { authConn.connect() }
+
+        // Send a non-auth message BEFORE auth completes
+        mock.simulateIncoming("""{"data":"pre-auth-message"}""")
+
+        // Now complete auth handshake
+        mock.simulateIncoming(AuthProtocol.encodeAuthSuccess())
+        authConn.connectionState.first { it == ConnectionState.CONNECTED }
+
+        turbineScope {
+            val messages = authConn.incoming.testIn(backgroundScope)
+
+            // Send a message after auth — this one should come through
+            mock.simulateIncoming("""{"data":"post-auth-message"}""")
+            assertEquals("""{"data":"post-auth-message"}""", messages.awaitItem())
+
+            // The pre-auth message should NOT have been forwarded
+            messages.expectNoEvents()
+
+            messages.cancel()
+        }
+
+        connectJob.cancel()
+    }
+
+    @Test
+    fun connectionState_becomesDisconnectedAfterTransportCloses() = runTest {
+        val mock = MockClientConnection()
+        val authConn = AuthClientConnection(
+            delegate = mock,
+            credentialProvider = CredentialProvider { "token" },
+        )
+
+        val connectJob = launch { authConn.connect() }
+
+        // Complete auth
+        mock.simulateIncoming(AuthProtocol.encodeAuthSuccess())
+        authConn.connectionState.first { it == ConnectionState.CONNECTED }
+
+        // Simulate transport disconnect by cancelling the connect job
+        connectJob.cancel()
+        delay(100)
+
+        // Connection state should be DISCONNECTED after connect() completes
+        assertEquals(ConnectionState.DISCONNECTED, authConn.connectionState.value)
+    }
+
+    @Test
+    fun sendBeforeAuth_suspendsUntilAuthThenProceeds() = runTest {
+        val mock = MockClientConnection()
+        val authConn = AuthClientConnection(
+            delegate = mock,
+            credentialProvider = CredentialProvider { "token" },
+        )
+
+        val connectJob = launch { authConn.connect() }
+
+        // Launch a send before auth completes — should suspend
+        val sendJob = launch { authConn.send("hello") }
+        delay(50)
+
+        // Send has not completed yet (still suspending on auth)
+        assertTrue(sendJob.isActive)
+
+        // Complete auth
+        mock.simulateIncoming(AuthProtocol.encodeAuthSuccess())
+        authConn.connectionState.first { it == ConnectionState.CONNECTED }
+
+        // Wait for send to complete
+        sendJob.join()
+
+        // Verify the message was sent via delegate (after auth request)
+        assertTrue(mock.sentMessages.size >= 2) // auth request + "hello"
+        assertEquals("hello", mock.sentMessages.last())
+
+        connectJob.cancel()
+    }
+
+    @Test
+    fun sendAfterAuthFailure_throwsAuthenticationException() = runTest {
+        val mock = MockClientConnection()
+        val authConn = AuthClientConnection(
+            delegate = mock,
+            credentialProvider = CredentialProvider { "bad-token" },
+        )
+
+        // Connect and fail auth
+        launch {
+            mock.simulateIncoming(AuthProtocol.encodeAuthError("Invalid"))
+        }
+        assertFailsWith<AuthenticationException> { authConn.connect() }
+
+        // Send after failure should throw
+        assertFailsWith<AuthenticationException> {
+            authConn.send("should-fail")
+        }
     }
 }

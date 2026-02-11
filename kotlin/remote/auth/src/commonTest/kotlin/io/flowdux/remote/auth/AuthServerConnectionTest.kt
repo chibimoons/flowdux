@@ -156,4 +156,59 @@ class AuthServerConnectionTest {
             messages.cancel()
         }
     }
+
+    @Test
+    fun connectionClosedBeforeAuth_returnsFailure() = runTest {
+        val mock = MockServerConnection()
+        val authConn = AuthServerConnection(
+            delegate = mock,
+            verifier = acceptAllVerifier,
+        )
+
+        // Close the connection before sending any message
+        mock.closeIncoming()
+
+        val result = authConn.awaitAuth(backgroundScope)
+
+        assertIs<AuthResult.Failure>(result)
+        assertEquals("Connection closed before auth", result.reason)
+    }
+
+    @Test
+    fun malformedAuthMessage_returnsFailure() = runTest {
+        val mock = MockServerConnection()
+        val authConn = AuthServerConnection(
+            delegate = mock,
+            verifier = acceptAllVerifier,
+        )
+
+        // Send an auth message with missing token field
+        mock.simulateIncoming("""{"type":"auth"}""")
+
+        val result = authConn.awaitAuth(backgroundScope)
+
+        assertIs<AuthResult.Failure>(result)
+        assertTrue(result.reason.contains("Malformed auth message"))
+
+        // Verify auth_error was sent back
+        assertTrue(mock.sentMessages.any { it.contains("auth_error") })
+    }
+
+    @Test
+    fun authOkAsFirstMessage_returnsFailure() = runTest {
+        val mock = MockServerConnection()
+        val authConn = AuthServerConnection(
+            delegate = mock,
+            verifier = acceptAllVerifier,
+        )
+
+        // Client sends auth_ok instead of auth request — unexpected auth type
+        mock.simulateIncoming(AuthProtocol.encodeAuthSuccess())
+
+        val result = authConn.awaitAuth(backgroundScope)
+
+        assertIs<AuthResult.Failure>(result)
+        // isAuthMessage returns true for auth_ok, but decodeAuthRequest fails (no token)
+        assertTrue(result.reason.contains("Malformed auth message"))
+    }
 }
