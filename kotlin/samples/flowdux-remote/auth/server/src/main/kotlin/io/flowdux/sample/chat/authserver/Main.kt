@@ -3,6 +3,7 @@ package io.flowdux.sample.chat.authserver
 import io.flowdux.Middleware
 import io.flowdux.remote.auth.server.AuthResult
 import io.flowdux.remote.auth.server.AuthVerifier
+import io.flowdux.remote.auth.server.getOrElse
 import io.flowdux.remote.auth.server.withAuth
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.serialization.typedJsonAs
@@ -70,25 +71,20 @@ fun main() {
                 val authed = KtorWebSocketServerConnection(this)
                     .withAuth(tokenVerifier)
 
-                when (val result = authed.awaitAuth(this)) {
-                    is AuthResult.Success -> {
-                        val sessionId = result.principal.userId
-                        println("[Server] Authenticated: ${result.principal.displayName} ($sessionId)")
+                val principal = authed.awaitAuth(this).getOrElse { reason ->
+                    println("[Server] Auth failed: $reason")
+                    close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, reason))
+                    return@webSocket
+                }
 
-                        val connection = authed
-                            .typedJsonAs<SharedChatAction, ChatAction>()
+                println("[Server] Authenticated: ${principal.displayName} (${principal.userId})")
 
-                        try {
-                            server.handleClient(sessionId, connection)
-                        } finally {
-                            println("[Server] Disconnected: $sessionId")
-                        }
-                    }
+                val connection = authed.typedJsonAs<SharedChatAction, ChatAction>()
 
-                    is AuthResult.Failure -> {
-                        println("[Server] Auth failed: ${result.reason}")
-                        close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, result.reason))
-                    }
+                try {
+                    server.handleClient(principal.userId, connection)
+                } finally {
+                    println("[Server] Disconnected: ${principal.userId}")
                 }
             }
         }

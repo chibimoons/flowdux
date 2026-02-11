@@ -21,13 +21,14 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Usage:
  * ```kotlin
  * val authed = KtorWebSocketServerConnection(session).withAuth(jwtVerifier)
- * when (val result = authed.awaitAuth(this)) {
- *     is AuthResult.Success -> {
- *         val userId = result.principal.userId
- *         // use authed as a normal ServerConnection
- *     }
- *     is AuthResult.Failure -> session.close(...)
+ *
+ * val principal = authed.awaitAuth(scope).getOrElse { reason ->
+ *     session.close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, reason))
+ *     return@webSocket
  * }
+ *
+ * // use authed as a normal ServerConnection
+ * server.handleClient(principal.userId, authed.typedJsonAs<...>())
  * ```
  */
 class AuthServerConnection<P : AuthPrincipal>(

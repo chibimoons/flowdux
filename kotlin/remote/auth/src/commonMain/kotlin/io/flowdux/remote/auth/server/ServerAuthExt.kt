@@ -8,10 +8,14 @@ import io.flowdux.remote.server.connection.ServerConnection
  *
  * ```kotlin
  * val authed = KtorWebSocketServerConnection(session).withAuth(jwtVerifier)
- * when (val result = authed.awaitAuth()) {
- *     is AuthResult.Success -> { /* use authed as ServerConnection */ }
- *     is AuthResult.Failure -> session.close(...)
+ *
+ * val principal = authed.awaitAuth(scope).getOrElse { reason ->
+ *     session.close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, reason))
+ *     return@webSocket
  * }
+ *
+ * // use authed as a normal ServerConnection
+ * server.handleClient(principal.userId, authed.typedJsonAs<...>())
  * ```
  */
 fun <P : AuthPrincipal> ServerConnection.withAuth(
