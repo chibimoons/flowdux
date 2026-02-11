@@ -1,7 +1,7 @@
 package io.flowdux.sample.chat.authclient
 
 import io.flowdux.Store
-import io.flowdux.remote.auth.withAuth
+import io.flowdux.remote.auth.client.withAuth
 import io.flowdux.remote.createClientStore
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.serialization.typedJsonAs

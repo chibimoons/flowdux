@@ -1,4 +1,4 @@
-package io.flowdux.remote.auth
+package io.flowdux.remote.auth.client
 
 /**
  * Client-side provider for authentication credentials (token string).

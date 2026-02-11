@@ -2,6 +2,9 @@ package io.flowdux.remote.auth
 
 import io.flowdux.remote.ClientConnection
 import io.flowdux.remote.ConnectionState
+import io.flowdux.remote.auth.server.AuthPrincipal
+import io.flowdux.remote.auth.server.AuthResult
+import io.flowdux.remote.auth.server.AuthVerifier
 import io.flowdux.remote.server.connection.ServerConnection
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.Channel

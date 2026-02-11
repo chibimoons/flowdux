@@ -1,9 +1,9 @@
 package io.flowdux.sample.chat.authserver
 
 import io.flowdux.Middleware
-import io.flowdux.remote.auth.AuthResult
-import io.flowdux.remote.auth.AuthVerifier
-import io.flowdux.remote.auth.withAuth
+import io.flowdux.remote.auth.server.AuthResult
+import io.flowdux.remote.auth.server.AuthVerifier
+import io.flowdux.remote.auth.server.withAuth
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.serialization.typedJsonAs
 import io.flowdux.remote.server.pattern.createSharedStateServer

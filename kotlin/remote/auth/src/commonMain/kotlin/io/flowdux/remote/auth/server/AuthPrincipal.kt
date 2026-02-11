@@ -1,4 +1,4 @@
-package io.flowdux.remote.auth
+package io.flowdux.remote.auth.server
 
 /**
  * Marker interface for a verified authentication principal.

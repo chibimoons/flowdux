@@ -1,4 +1,4 @@
-package io.flowdux.remote.auth
+package io.flowdux.remote.auth.server
 
 /**
  * Server-side token verifier that produces a principal on success.

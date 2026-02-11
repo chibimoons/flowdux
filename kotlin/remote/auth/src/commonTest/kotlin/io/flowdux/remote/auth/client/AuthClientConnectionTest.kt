@@ -1,7 +1,11 @@
-package io.flowdux.remote.auth
+package io.flowdux.remote.auth.client
 
 import app.cash.turbine.turbineScope
 import io.flowdux.remote.ConnectionState
+import io.flowdux.remote.auth.AuthConfig
+import io.flowdux.remote.auth.AuthProtocol
+import io.flowdux.remote.auth.AuthenticationException
+import io.flowdux.remote.auth.MockClientConnection
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

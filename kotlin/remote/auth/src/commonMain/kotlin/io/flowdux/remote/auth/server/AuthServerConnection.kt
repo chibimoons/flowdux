@@ -1,5 +1,7 @@
-package io.flowdux.remote.auth
+package io.flowdux.remote.auth.server
 
+import io.flowdux.remote.auth.AuthConfig
+import io.flowdux.remote.auth.AuthProtocol
 import io.flowdux.remote.server.connection.ServerConnection
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
