@@ -157,13 +157,15 @@ class ClientConnectionMultiplexer<A : Action>(
                     throw e
                 }
             } finally {
-                connecting.store(false)
                 // Transport error: clean up physical connection to avoid zombie state
                 // (routing dead but connection alive). Skipped on normal cancellation
                 // since disconnect()/close() already handle cleanup.
+                // Must disconnect before resetting connecting flag to prevent a
+                // concurrent connect() from starting a new connection that we then kill.
                 if (transportError != null) {
                     physicalConnection.disconnect()
                 }
+                connecting.store(false)
             }
         }
     }
