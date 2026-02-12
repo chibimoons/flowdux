@@ -153,7 +153,8 @@ val roomServer = createSharedStateRoomServer(
 )
 
 // Multiplexer의 onUnknownRoom 콜백에서 방 생성
-val multiplexer = ServerConnectionMultiplexer(
+lateinit var multiplexer: ServerConnectionMultiplexer<SharedChatAction>
+multiplexer = ServerConnectionMultiplexer(
     physicalConnection,
     this,
     onUnknownRoom = { roomId, action ->
@@ -207,6 +208,7 @@ suspend fun joinRoom(roomId: String): Store<ClientRoomState, ChatAction> {
 suspend fun leaveRoom(roomId: String) {
     stores.remove(roomId)?.let { store ->
         store.dispatch(SharedChatAction.LeaveRoom(username))
+        store.close()
     }
     multiplexer.removeRoom(roomId)
 }

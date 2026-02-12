@@ -90,10 +90,12 @@ class ClientConnectionMultiplexer<A : Action>(
                 throw e
             } catch (e: Exception) {
                 if (onEvent != null) {
-                    onEvent.invoke(MultiplexerEvent.RoutingStopped(e))
+                    onEvent.invoke(MultiplexerEvent.ConnectionFailed(e))
                 } else {
                     throw e
                 }
+            } finally {
+                connecting.store(false)
             }
         }
     }
@@ -105,6 +107,7 @@ class ClientConnectionMultiplexer<A : Action>(
      * Use [removeRoom] to clean up individual rooms, or [close] to shut down entirely.
      */
     suspend fun disconnect() {
+        connecting.store(false)
         routingJob?.cancel()
         connectJob?.cancel()
         val callerJob = currentCoroutineContext()[Job]
@@ -116,7 +119,6 @@ class ClientConnectionMultiplexer<A : Action>(
         }
         routingJob = null
         connectJob = null
-        connecting.store(false)
         physicalConnection.disconnect()
     }
 
@@ -211,6 +213,7 @@ class ClientConnectionMultiplexer<A : Action>(
             connections
         }
         virtualConnections.forEach { it.channel.close() }
+        connecting.store(false)
         routingJob?.cancel()
         connectJob?.cancel()
         // Guard against self-join to avoid deadlock if close() is called
@@ -224,7 +227,6 @@ class ClientConnectionMultiplexer<A : Action>(
         }
         routingJob = null
         connectJob = null
-        connecting.store(false)
         physicalConnection.disconnect()
     }
 
