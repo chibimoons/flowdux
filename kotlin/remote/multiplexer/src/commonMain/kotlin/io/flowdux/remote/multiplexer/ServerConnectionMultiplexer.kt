@@ -6,6 +6,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -26,10 +27,14 @@ import kotlinx.coroutines.sync.withLock
  *     val physical = KtorWebSocketServerConnection(this)
  *         .typedRoutedJson<SharedChatAction>()
  *
- *     val mux = ServerConnectionMultiplexer(physical, this) { roomId, action ->
- *         // Handle action for unknown room (e.g., JoinRoom)
- *         handleNewRoom(roomId, action)
- *     }
+ *     val mux = ServerConnectionMultiplexer(
+ *         physicalConnection = physical,
+ *         scope = this,
+ *         onUnknownRoom = { roomId, action ->
+ *             // Handle action for unknown room (e.g., JoinRoom)
+ *             handleNewRoom(roomId, action)
+ *         },
+ *     )
  *
  *     // When client requests to join a room
  *     val virtualConn = mux.getOrCreateRoom("room-1")
@@ -42,11 +47,15 @@ import kotlinx.coroutines.sync.withLock
  * @param scope The coroutine scope for the routing job
  * @param onUnknownRoom Optional callback invoked when an action arrives for an unknown room.
  *        This allows dynamic room creation (e.g., for JoinRoom actions).
+ * @param onEvent Optional callback for routing events (message drops, errors).
+ *        When provided, transport exceptions are reported via [MultiplexerEvent.RoutingStopped].
+ *        When absent, transport exceptions propagate to [scope] via structured concurrency.
  */
 class ServerConnectionMultiplexer<A : Action>(
     private val physicalConnection: TypedServerConnection<RoutedAction<A>>,
     private val scope: CoroutineScope,
     private val onUnknownRoom: (suspend (roomId: String, action: A) -> Unit)? = null,
+    private val onEvent: ((MultiplexerEvent) -> Unit)? = null,
 ) {
     private val mutex = Mutex()
     private val rooms = mutableMapOf<String, VirtualServerConnection>()
@@ -64,18 +73,39 @@ class ServerConnectionMultiplexer<A : Action>(
                     val roomId = routedAction.roomId
                     val virtualConnection = mutex.withLock { rooms[roomId] }
                     if (virtualConnection != null) {
-                        virtualConnection.channel.send(routedAction.action)
+                        val result = virtualConnection.channel.trySend(routedAction.action)
+                        if (result.isFailure) {
+                            safeOnEvent(MultiplexerEvent.MessageDropped(roomId))
+                        }
                     } else if (onUnknownRoom != null) {
-                        // Invoke callback for unknown room (e.g., to handle JoinRoom)
-                        onUnknownRoom.invoke(roomId, routedAction.action)
+                        try {
+                            onUnknownRoom.invoke(roomId, routedAction.action)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            safeOnEvent(MultiplexerEvent.CallbackFailed(roomId, e))
+                        }
                     }
                     // If no callback and unknown room: silent drop
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
-                // Connection closed or error
+            } catch (e: Exception) {
+                // Physical connection closed or transport error — routing stops.
+                if (onEvent != null) {
+                    safeOnEvent(MultiplexerEvent.RoutingStopped(e))
+                } else {
+                    throw e
+                }
             }
+        }
+    }
+
+    private fun safeOnEvent(event: MultiplexerEvent) {
+        try {
+            onEvent?.invoke(event)
+        } catch (_: Exception) {
+            // Never let a faulty event handler break routing
         }
     }
 
@@ -121,6 +151,9 @@ class ServerConnectionMultiplexer<A : Action>(
 
     /**
      * Closes the multiplexer and all virtual connections.
+     *
+     * Cancels the routing job, closes all virtual connection channels,
+     * and clears the room registry. After closing, no new rooms can be created.
      */
     suspend fun close() {
         val virtualConnections = mutex.withLock {
@@ -131,6 +164,13 @@ class ServerConnectionMultiplexer<A : Action>(
         }
         virtualConnections.forEach { it.channel.close() }
         routingJob?.cancel()
+        // Guard against self-join: skip join() if called from within the routing
+        // coroutine (e.g., from onUnknownRoom callback) to avoid deadlock.
+        val callerJob = currentCoroutineContext()[Job]
+        if (routingJob != null && callerJob != routingJob) {
+            routingJob?.join()
+        }
+        routingJob = null
     }
 
     private inner class VirtualServerConnection(

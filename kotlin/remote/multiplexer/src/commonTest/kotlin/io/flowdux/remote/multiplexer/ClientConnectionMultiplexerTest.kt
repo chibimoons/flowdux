@@ -3,6 +3,8 @@ package io.flowdux.remote.multiplexer
 import io.flowdux.Action
 import io.flowdux.remote.ConnectionState
 import io.flowdux.remote.TypedClientConnection
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -268,6 +270,127 @@ class ClientConnectionMultiplexerTest {
         mux.connect()
 
         assertFalse(mux.hasRoom("nonexistent"))
+
+        mux.close()
+    }
+
+    // --- Concurrency tests ---
+
+    @Test
+    fun concurrentGetOrCreateRoomReturnsSameInstance() = runTest {
+        val physical = FakeTypedClientConnection<TestAction>()
+        val mux = ClientConnectionMultiplexer(physical, this)
+        mux.connect()
+
+        val results = (1..10).map {
+            async { mux.getOrCreateRoom("shared-room") }
+        }.awaitAll()
+
+        // All should be the same instance
+        val first = results.first()
+        results.forEach { assertTrue(it === first) }
+        assertEquals(setOf("shared-room"), mux.roomIds())
+
+        mux.close()
+    }
+
+    @Test
+    fun concurrentRemoveRoomIsSafe() = runTest {
+        val physical = FakeTypedClientConnection<TestAction>()
+        val mux = ClientConnectionMultiplexer(physical, this)
+        mux.connect()
+
+        mux.getOrCreateRoom("room-1")
+
+        // Multiple concurrent removes should not throw
+        val jobs = (1..5).map {
+            async { mux.removeRoom("room-1") }
+        }
+        jobs.awaitAll()
+
+        assertFalse(mux.hasRoom("room-1"))
+        mux.close()
+    }
+
+    @Test
+    fun rapidCreateRemoveCreateLifecycle() = runTest {
+        val physical = FakeTypedClientConnection<TestAction>()
+        val mux = ClientConnectionMultiplexer(physical, this)
+        mux.connect()
+
+        val room1 = mux.getOrCreateRoom("room-1")
+        mux.removeRoom("room-1")
+        val room2 = mux.getOrCreateRoom("room-1")
+
+        // After remove and recreate, should be a new instance
+        assertFalse(room1 === room2)
+        assertTrue(mux.hasRoom("room-1"))
+
+        mux.close()
+    }
+
+    // --- connect() idempotency tests ---
+
+    @Test
+    fun multipleConnectCallsAreIdempotent() = runTest {
+        val physical = FakeTypedClientConnection<TestAction>()
+        val mux = ClientConnectionMultiplexer(physical, this)
+
+        // Call connect multiple times
+        mux.connect()
+        mux.connect()
+        mux.connect()
+
+        testScheduler.advanceUntilIdle()
+
+        // Should still work correctly with single routing
+        val room1 = mux.getOrCreateRoom("room-1")
+        val room1Actions = mutableListOf<TestAction>()
+
+        val job = launch {
+            room1.incoming.take(1).toList(room1Actions)
+        }
+        yield()
+
+        physical.simulateIncoming(routed("room-1", TestAction.Message("hello")))
+
+        withTimeout(1000) { job.join() }
+
+        val expectedRoom1: List<TestAction> = listOf(TestAction.Message("hello"))
+        assertEquals(expectedRoom1, room1Actions)
+
+        mux.close()
+    }
+
+    @Test
+    fun disconnectAndReconnectWorks() = runTest {
+        val physical = FakeTypedClientConnection<TestAction>()
+        val mux = ClientConnectionMultiplexer(physical, this)
+
+        mux.connect()
+        testScheduler.advanceUntilIdle()
+        assertEquals(ConnectionState.CONNECTED, mux.connectionState.value)
+
+        mux.disconnect()
+        assertEquals(ConnectionState.DISCONNECTED, mux.connectionState.value)
+
+        // Should be able to connect again after disconnect
+        mux.connect()
+        testScheduler.advanceUntilIdle()
+        assertEquals(ConnectionState.CONNECTED, mux.connectionState.value)
+
+        mux.close()
+    }
+
+    @Test
+    fun removeRoomForNonexistentRoomIsSafe() = runTest {
+        val physical = FakeTypedClientConnection<TestAction>()
+        val mux = ClientConnectionMultiplexer(physical, this)
+        mux.connect()
+
+        // Should not throw
+        mux.removeRoom("nonexistent")
+        assertEquals(emptySet(), mux.roomIds())
 
         mux.close()
     }

@@ -141,10 +141,14 @@ fun main() {
                 clientSessions[sessionId] = clientSession
 
                 // Create multiplexer for this client with callback for unknown rooms
-                val multiplexer = ServerConnectionMultiplexer(physicalConnection, this) { roomId, action ->
-                    // Handle actions for unknown rooms (e.g., JoinRoom)
-                    clientSession.handleAction(roomId, action, this@webSocket)
-                }
+                val multiplexer = ServerConnectionMultiplexer(
+                    physicalConnection = physicalConnection,
+                    scope = this,
+                    onUnknownRoom = { roomId, action ->
+                        // Handle actions for unknown rooms (e.g., JoinRoom)
+                        clientSession.handleAction(roomId, action, this@webSocket)
+                    },
+                )
                 clientSession.setMultiplexer(multiplexer)
 
                 try {
