@@ -101,7 +101,11 @@ gh run view <run-id> --log-failed
 
 ```bash
 gh pr checks <pr-number>
-gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments | jq '[.[] | select(.in_reply_to_id == null)] | length'
+gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments | jq '
+  ( [.[].in_reply_to_id] | unique ) as $replied_ids
+  | [ .[] | select(.in_reply_to_id == null and (.id | IN($replied_ids[]) | not)) ]
+  | length
+'
 ```
 
 - CI 모두 통과 ✓

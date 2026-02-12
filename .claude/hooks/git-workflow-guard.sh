@@ -14,12 +14,27 @@ if ! echo "$INPUT" | grep -qE '"git push|"gh pr create|"git tag'; then
   exit 0
 fi
 
+# Guard: jq is required for JSON parsing
+if ! command -v jq >/dev/null 2>&1; then
+  exit 0
+fi
+
 # Only parse with jq if we matched
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 if echo "$COMMAND" | grep -qE "git push|gh pr create|git tag"; then
-  CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
-  RULES_FILE="${CWD:-.}/docs/dev/git-workflow.md"
+  # Resolve repository root
+  if [ -n "$CLAUDE_PROJECT_DIR" ]; then
+    REPO_ROOT="$CLAUDE_PROJECT_DIR"
+  else
+    REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "")
+    if [ -z "$REPO_ROOT" ]; then
+      CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
+      REPO_ROOT="${CWD:-.}"
+    fi
+  fi
+
+  RULES_FILE="$REPO_ROOT/docs/dev/git-workflow.md"
 
   if [ -f "$RULES_FILE" ]; then
     echo "[Git Workflow Rules — 아래 규칙을 반드시 확인하세요]" >&2

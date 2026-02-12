@@ -9,7 +9,7 @@ FlowDux 프로젝트에서 Claude Code를 효과적으로 사용하기 위한 �
 | 파일 | 로드 시점 | 제한 | 용도 |
 |------|----------|------|------|
 | `CLAUDE.md` (프로젝트 루트) | 항상 (세션 시작) | 없음 | 핵심 규칙, 프로젝트 컨텍스트 |
-| `CLAUDE.local.md` (프로젝트 루트) | 항상 (세션 시작) | 없음 | 로컬 전용 설정 (gitignore 대상) |
+| `CLAUDE.local.md` (프로젝트 루트) | 항상 (세션 시작) | 없음 | 로컬 전용 설정 (`.gitignore`에 추가 권장) |
 | `~/.claude/CLAUDE.md` | 항상 (세션 시작) | 없음 | 사용자 전역 설정 |
 | `MEMORY.md` (auto memory) | 항상 (세션 시작) | **200줄 초과 시 truncate** | 세션 간 학습 내용 유지 |
 
@@ -139,7 +139,7 @@ Claude Code Hooks를 사용하여 특정 도구 실행 시 자동으로 규칙 �
 |------|------|------|
 | `~/.claude/settings.json` | 전역 (모든 프로젝트) | X |
 | `.claude/settings.json` | 프로젝트 | O (git commit 가능) |
-| `.claude/settings.local.json` | 프로젝트 (개인) | X (gitignore) |
+| `.claude/settings.local.json` | 프로젝트 (개인) | X (`.gitignore`에 추가 권장) |
 
 ### Hook 이벤트 종류
 
