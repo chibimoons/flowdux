@@ -399,6 +399,7 @@ See `kotlin/samples/flowdux-remote/simple` for a complete working example.
 ## Next Steps
 
 - [Remote Authentication](./remote-authentication.md) — In-band WebSocket auth handshake (AuthVerifier, AuthPrincipal)
+- [JWT Integration](./jwt-integration.md) — HS256, Firebase Auth, Supabase Auth integration guide
 - [Server Patterns Overview](./server-patterns.md) — Pattern selection guide (Single Client, Shared State, Room, Per-Client)
 - [Scaling Architecture](./scaling.md) — Parallel broadcast for large-scale deployments
 - [Room Pattern](./pattern-room.md) — Multi-room management, session-aware broadcasting
