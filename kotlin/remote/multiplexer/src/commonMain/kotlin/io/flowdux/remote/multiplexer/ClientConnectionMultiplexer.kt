@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -88,7 +89,10 @@ class ClientConnectionMultiplexer<A : Action>(
      */
     suspend fun disconnect() {
         routingJob?.cancel()
-        routingJob?.join()
+        val callerJob = currentCoroutineContext()[Job]
+        if (routingJob != null && callerJob != routingJob) {
+            routingJob?.join()
+        }
         routingJob = null
         connecting.store(false)
         physicalConnection.disconnect()
@@ -114,6 +118,10 @@ class ClientConnectionMultiplexer<A : Action>(
                 // Physical connection closed or transport error — routing stops.
                 // This is expected when the server disconnects or the network drops.
                 println("ClientConnectionMultiplexer: routing stopped (${e.message})")
+            } finally {
+                // Reset connecting flag so connect() can be called again after
+                // routing stops due to transport errors or end of incoming flow.
+                connecting.store(false)
             }
         }
     }
@@ -174,7 +182,12 @@ class ClientConnectionMultiplexer<A : Action>(
         }
         virtualConnections.forEach { it.channel.close() }
         routingJob?.cancel()
-        routingJob?.join()
+        // Guard against self-join to avoid deadlock if close() is called
+        // from within the routing coroutine.
+        val callerJob = currentCoroutineContext()[Job]
+        if (routingJob != null && callerJob != routingJob) {
+            routingJob?.join()
+        }
         routingJob = null
         connecting.store(false)
         physicalConnection.disconnect()

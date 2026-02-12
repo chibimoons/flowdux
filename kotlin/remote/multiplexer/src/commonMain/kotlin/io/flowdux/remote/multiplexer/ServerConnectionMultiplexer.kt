@@ -6,6 +6,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -145,7 +146,12 @@ class ServerConnectionMultiplexer<A : Action>(
         }
         virtualConnections.forEach { it.channel.close() }
         routingJob?.cancel()
-        routingJob?.join()
+        // Guard against self-join: skip join() if called from within the routing
+        // coroutine (e.g., from onUnknownRoom callback) to avoid deadlock.
+        val callerJob = currentCoroutineContext()[Job]
+        if (routingJob != null && callerJob != routingJob) {
+            routingJob?.join()
+        }
         routingJob = null
     }
 
