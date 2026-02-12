@@ -77,8 +77,7 @@ client/                           # 클라이언트 모듈
 import io.flowdux.remote.server.pattern.createSingleClientServer
 import io.flowdux.remote.server.serve
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
-import io.flowdux.remote.serialization.typedJson
-import io.flowdux.remote.serialization.upcast
+import io.flowdux.remote.serialization.typedJsonAs
 
 fun main() {
     embeddedServer(CIO, port = 8080) {
@@ -89,8 +88,7 @@ fun main() {
                 println("Client connected")
 
                 val connection = KtorWebSocketServerConnection(this)
-                    .typedJson<SharedUserAction>()
-                    .upcast<SharedUserAction, UserAction>()
+                    .typedJsonAs<SharedUserAction, UserAction>()
 
                 // createSingleClientServer 팩토리 사용 (내부적으로 SingleClientSyncMiddleware 설정)
                 val server = createSingleClientServer(
@@ -244,16 +242,14 @@ class UserRemoteMiddleware(
 ```kotlin
 import io.flowdux.createStore
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
-import io.flowdux.remote.serialization.typedJson
-import io.flowdux.remote.serialization.upcast
+import io.flowdux.remote.serialization.typedJsonAs
 
 suspend fun main() {
     val connection = KtorWebSocketClientConnection.create(
         host = "localhost",
         port = 8080,
         path = "/ws",
-    ).typedJson<SharedUserAction>()
-     .upcast<SharedUserAction, UserAction>()
+    ).typedJsonAs<SharedUserAction, UserAction>()
 
     val store = createStore(
         initialState = UserState(),

@@ -82,7 +82,7 @@ val chatRoom = createSharedStateServer(
 webSocket("/chat") {
     val sessionId = UUID.randomUUID().toString()
     val connection = KtorWebSocketServerConnection(this)
-        .typedJson<SharedChatAction>() as TypedServerConnection<ChatAction>
+        .typedJsonAs<SharedChatAction, ChatAction>()
 
     chatRoom.handleClient(sessionId, connection)
 }
@@ -239,7 +239,7 @@ routing {
         val sessionId = UUID.randomUUID().toString()
 
         val connection = KtorWebSocketServerConnection(this)
-            .typedJson<SharedChatAction>() as TypedServerConnection<ChatAction>
+            .typedJsonAs<SharedChatAction, ChatAction>()
 
         println("[$roomId] Client $sessionId joined")
 
@@ -297,7 +297,7 @@ fun connectToRoom(roomId: String): Store<ClientChatState, ChatAction> {
         host = "localhost",
         port = 8080,
         path = "/room/$roomId",  // 방 ID를 경로에 포함
-    ).typedJson<SharedChatAction>() as TypedClientConnection<ChatAction>
+    ).typedJsonAs<SharedChatAction, ChatAction>()
 
     return createStore(
         initialState = ClientChatState(),

@@ -121,8 +121,7 @@ val chatRoom = createSharedStateServer(
 
 webSocket("/chat") {
     val connection = KtorWebSocketServerConnection(this)
-        .typedJson<SharedChatAction>()
-        .upcast<SharedChatAction, ChatAction>()
+        .typedJsonAs<SharedChatAction, ChatAction>()
     chatRoom.handleClient(sessionId, connection)
 }
 

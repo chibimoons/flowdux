@@ -269,8 +269,7 @@ fun main() {
             webSocket("/chat") {
                 val sessionId = UUID.randomUUID().toString()
                 val connection = KtorWebSocketServerConnection(this)
-                    .typedJson<SharedChatAction>()
-                    .upcast<SharedChatAction, ChatAction>()
+                    .typedJsonAs<SharedChatAction, ChatAction>()
 
                 server.handleClient(sessionId, connection)
             }

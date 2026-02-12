@@ -2,8 +2,7 @@ package io.flowdux.sample.scaling
 
 import io.flowdux.Middleware
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
-import io.flowdux.remote.serialization.typedJson
-import io.flowdux.remote.serialization.upcast
+import io.flowdux.remote.serialization.typedJsonAs
 import io.flowdux.remote.server.session.BroadcastConfig
 import io.flowdux.remote.server.session.InMemorySessionRegistry
 import io.flowdux.remote.server.pattern.createSharedStateServer
@@ -161,8 +160,7 @@ fun main() {
                 server.store.dispatch(ServerScalingAction.ClientConnected(clientId))
 
                 val connection = KtorWebSocketServerConnection(this)
-                    .typedJson<SharedScalingAction>()
-                    .upcast<SharedScalingAction, ScalingAction>()
+                    .typedJsonAs<SharedScalingAction, ScalingAction>()
 
                 try {
                     // Send initial state

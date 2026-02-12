@@ -16,6 +16,7 @@ FlowDux 샘플 앱 가이드입니다. 각 샘플은 특정 기능이나 패턴�
 | [remote-multiroom](#remote-multi-room-sample) | Room Store (다중 방) | JVM | 독립된 여러 방 관리 |
 | [remote-scaling](#remote-scaling-sample) | 병렬 브로드캐스트, 스케일링 | JVM | 대규모 동시 연결 |
 | [remote-poker](#remote-poker-sample) | Per-Client Store | JVM | 비공개 상태 관리 (포커) |
+| [remote-auth](#remote-auth-sample) | In-Band WebSocket 인증 | JVM | 토큰 기반 인증 채팅 |
 
 ---
 
@@ -412,10 +413,63 @@ curl -X POST http://localhost:8080/winner
 
 ---
 
+## Remote Auth Sample
+
+**학습 포인트:** In-Band WebSocket 인증, AuthVerifier, AuthPrincipal, getOrElse 패턴
+
+토큰 기반 인증이 적용된 채팅 앱이다. 클라이언트는 연결 후 첫 메시지로 토큰을 전송하고,
+서버는 `AuthVerifier`로 검증 후 인증된 세션만 허용한다.
+
+```
+┌────────┐  1. WebSocket Open      ┌────────┐
+│ Client │ ──────────────────────►  │ Server │
+│        │  2. {"type":"auth",      │        │
+│        │      "token":"user:Alice"│        │  AuthVerifier
+│        │  ──────────────────────► │        │  ├─ 실패 → close
+│        │  3. {"type":"auth_ok"}   │        │  └─ 성공:
+│        │ ◄────────────────────── │        │
+│ Store  │ ═══ 정상 메시지 교환 ═══ │ Store  │
+└────────┘                          └────────┘
+```
+
+### 서버 시작
+
+```bash
+./gradlew :kotlin:sample-remote-auth:server:run
+```
+
+### 클라이언트 실행 (여러 터미널에서)
+
+```bash
+./gradlew :kotlin:sample-remote-auth:client:run --args="Alice" --console=plain
+./gradlew :kotlin:sample-remote-auth:client:run --args="Bob" --console=plain
+```
+
+### 클라이언트 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `<메시지>` | 채팅 메시지 전송 |
+| `/users` | 현재 접속 유저 목록 |
+| `/history` | 메시지 히스토리 |
+| `/quit` | 종료 |
+
+### 인증 흐름
+
+1. 클라이언트가 `user:{name}` 형식의 토큰으로 인증 요청
+2. 서버의 `AuthVerifier`가 토큰을 검증하고 `ChatPrincipal`을 생성
+3. 인증 성공 시 `auth_ok` 응답 → 정상 채팅 시작
+4. 인증 실패 시 `auth_error` 응답 → 연결 종료
+
+자세한 인증 아키텍처는 [Remote Authentication](./remote-authentication.md) 참조.
+
+---
+
 ## 관련 문서
 
 - [Server Patterns Overview](./server-patterns.md) — 패턴 선택 가이드 (Single Client, Shared State, Room, Per-Client)
 - [Remote (WebSocket)](./remote.md) — 클라이언트-서버 설정 가이드
+- [Remote Authentication](./remote-authentication.md) — In-Band WebSocket 인증 아키텍처
 - [Scaling Architecture](./scaling.md) — 병렬 브로드캐스트, 대규모 연결
 - [Room Pattern](./pattern-room.md) — 다중 방 관리 패턴 상세
 - [Per-Client Pattern](./pattern-per-client.md) — 비공개 상태 관리 패턴
