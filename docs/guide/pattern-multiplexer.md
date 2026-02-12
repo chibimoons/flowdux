@@ -208,7 +208,6 @@ suspend fun joinRoom(roomId: String): Store<ClientRoomState, ChatAction> {
 suspend fun leaveRoom(roomId: String) {
     stores.remove(roomId)?.let { store ->
         store.dispatch(SharedChatAction.LeaveRoom(username))
-        store.close()
     }
     multiplexer.removeRoom(roomId)
 }
