@@ -64,17 +64,24 @@ class ServerConnectionMultiplexer<A : Action>(
                     val roomId = routedAction.roomId
                     val virtualConnection = mutex.withLock { rooms[roomId] }
                     if (virtualConnection != null) {
-                        virtualConnection.channel.send(routedAction.action)
+                        virtualConnection.channel.trySend(routedAction.action)
                     } else if (onUnknownRoom != null) {
-                        // Invoke callback for unknown room (e.g., to handle JoinRoom)
-                        onUnknownRoom.invoke(roomId, routedAction.action)
+                        try {
+                            onUnknownRoom.invoke(roomId, routedAction.action)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            println("ServerConnectionMultiplexer: onUnknownRoom callback failed for room '$roomId' (${e.message})")
+                        }
                     }
                     // If no callback and unknown room: silent drop
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
-                // Connection closed or error
+            } catch (e: Exception) {
+                // Physical connection closed or transport error — routing stops.
+                // This is expected when the client disconnects or the network drops.
+                println("ServerConnectionMultiplexer: routing stopped (${e.message})")
             }
         }
     }
@@ -121,6 +128,9 @@ class ServerConnectionMultiplexer<A : Action>(
 
     /**
      * Closes the multiplexer and all virtual connections.
+     *
+     * Cancels the routing job, closes all virtual connection channels,
+     * and clears the room registry. After closing, no new rooms can be created.
      */
     suspend fun close() {
         val virtualConnections = mutex.withLock {
@@ -131,6 +141,8 @@ class ServerConnectionMultiplexer<A : Action>(
         }
         virtualConnections.forEach { it.channel.close() }
         routingJob?.cancel()
+        routingJob?.join()
+        routingJob = null
     }
 
     private inner class VirtualServerConnection(

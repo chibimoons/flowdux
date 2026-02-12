@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * Client-side connection multiplexer that routes actions to/from multiple rooms
@@ -39,6 +41,7 @@ import kotlinx.coroutines.sync.withLock
  * @param physicalConnection The underlying connection that carries [RoutedAction] messages
  * @param scope The coroutine scope for the routing job
  */
+@OptIn(ExperimentalAtomicApi::class)
 class ClientConnectionMultiplexer<A : Action>(
     private val physicalConnection: TypedClientConnection<RoutedAction<A>>,
     private val scope: CoroutineScope,
@@ -47,6 +50,7 @@ class ClientConnectionMultiplexer<A : Action>(
     private val rooms = mutableMapOf<String, VirtualClientConnection>()
     private var routingJob: Job? = null
     private var closed = false
+    private val connecting = AtomicBoolean(false)
 
     /**
      * Connection state of the underlying physical connection.
@@ -63,8 +67,8 @@ class ClientConnectionMultiplexer<A : Action>(
      * already connected.
      */
     fun connect() {
-        // Idempotency guard: skip if already routing
-        if (routingJob?.isActive == true) {
+        // Atomic guard: prevents duplicate routing jobs from concurrent calls
+        if (!connecting.compareAndSet(expectedValue = false, newValue = true)) {
             return
         }
 
@@ -77,10 +81,16 @@ class ClientConnectionMultiplexer<A : Action>(
     }
 
     /**
-     * Disconnects the physical connection.
+     * Disconnects the physical connection and stops routing.
+     *
+     * Rooms are preserved so that [connect] can be called again to resume.
+     * Use [removeRoom] to clean up individual rooms, or [close] to shut down entirely.
      */
     suspend fun disconnect() {
         routingJob?.cancel()
+        routingJob?.join()
+        routingJob = null
+        connecting.store(false)
         physicalConnection.disconnect()
     }
 
@@ -91,14 +101,16 @@ class ClientConnectionMultiplexer<A : Action>(
                     val roomId = routedAction.roomId
                     val virtualConnection = mutex.withLock { rooms[roomId] }
                     if (virtualConnection != null) {
-                        virtualConnection.channel.send(routedAction.action)
+                        virtualConnection.channel.trySend(routedAction.action)
                     }
                     // Unknown rooms: silent drop (as per design decision)
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
-                // Connection closed or error
+            } catch (e: Exception) {
+                // Physical connection closed or transport error — routing stops.
+                // This is expected when the server disconnects or the network drops.
+                println("ClientConnectionMultiplexer: routing stopped (${e.message})")
             }
         }
     }
@@ -145,6 +157,10 @@ class ClientConnectionMultiplexer<A : Action>(
 
     /**
      * Closes the multiplexer and all virtual connections.
+     *
+     * Cancels the routing job, closes all virtual connection channels,
+     * and disconnects the physical connection. After closing, no new rooms
+     * can be created.
      */
     suspend fun close() {
         val virtualConnections = mutex.withLock {
@@ -155,6 +171,9 @@ class ClientConnectionMultiplexer<A : Action>(
         }
         virtualConnections.forEach { it.channel.close() }
         routingJob?.cancel()
+        routingJob?.join()
+        routingJob = null
+        connecting.store(false)
         physicalConnection.disconnect()
     }
 

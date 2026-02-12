@@ -563,6 +563,7 @@ Room 패턴에서 다른 패턴으로 전환해야 하는 신호:
 ## Related
 
 - [Server Patterns Overview](./server-patterns.md) — 패턴 선택 가이드
+- [Multiplexer Pattern](./pattern-multiplexer.md) — 단일 WebSocket으로 다중 방 동시 참여
 - [Shared State Pattern](./pattern-shared-state.md) — 단일 방 패턴
 - [Per-Client Pattern](./pattern-per-client.md) — 비공개 상태 추가
 - [Scaling Guide](./scaling.md) — 대규모 연결 처리

@@ -17,6 +17,7 @@ FlowDux 샘플 앱 가이드입니다. 각 샘플은 특정 기능이나 패턴�
 | [remote-scaling](#remote-scaling-sample) | 병렬 브로드캐스트, 스케일링 | JVM | 대규모 동시 연결 |
 | [remote-poker](#remote-poker-sample) | Per-Client Store | JVM | 비공개 상태 관리 (포커) |
 | [remote-auth](#remote-auth-sample) | In-Band WebSocket 인증 | JVM | 토큰 기반 인증 채팅 |
+| [remote-multiplexer](#remote-multiplexer-sample) | Connection Multiplexer | JVM | 단일 WS, 다중 방 동시 참여 |
 
 ---
 
@@ -465,6 +466,62 @@ curl -X POST http://localhost:8080/winner
 
 ---
 
+## Remote Multiplexer Sample
+
+**학습 포인트:** ConnectionMultiplexer, RoutedAction, 단일 WebSocket 다중 방
+
+하나의 WebSocket 연결로 여러 채팅방에 동시 참여하는 예제입니다. `ClientConnectionMultiplexer`와 `ServerConnectionMultiplexer`가 `RoutedAction`을 사용하여 방별로 메시지를 라우팅합니다.
+
+```
+┌────────────── 단일 WebSocket ──────────────┐
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐    │
+│  │ general │  │ random  │  │ kotlin  │    │
+│  │ (Store) │  │ (Store) │  │ (Store) │    │
+│  └────┬────┘  └────┬────┘  └────┬────┘    │
+│       └────────────┼────────────┘          │
+│                    │ RoutedAction           │
+└────────────────────┼───────────────────────┘
+                     │
+                   Client
+```
+
+### 서버 시작
+
+```bash
+./gradlew :kotlin:sample-remote-multiplexer:server:run
+```
+
+### 클라이언트 실행 (여러 터미널에서)
+
+```bash
+./gradlew :kotlin:sample-remote-multiplexer:client:run --args="Alice"
+./gradlew :kotlin:sample-remote-multiplexer:client:run --args="Bob"
+```
+
+### 클라이언트 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `/join <room>` | 방 참여 |
+| `/leave <room>` | 방 나가기 |
+| `/rooms` | 참여 중인 방 목록 |
+| `/switch <room>` | 활성 방 전환 |
+| `/quit` | 종료 |
+
+### 데모 시나리오
+
+1. 터미널 3개 열기
+2. 서버 시작
+3. Client 1: Alice로 접속 → 자동 `general` 입장
+4. Client 2: Bob으로 접속 → Alice와 같은 `general`
+5. Alice: `/join random` → 동일 WS에서 `random` 추가 참여
+6. Alice: `/switch random` + 메시지 → `random` 방에서 혼자 채팅
+7. Bob: `/join random` → Alice와 `random`에서도 대화 가능
+
+자세한 패턴 설명은 [Multiplexer Pattern](./pattern-multiplexer.md)을 참조하세요.
+
+---
+
 ## 관련 문서
 
 - [Server Patterns Overview](./server-patterns.md) — 패턴 선택 가이드 (Single Client, Shared State, Room, Per-Client)
@@ -473,4 +530,5 @@ curl -X POST http://localhost:8080/winner
 - [Scaling Architecture](./scaling.md) — 병렬 브로드캐스트, 대규모 연결
 - [Room Pattern](./pattern-room.md) — 다중 방 관리 패턴 상세
 - [Per-Client Pattern](./pattern-per-client.md) — 비공개 상태 관리 패턴
+- [Multiplexer Pattern](./pattern-multiplexer.md) — 단일 WebSocket 다중 방 패턴
 - [FlowDux Remote vs Raw WebSocket](./flowdux-remote-vs-raw.md) — Use Case별 비교 및 선택 가이드
