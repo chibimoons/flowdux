@@ -54,6 +54,7 @@ class ClientConnectionMultiplexer<A : Action>(
     private val mutex = Mutex()
     private val rooms = mutableMapOf<String, VirtualClientConnection>()
     private var routingJob: Job? = null
+    private var connectJob: Job? = null
     private var closed = false
     private val connecting = AtomicBoolean(false)
 
@@ -82,8 +83,18 @@ class ClientConnectionMultiplexer<A : Action>(
         // Start routing first so we're ready to receive messages
         startRouting()
         // Launch connection in background (connect() suspends until closed)
-        scope.launch {
-            physicalConnection.connect()
+        connectJob = scope.launch {
+            try {
+                physicalConnection.connect()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (onEvent != null) {
+                    onEvent.invoke(MultiplexerEvent.RoutingStopped(e))
+                } else {
+                    throw e
+                }
+            }
         }
     }
 
@@ -95,11 +106,16 @@ class ClientConnectionMultiplexer<A : Action>(
      */
     suspend fun disconnect() {
         routingJob?.cancel()
+        connectJob?.cancel()
         val callerJob = currentCoroutineContext()[Job]
         if (routingJob != null && callerJob != routingJob) {
             routingJob?.join()
         }
+        if (connectJob != null && callerJob != connectJob) {
+            connectJob?.join()
+        }
         routingJob = null
+        connectJob = null
         connecting.store(false)
         physicalConnection.disconnect()
     }
@@ -196,13 +212,18 @@ class ClientConnectionMultiplexer<A : Action>(
         }
         virtualConnections.forEach { it.channel.close() }
         routingJob?.cancel()
+        connectJob?.cancel()
         // Guard against self-join to avoid deadlock if close() is called
         // from within the routing coroutine.
         val callerJob = currentCoroutineContext()[Job]
         if (routingJob != null && callerJob != routingJob) {
             routingJob?.join()
         }
+        if (connectJob != null && callerJob != connectJob) {
+            connectJob?.join()
+        }
         routingJob = null
+        connectJob = null
         connecting.store(false)
         physicalConnection.disconnect()
     }
