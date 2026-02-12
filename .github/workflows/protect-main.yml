@@ -12,10 +12,10 @@ jobs:
       - name: Check branch pattern
         run: |
           HEAD_REF="${{ github.head_ref }}"
-          if [[ "$HEAD_REF" =~ ^release/ ]] || [[ "$HEAD_REF" =~ ^hotfix/ ]]; then
+          if [[ "$HEAD_REF" =~ ^release/ ]] || [[ "$HEAD_REF" =~ ^hotfix/ ]] || [[ "$HEAD_REF" =~ ^docs/ ]]; then
             echo "✅ Source branch '$HEAD_REF' is allowed to merge into main."
           else
             echo "❌ Source branch '$HEAD_REF' is not allowed to merge into main."
-            echo "Only 'release/*' and 'hotfix/*' branches can be merged into main."
+            echo "Only 'release/*', 'hotfix/*', and 'docs/*' branches can be merged into main."
             exit 1
           fi

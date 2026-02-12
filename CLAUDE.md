@@ -76,14 +76,29 @@ Check `gh auth status` output to identify available accounts and ensure the corr
 
 - **기본 타겟 브랜치**: `develop`
 - release, hotfix 브랜치 외 모든 작업(feature, fix, docs 등)은 `develop`으로 PR 생성
-- release, hotfix 브랜치만 `main`으로 머지
+- release, hotfix, docs 브랜치만 `main`으로 머지
 
 ```
 feature/xxx  ─┐
 fix/xxx      ─┼─► develop ─► release/x.x.x ─► main ─► tag
-docs/xxx     ─┘
+docs/xxx     ─┼─► develop (일반) / main (직접 반영 필요 시)
+              ┘
 hotfix/xxx   ─────────────────────────────► main ─► tag
 ```
+
+### Main 브랜치 머지 규칙 (CI 강제)
+
+`.github/workflows/protect-main.yml`이 소스 브랜치명을 검증한다.
+**아래 패턴만 main에 머지 가능:**
+
+| 브랜치 패턴 | 용도 |
+|-------------|------|
+| `release/*` | 릴리즈 배포 |
+| `hotfix/*` | 긴급 수정 |
+| `docs/*` | 문서 업데이트 |
+
+- `sync/*`, `feature/*`, `fix/*` 등은 **CI에서 reject됨**
+- develop 내용을 main에 반영해야 할 때: `hotfix/*` 또는 `docs/*` 브랜치를 `origin/main`에서 생성 후 cherry-pick
 
 ## Release Process
 
