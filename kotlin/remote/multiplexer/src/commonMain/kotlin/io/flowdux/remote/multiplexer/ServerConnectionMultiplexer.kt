@@ -43,11 +43,14 @@ import kotlinx.coroutines.sync.withLock
  * @param scope The coroutine scope for the routing job
  * @param onUnknownRoom Optional callback invoked when an action arrives for an unknown room.
  *        This allows dynamic room creation (e.g., for JoinRoom actions).
+ * @param onEvent Optional callback for routing events (message drops, errors).
+ *        Defaults to no-op. Use this to integrate with your application's logging.
  */
 class ServerConnectionMultiplexer<A : Action>(
     private val physicalConnection: TypedServerConnection<RoutedAction<A>>,
     private val scope: CoroutineScope,
     private val onUnknownRoom: (suspend (roomId: String, action: A) -> Unit)? = null,
+    private val onEvent: ((MultiplexerEvent) -> Unit)? = null,
 ) {
     private val mutex = Mutex()
     private val rooms = mutableMapOf<String, VirtualServerConnection>()
@@ -67,8 +70,7 @@ class ServerConnectionMultiplexer<A : Action>(
                     if (virtualConnection != null) {
                         val result = virtualConnection.channel.trySend(routedAction.action)
                         if (result.isFailure) {
-                            val reason = if (result.isClosed) "closed" else "full"
-                            println("ServerConnectionMultiplexer: dropped message for room '$roomId' (channel $reason)")
+                            onEvent?.invoke(MultiplexerEvent.MessageDropped(roomId))
                         }
                     } else if (onUnknownRoom != null) {
                         try {
@@ -76,7 +78,7 @@ class ServerConnectionMultiplexer<A : Action>(
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            println("ServerConnectionMultiplexer: onUnknownRoom callback failed for room '$roomId' (${e.message})")
+                            onEvent?.invoke(MultiplexerEvent.CallbackFailed(roomId, e))
                         }
                     }
                     // If no callback and unknown room: silent drop
@@ -86,7 +88,7 @@ class ServerConnectionMultiplexer<A : Action>(
             } catch (e: Exception) {
                 // Physical connection closed or transport error — routing stops.
                 // This is expected when the client disconnects or the network drops.
-                println("ServerConnectionMultiplexer: routing stopped (${e.message})")
+                onEvent?.invoke(MultiplexerEvent.RoutingStopped(e))
             }
         }
     }

@@ -41,11 +41,14 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * @param A The type of actions being multiplexed
  * @param physicalConnection The underlying connection that carries [RoutedAction] messages
  * @param scope The coroutine scope for the routing job
+ * @param onEvent Optional callback for routing events (message drops, errors).
+ *        Defaults to no-op. Use this to integrate with your application's logging.
  */
 @OptIn(ExperimentalAtomicApi::class)
 class ClientConnectionMultiplexer<A : Action>(
     private val physicalConnection: TypedClientConnection<RoutedAction<A>>,
     private val scope: CoroutineScope,
+    private val onEvent: ((MultiplexerEvent) -> Unit)? = null,
 ) {
     private val mutex = Mutex()
     private val rooms = mutableMapOf<String, VirtualClientConnection>()
@@ -68,6 +71,8 @@ class ClientConnectionMultiplexer<A : Action>(
      * already connected.
      */
     fun connect() {
+        check(!closed) { "Multiplexer is closed" }
+
         // Atomic guard: prevents duplicate routing jobs from concurrent calls
         if (!connecting.compareAndSet(expectedValue = false, newValue = true)) {
             return
@@ -107,7 +112,7 @@ class ClientConnectionMultiplexer<A : Action>(
                     if (virtualConnection != null) {
                         val result = virtualConnection.channel.trySend(routedAction.action)
                         if (result.isFailure) {
-                            println("ClientConnectionMultiplexer: dropped message for room '$roomId' (channel buffer full or closed)")
+                            onEvent?.invoke(MultiplexerEvent.MessageDropped(roomId))
                         }
                     }
                     // Unknown rooms: silent drop (as per design decision)
@@ -117,7 +122,7 @@ class ClientConnectionMultiplexer<A : Action>(
             } catch (e: Exception) {
                 // Physical connection closed or transport error — routing stops.
                 // This is expected when the server disconnects or the network drops.
-                println("ClientConnectionMultiplexer: routing stopped (${e.message})")
+                onEvent?.invoke(MultiplexerEvent.RoutingStopped(e))
             } finally {
                 // Reset connecting flag so connect() can be called again after
                 // routing stops due to transport errors or end of incoming flow.

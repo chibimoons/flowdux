@@ -277,9 +277,11 @@ class ServerConnectionMultiplexerTest {
         val physical = FakeTypedServerConnection<TestAction>()
         val receivedCalls = mutableListOf<Pair<String, TestAction>>()
 
-        val mux = ServerConnectionMultiplexer(physical, this) { roomId, action ->
-            receivedCalls.add(roomId to action)
-        }
+        val mux = ServerConnectionMultiplexer(
+            physicalConnection = physical,
+            scope = this,
+            onUnknownRoom = { roomId, action -> receivedCalls.add(roomId to action) },
+        )
 
         yield()
 
@@ -299,10 +301,14 @@ class ServerConnectionMultiplexerTest {
         val physical = FakeTypedServerConnection<TestAction>()
         var callCount = 0
 
-        val mux = ServerConnectionMultiplexer(physical, this) { _, _ ->
-            callCount++
-            if (callCount == 1) throw RuntimeException("callback error")
-        }
+        val mux = ServerConnectionMultiplexer(
+            physicalConnection = physical,
+            scope = this,
+            onUnknownRoom = { _, _ ->
+                callCount++
+                if (callCount == 1) throw RuntimeException("callback error")
+            },
+        )
 
         // Also create a known room to verify routing continues
         val room1 = mux.getOrCreateRoom("room-1")
