@@ -75,7 +75,7 @@ class ServerConnectionMultiplexer<A : Action>(
                     if (virtualConnection != null) {
                         val result = virtualConnection.channel.trySend(routedAction.action)
                         if (result.isFailure) {
-                            onEvent?.invoke(MultiplexerEvent.MessageDropped(roomId))
+                            safeOnEvent(MultiplexerEvent.MessageDropped(roomId))
                         }
                     } else if (onUnknownRoom != null) {
                         try {
@@ -83,7 +83,7 @@ class ServerConnectionMultiplexer<A : Action>(
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            onEvent?.invoke(MultiplexerEvent.CallbackFailed(roomId, e))
+                            safeOnEvent(MultiplexerEvent.CallbackFailed(roomId, e))
                         }
                     }
                     // If no callback and unknown room: silent drop
@@ -93,11 +93,19 @@ class ServerConnectionMultiplexer<A : Action>(
             } catch (e: Exception) {
                 // Physical connection closed or transport error — routing stops.
                 if (onEvent != null) {
-                    onEvent.invoke(MultiplexerEvent.RoutingStopped(e))
+                    safeOnEvent(MultiplexerEvent.RoutingStopped(e))
                 } else {
                     throw e
                 }
             }
+        }
+    }
+
+    private fun safeOnEvent(event: MultiplexerEvent) {
+        try {
+            onEvent?.invoke(event)
+        } catch (_: Exception) {
+            // Never let a faulty event handler break routing
         }
     }
 

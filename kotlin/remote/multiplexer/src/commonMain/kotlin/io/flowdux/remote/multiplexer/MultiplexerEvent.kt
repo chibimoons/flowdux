@@ -30,8 +30,9 @@ sealed interface MultiplexerEvent {
     data class MessageDropped(val roomId: String) : MultiplexerEvent
 
     /**
-     * Routing stopped due to a transport error or end of the incoming flow.
-     * This is expected when the remote peer disconnects or the network drops.
+     * Routing stopped due to a transport-layer failure.
+     * This is typically emitted when the remote peer disconnects unexpectedly,
+     * the network drops, or another I/O error occurs.
      */
     data class RoutingStopped(val cause: Exception) : MultiplexerEvent
 
