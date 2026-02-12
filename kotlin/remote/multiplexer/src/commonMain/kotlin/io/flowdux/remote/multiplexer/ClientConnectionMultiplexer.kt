@@ -106,6 +106,7 @@ class ClientConnectionMultiplexer<A : Action>(
 
     private fun startRouting() {
         routingJob = scope.launch {
+            var transportError: Exception? = null
             try {
                 physicalConnection.incoming.collect { routedAction ->
                     val roomId = routedAction.roomId
@@ -121,16 +122,20 @@ class ClientConnectionMultiplexer<A : Action>(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // Physical connection closed or transport error — routing stops.
+                transportError = e
                 if (onEvent != null) {
                     onEvent.invoke(MultiplexerEvent.RoutingStopped(e))
                 } else {
                     throw e
                 }
             } finally {
-                // Reset connecting flag so connect() can be called again after
-                // routing stops due to transport errors or end of incoming flow.
                 connecting.store(false)
+                // Transport error: clean up physical connection to avoid zombie state
+                // (routing dead but connection alive). Skipped on normal cancellation
+                // since disconnect()/close() already handle cleanup.
+                if (transportError != null) {
+                    physicalConnection.disconnect()
+                }
             }
         }
     }
