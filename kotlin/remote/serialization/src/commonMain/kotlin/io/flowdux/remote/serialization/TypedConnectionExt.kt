@@ -52,6 +52,52 @@ inline fun <reified A : Action> ServerConnection.typedJson(
 ): TypedServerConnection<A> = typed(actionCodecOf<A>(json), JsonMessageCodec())
 
 /**
+ * Creates a [TypedClientConnection] using JSON serialization and upcasts to a supertype.
+ *
+ * Combines [typedJson] and [upcast] into a single call:
+ * ```kotlin
+ * // Before
+ * val connection = rawConnection
+ *     .typedJson<SharedAction>()
+ *     .upcast<SharedAction, AppAction>()
+ *
+ * // After
+ * val connection = rawConnection.typedJsonAs<SharedAction, AppAction>()
+ * ```
+ *
+ * @param Wire The narrow serializable action type used on the wire
+ * @param A The broader action type that [Wire] extends, used by the store/middleware
+ * @param json Custom [Json] instance for action serialization. Defaults to
+ *   [SerializableActionCodec.DefaultJson] (with `classDiscriminator = "type"`).
+ */
+inline fun <reified Wire : A, reified A : Action> ClientConnection.typedJsonAs(
+    json: Json = SerializableActionCodec.DefaultJson,
+): TypedClientConnection<A> = typedJson<Wire>(json).upcast<Wire, A>()
+
+/**
+ * Creates a [TypedServerConnection] using JSON serialization and upcasts to a supertype.
+ *
+ * Combines [typedJson] and [upcast] into a single call:
+ * ```kotlin
+ * // Before
+ * val connection = rawConnection
+ *     .typedJson<SharedAction>()
+ *     .upcast<SharedAction, AppAction>()
+ *
+ * // After
+ * val connection = rawConnection.typedJsonAs<SharedAction, AppAction>()
+ * ```
+ *
+ * @param Wire The narrow serializable action type used on the wire
+ * @param A The broader action type that [Wire] extends, used by the store/middleware
+ * @param json Custom [Json] instance for action serialization. Defaults to
+ *   [SerializableActionCodec.DefaultJson] (with `classDiscriminator = "type"`).
+ */
+inline fun <reified Wire : A, reified A : Action> ServerConnection.typedJsonAs(
+    json: Json = SerializableActionCodec.DefaultJson,
+): TypedServerConnection<A> = typedJson<Wire>(json).upcast<Wire, A>()
+
+/**
  * Upcasts this [TypedClientConnection] to work with a supertype action.
  *
  * This is useful when the connection is typed with a narrow serializable type (e.g., `SharedAction`)
@@ -61,13 +107,13 @@ inline fun <reified A : Action> ServerConnection.typedJson(
  * - Incoming actions from the server are always [Sub] type (safe upcast to [Super])
  * - Only [Sub] actions should be sent through the connection (enforced at runtime)
  *
+ * **Tip:** If starting from a raw [ClientConnection], prefer [typedJsonAs] which combines
+ * `typedJson` and `upcast` in a single call.
+ *
  * Example:
  * ```kotlin
- * // Before (unchecked cast)
- * val connection = ktConnection.typedJson<SharedAction>() as TypedClientConnection<AppAction>
- *
- * // After (type-safe upcast)
- * val connection = ktConnection.typedJson<SharedAction>().upcast<SharedAction, AppAction>()
+ * // From a TypedClientConnection
+ * val connection = typedConnection.upcast<SharedAction, AppAction>()
  * ```
  *
  * @param Sub The narrow action type this connection is typed with
@@ -87,13 +133,13 @@ inline fun <reified Sub : Super, reified Super : Action> TypedClientConnection<S
  * - Incoming actions from the client are always [Sub] type (safe upcast to [Super])
  * - Only [Sub] actions should be sent through the connection (enforced at runtime)
  *
+ * **Tip:** If starting from a raw [ServerConnection], prefer [typedJsonAs] which combines
+ * `typedJson` and `upcast` in a single call.
+ *
  * Example:
  * ```kotlin
- * // Before (unchecked cast)
- * val connection = ktConnection.typedJson<SharedAction>() as TypedServerConnection<AppAction>
- *
- * // After (type-safe upcast)
- * val connection = ktConnection.typedJson<SharedAction>().upcast<SharedAction, AppAction>()
+ * // From a TypedServerConnection
+ * val connection = typedConnection.upcast<SharedAction, AppAction>()
  * ```
  *
  * @param Sub The narrow action type this connection is typed with

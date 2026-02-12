@@ -79,8 +79,7 @@ client/                           # 클라이언트 모듈
 import io.flowdux.remote.server.pattern.SharedStateServer
 import io.flowdux.remote.server.pattern.createSharedStateServer
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
-import io.flowdux.remote.serialization.typedJson
-import io.flowdux.remote.serialization.upcast
+import io.flowdux.remote.serialization.typedJsonAs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -108,8 +107,7 @@ fun main() {
                 println("Client connected: $sessionId")
 
                 val connection = KtorWebSocketServerConnection(this)
-                    .typedJson<SharedChatAction>()
-                    .upcast<SharedChatAction, ChatAction>()
+                    .typedJsonAs<SharedChatAction, ChatAction>()
 
                 try {
                     server.handleClient(sessionId, connection)
@@ -278,8 +276,7 @@ suspend fun main() {
         host = "localhost",
         port = 8080,
         path = "/chat",
-    ).typedJson<SharedChatAction>()
-     .upcast<SharedChatAction, ChatAction>()
+    ).typedJsonAs<SharedChatAction, ChatAction>()
 
     val store = createStore(
         initialState = ClientChatState(),

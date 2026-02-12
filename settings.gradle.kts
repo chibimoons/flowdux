@@ -39,6 +39,9 @@ project(":kotlin:flowdux-remote-ktor").projectDir = file("kotlin/remote/ktor")
 include(":kotlin:flowdux-remote-serialization")
 project(":kotlin:flowdux-remote-serialization").projectDir = file("kotlin/remote/serialization")
 
+include(":kotlin:flowdux-remote-auth")
+project(":kotlin:flowdux-remote-auth").projectDir = file("kotlin/remote/auth")
+
 include(":kotlin:flowdux-remote-multiplexer")
 project(":kotlin:flowdux-remote-multiplexer").projectDir = file("kotlin/remote/multiplexer")
 
@@ -111,6 +114,14 @@ project(":kotlin:sample-remote-multiplexer:server").projectDir = file("kotlin/sa
 
 include(":kotlin:sample-remote-multiplexer:client")
 project(":kotlin:sample-remote-multiplexer:client").projectDir = file("kotlin/samples/flowdux-remote/multiplexer/client")
+
+// ── Samples: flowdux-remote (auth) ──
+include(":kotlin:sample-remote-auth:server")
+project(":kotlin:sample-remote-auth").projectDir = file("kotlin/samples/flowdux-remote/auth")
+project(":kotlin:sample-remote-auth:server").projectDir = file("kotlin/samples/flowdux-remote/auth/server")
+
+include(":kotlin:sample-remote-auth:client")
+project(":kotlin:sample-remote-auth:client").projectDir = file("kotlin/samples/flowdux-remote/auth/client")
 
 // ── Benchmark ──
 include(":kotlin:flowdux-benchmark")

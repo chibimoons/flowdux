@@ -1,8 +1,7 @@
 package io.flowdux.sample.poker.server
 
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
-import io.flowdux.remote.serialization.typedJson
-import io.flowdux.remote.serialization.upcast
+import io.flowdux.remote.serialization.typedJsonAs
 import io.flowdux.sample.poker.PokerAction
 import io.flowdux.sample.poker.SharedPokerAction
 import io.ktor.http.HttpStatusCode
@@ -87,8 +86,7 @@ fun main() {
 
                 // Create typed connection for this player
                 val connection = KtorWebSocketServerConnection(this)
-                    .typedJson<SharedPokerAction>()
-                    .upcast<SharedPokerAction, PokerAction>()
+                    .typedJsonAs<SharedPokerAction, PokerAction>()
 
                 // Create Per-Client Store for private state
                 val playerSession = PlayerSession(playerId, connection)

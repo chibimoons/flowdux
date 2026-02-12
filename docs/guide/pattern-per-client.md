@@ -211,8 +211,7 @@ webSocket("/poker/{playerId}") {
     val playerId = call.parameters["playerId"] ?: return@webSocket
 
     val connection = KtorWebSocketServerConnection(this)
-        .typedJson<SharedPokerAction>()
-        .upcast<SharedPokerAction, PokerAction>()
+        .typedJsonAs<SharedPokerAction, PokerAction>()
 
     // Create Per-Client Store
     val playerSession = PlayerSession(playerId, connection)
@@ -326,8 +325,7 @@ suspend fun main() {
         host = "localhost",
         port = 8080,
         path = "/poker/$playerId",
-    ).typedJson<SharedPokerAction>()
-     .upcast<SharedPokerAction, PokerAction>()
+    ).typedJsonAs<SharedPokerAction, PokerAction>()
 
     val store = createStore(
         initialState = ClientPokerState(),
