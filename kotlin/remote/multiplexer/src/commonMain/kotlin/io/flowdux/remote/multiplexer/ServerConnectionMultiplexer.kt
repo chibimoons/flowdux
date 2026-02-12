@@ -64,7 +64,11 @@ class ServerConnectionMultiplexer<A : Action>(
                     val roomId = routedAction.roomId
                     val virtualConnection = mutex.withLock { rooms[roomId] }
                     if (virtualConnection != null) {
-                        virtualConnection.channel.trySend(routedAction.action)
+                        val result = virtualConnection.channel.trySend(routedAction.action)
+                        if (result.isFailure) {
+                            val reason = if (result.isClosed) "closed" else "full"
+                            println("ServerConnectionMultiplexer: dropped message for room '$roomId' (channel $reason)")
+                        }
                     } else if (onUnknownRoom != null) {
                         try {
                             onUnknownRoom.invoke(roomId, routedAction.action)
