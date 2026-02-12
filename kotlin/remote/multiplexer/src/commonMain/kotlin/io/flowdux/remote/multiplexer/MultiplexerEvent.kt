@@ -5,16 +5,21 @@ package io.flowdux.remote.multiplexer
  * during routing.
  *
  * Pass an `onEvent` callback to the multiplexer constructor to handle these events
- * (e.g., for logging or monitoring). By default, events are silently ignored.
+ * (e.g., for logging or monitoring). By default, events are not reported via this callback;
+ * transport errors ([RoutingStopped]) still propagate to the scope unless handled via `onEvent`.
  *
  * ```kotlin
- * val mux = ClientConnectionMultiplexer(physical, scope) { event ->
- *     when (event) {
- *         is MultiplexerEvent.MessageDropped -> logger.warn("Dropped: ${event.roomId}")
- *         is MultiplexerEvent.RoutingStopped -> logger.info("Routing stopped", event.cause)
- *         is MultiplexerEvent.CallbackFailed -> logger.error("Callback failed", event.cause)
- *     }
- * }
+ * val mux = ClientConnectionMultiplexer(
+ *     physicalConnection = physical,
+ *     scope = scope,
+ *     onEvent = { event ->
+ *         when (event) {
+ *             is MultiplexerEvent.MessageDropped -> logger.warn("Dropped: ${event.roomId}")
+ *             is MultiplexerEvent.RoutingStopped -> logger.info("Routing stopped", event.cause)
+ *             is MultiplexerEvent.CallbackFailed -> logger.error("Callback failed", event.cause)
+ *         }
+ *     },
+ * )
  * ```
  */
 sealed interface MultiplexerEvent {

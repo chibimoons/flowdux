@@ -123,10 +123,14 @@ webSocket("/ws") {
     val physicalConnection = KtorWebSocketServerConnection(this)
         .typedRoutedJson<SharedChatAction>()
 
-    val multiplexer = ServerConnectionMultiplexer(physicalConnection, this) { roomId, action ->
-        // 알 수 없는 방에 대한 액션 처리 (JoinRoom 등)
-        handleNewRoom(roomId, action)
-    }
+    val multiplexer = ServerConnectionMultiplexer(
+        physicalConnection,
+        this,
+        onUnknownRoom = { roomId, action ->
+            // 알 수 없는 방에 대한 액션 처리 (JoinRoom 등)
+            handleNewRoom(roomId, action)
+        },
+    )
 
     try {
         // 연결 유지 (incoming flow가 끝날 때까지)
@@ -149,13 +153,17 @@ val roomServer = createSharedStateRoomServer(
 )
 
 // Multiplexer의 onUnknownRoom 콜백에서 방 생성
-val multiplexer = ServerConnectionMultiplexer(physicalConnection, this) { roomId, action ->
-    if (action is SharedChatAction.JoinRoom) {
-        val room = roomServer.getOrCreateRoom(roomId)
-        val virtualConn = multiplexer.getOrCreateRoom(roomId)
-        room.handleClient(sessionId, virtualConn)
-    }
-}
+val multiplexer = ServerConnectionMultiplexer(
+    physicalConnection,
+    this,
+    onUnknownRoom = { roomId, action ->
+        if (action is SharedChatAction.JoinRoom) {
+            val room = roomServer.getOrCreateRoom(roomId)
+            val virtualConn = multiplexer.getOrCreateRoom(roomId)
+            room.handleClient(sessionId, virtualConn)
+        }
+    },
+)
 ```
 
 ## 클라이언트 구성

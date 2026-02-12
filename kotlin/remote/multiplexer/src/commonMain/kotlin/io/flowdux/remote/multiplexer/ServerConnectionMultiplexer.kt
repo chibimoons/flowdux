@@ -27,10 +27,14 @@ import kotlinx.coroutines.sync.withLock
  *     val physical = KtorWebSocketServerConnection(this)
  *         .typedRoutedJson<SharedChatAction>()
  *
- *     val mux = ServerConnectionMultiplexer(physical, this) { roomId, action ->
- *         // Handle action for unknown room (e.g., JoinRoom)
- *         handleNewRoom(roomId, action)
- *     }
+ *     val mux = ServerConnectionMultiplexer(
+ *         physicalConnection = physical,
+ *         scope = this,
+ *         onUnknownRoom = { roomId, action ->
+ *             // Handle action for unknown room (e.g., JoinRoom)
+ *             handleNewRoom(roomId, action)
+ *         },
+ *     )
  *
  *     // When client requests to join a room
  *     val virtualConn = mux.getOrCreateRoom("room-1")
