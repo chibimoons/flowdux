@@ -44,7 +44,8 @@ import kotlinx.coroutines.sync.withLock
  * @param onUnknownRoom Optional callback invoked when an action arrives for an unknown room.
  *        This allows dynamic room creation (e.g., for JoinRoom actions).
  * @param onEvent Optional callback for routing events (message drops, errors).
- *        Defaults to no-op. Use this to integrate with your application's logging.
+ *        When provided, transport exceptions are reported via [MultiplexerEvent.RoutingStopped].
+ *        When absent, transport exceptions propagate to [scope] via structured concurrency.
  */
 class ServerConnectionMultiplexer<A : Action>(
     private val physicalConnection: TypedServerConnection<RoutedAction<A>>,
@@ -87,8 +88,11 @@ class ServerConnectionMultiplexer<A : Action>(
                 throw e
             } catch (e: Exception) {
                 // Physical connection closed or transport error — routing stops.
-                // This is expected when the client disconnects or the network drops.
-                onEvent?.invoke(MultiplexerEvent.RoutingStopped(e))
+                if (onEvent != null) {
+                    onEvent.invoke(MultiplexerEvent.RoutingStopped(e))
+                } else {
+                    throw e
+                }
             }
         }
     }

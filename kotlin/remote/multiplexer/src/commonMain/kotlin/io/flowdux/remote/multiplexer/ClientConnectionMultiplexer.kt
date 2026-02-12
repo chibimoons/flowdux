@@ -42,7 +42,8 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * @param physicalConnection The underlying connection that carries [RoutedAction] messages
  * @param scope The coroutine scope for the routing job
  * @param onEvent Optional callback for routing events (message drops, errors).
- *        Defaults to no-op. Use this to integrate with your application's logging.
+ *        When provided, transport exceptions are reported via [MultiplexerEvent.RoutingStopped].
+ *        When absent, transport exceptions propagate to [scope] via structured concurrency.
  */
 @OptIn(ExperimentalAtomicApi::class)
 class ClientConnectionMultiplexer<A : Action>(
@@ -121,8 +122,11 @@ class ClientConnectionMultiplexer<A : Action>(
                 throw e
             } catch (e: Exception) {
                 // Physical connection closed or transport error — routing stops.
-                // This is expected when the server disconnects or the network drops.
-                onEvent?.invoke(MultiplexerEvent.RoutingStopped(e))
+                if (onEvent != null) {
+                    onEvent.invoke(MultiplexerEvent.RoutingStopped(e))
+                } else {
+                    throw e
+                }
             } finally {
                 // Reset connecting flag so connect() can be called again after
                 // routing stops due to transport errors or end of incoming flow.
