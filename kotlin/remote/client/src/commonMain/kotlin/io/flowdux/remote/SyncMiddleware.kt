@@ -136,31 +136,6 @@ open class SyncMiddleware<S : State, A : Action>(
         }
     }
 
-    /**
-     * Send an action directly to the server, bypassing the middleware pipeline.
-     *
-     * Use this method when you need to send a [ServerSharedAction] from within a processor.
-     * Actions emitted via [FlowCollector.emit] do not go through the middleware pipeline again,
-     * so [ServerSharedAction]s emitted from processors would go directly to the Reducer
-     * instead of being sent to the server.
-     *
-     * Example:
-     * ```kotlin
-     * override val processors = buildProcessors {
-     *     on<SendMessage> { _, action ->
-     *         sendToServer(ChatMessage(action.text))  // Sent to server
-     *         emit(MessageSent(action.text))          // Updates local state
-     *     }
-     * }
-     * ```
-     *
-     * @param action The action to send to the server.
-     */
-    @Suppress("UNCHECKED_CAST")
-    protected suspend fun sendToServer(action: ServerSharedAction) {
-        connection.send(action as A)
-    }
-
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
         // 1. ServerSharedAction: send to server, do NOT emit locally
         if (action is ServerSharedAction) {

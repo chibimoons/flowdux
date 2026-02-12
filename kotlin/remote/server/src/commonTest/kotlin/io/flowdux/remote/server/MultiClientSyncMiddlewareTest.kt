@@ -30,8 +30,8 @@ class MultiClientSyncMiddlewareTest {
             scope = backgroundScope,
         )
 
-        // InternalAddSession now handles both registry.addSession and listener setup
-        store.dispatchAddSession("client-1", connection)
+        registry.addSession("client-1", connection)
+        store.dispatchSessionListener(connection)
         delay(100)
 
         assertEquals(1, registry.sessionCount())
@@ -53,12 +53,12 @@ class MultiClientSyncMiddlewareTest {
             scope = backgroundScope,
         )
 
-        store.dispatchAddSession("client-1", connection)
+        registry.addSession("client-1", connection)
+        store.dispatchSessionListener(connection)
         delay(100)
         assertEquals(1, registry.sessionCount())
 
-        // Use helper function for InternalRemoveSession
-        store.dispatchRemoveSession("client-1")
+        registry.removeSession("client-1")
         delay(100)
 
         assertEquals(0, registry.sessionCount())
@@ -80,7 +80,8 @@ class MultiClientSyncMiddlewareTest {
 
         for (i in 1..3) {
             val conn = MockTypedServerConnection<ServerAction>()
-            store.dispatchAddSession("client-$i", conn)
+            registry.addSession("client-$i", conn)
+            store.dispatchSessionListener(conn)
         }
         delay(100)
 
@@ -104,8 +105,10 @@ class MultiClientSyncMiddlewareTest {
             scope = backgroundScope,
         )
 
-        store.dispatchAddSession("client-1", conn1)
-        store.dispatchAddSession("client-2", conn2)
+        registry.addSession("client-1", conn1)
+        store.dispatchSessionListener(conn1)
+        registry.addSession("client-2", conn2)
+        store.dispatchSessionListener(conn2)
         delay(100)
 
         // Dispatch a ClientSharedAction
@@ -144,8 +147,10 @@ class MultiClientSyncMiddlewareTest {
             scope = backgroundScope,
         )
 
-        store.dispatchAddSession("failing", failingConn)
-        store.dispatchAddSession("good", goodConn)
+        registry.addSession("failing", failingConn)
+        store.dispatchSessionListener(failingConn)
+        registry.addSession("good", goodConn)
+        store.dispatchSessionListener(goodConn)
         delay(100)
 
         // Broadcast — should not crash
@@ -156,28 +161,6 @@ class MultiClientSyncMiddlewareTest {
         val syncs = goodConn.sentActions.filterIsInstance<ServerAction.SyncState>()
         assertTrue(syncs.any { it.state.count == 99 })
 
-        store.close()
-    }
-
-    @Test
-    fun `InternalAddSession is consumed and does not reach reducer`() = runTest {
-        val connection = MockTypedServerConnection<ServerAction>()
-        val registry = InMemorySessionRegistry<ServerAction>()
-        val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Sequential)
-        val middleware = MultiClientSyncMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
-        val store = createStore(
-            initialState = ServerState(),
-            reducer = serverReducer, // sealed when — would crash if InternalAddSession leaked
-            middlewares = listOf(middleware),
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
-
-        store.dispatchAddSession("client-1", connection)
-        delay(100)
-
-        // State unchanged — action was consumed
-        assertEquals(0, store.state.value.count)
         store.close()
     }
 
@@ -232,7 +215,8 @@ class MultiClientSyncMiddlewareTest {
             scope = backgroundScope,
         )
 
-        store.dispatchAddSession("client-1", connection)
+        registry.addSession("client-1", connection)
+        store.dispatchSessionListener(connection)
         delay(100)
 
         // Simulate client sending an action
@@ -259,11 +243,12 @@ class MultiClientSyncMiddlewareTest {
             scope = backgroundScope,
         )
 
-        store.dispatchAddSession("client-1", conn1)
-        store.dispatchAddSession("client-2", conn2)
+        registry.addSession("client-1", conn1)
+        store.dispatchSessionListener(conn1)
+        registry.addSession("client-2", conn2)
+        store.dispatchSessionListener(conn2)
         delay(100)
 
-        // Use helper function for InternalSendToClient
         store.dispatchSendToClient("client-1", ServerAction.Add(5))
         delay(100)
 
@@ -283,31 +268,6 @@ class MultiClientSyncMiddlewareTest {
     }
 
     @Test
-    fun `InternalRemoveSession removes session from registry`() = runTest {
-        val connection = MockTypedServerConnection<ServerAction>()
-        val registry = InMemorySessionRegistry<ServerAction>()
-        val broadcaster = SessionBroadcaster(registry, BroadcastConfig.Sequential)
-        val middleware = MultiClientSyncMiddleware<ServerState, ServerAction>(broadcaster = broadcaster)
-        val store = createStore(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
-
-        store.dispatchAddSession("client-1", connection)
-        delay(100)
-        assertEquals(1, registry.sessionCount())
-
-        store.dispatchRemoveSession("client-1")
-        delay(100)
-
-        assertEquals(0, registry.sessionCount())
-        store.close()
-    }
-
-    @Test
     fun `InternalSendToClient sends action to specific client`() = runTest {
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
@@ -322,8 +282,10 @@ class MultiClientSyncMiddlewareTest {
             scope = backgroundScope,
         )
 
-        store.dispatchAddSession("client-1", conn1)
-        store.dispatchAddSession("client-2", conn2)
+        registry.addSession("client-1", conn1)
+        store.dispatchSessionListener(conn1)
+        registry.addSession("client-2", conn2)
+        store.dispatchSessionListener(conn2)
         delay(100)
 
         store.dispatchSendToClient("client-1", ServerAction.Add(7))
