@@ -45,7 +45,7 @@ class CentralNodeManagerTest {
     fun handleNodeRegistersAndUnregisters() = runTest {
         val events = mutableListOf<NodeMediatorEvent>()
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
+
             onUpstreamAction = { _, _, _ -> },
             onEvent = { events.add(it) },
         )
@@ -73,7 +73,7 @@ class CentralNodeManagerTest {
     fun upstreamActionsRoutedToCallback() = runTest {
         val received = mutableListOf<Triple<String, String, TestAction>>()
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
+
             onUpstreamAction = { nodeId, roomId, action ->
                 received.add(Triple(nodeId, roomId, action))
             },
@@ -103,7 +103,7 @@ class CentralNodeManagerTest {
         val registry = InMemoryRoomRegistry()
         val manager = CentralNodeManager<TestAction>(
             roomRegistry = registry,
-            scope = this,
+
             onUpstreamAction = { _, _, _ -> },
         )
 
@@ -127,7 +127,7 @@ class CentralNodeManagerTest {
     @Test
     fun sendToRoomUnknownRoomDoesNothing() = runTest {
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
+
             onUpstreamAction = { _, _, _ -> },
         )
 
@@ -140,7 +140,7 @@ class CentralNodeManagerTest {
     @Test
     fun sendToNode() = runTest {
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
+
             onUpstreamAction = { _, _, _ -> },
         )
 
@@ -163,7 +163,7 @@ class CentralNodeManagerTest {
     @Test
     fun sendToNodeUnknownNodeDoesNothing() = runTest {
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
+
             onUpstreamAction = { _, _, _ -> },
         )
 
@@ -176,7 +176,7 @@ class CentralNodeManagerTest {
     @Test
     fun broadcastToAllNodes() = runTest {
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
+
             onUpstreamAction = { _, _, _ -> },
         )
 
@@ -203,7 +203,7 @@ class CentralNodeManagerTest {
     @Test
     fun multipleNodesManaged() = runTest {
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
+
             onUpstreamAction = { _, _, _ -> },
         )
 
@@ -236,7 +236,7 @@ class CentralNodeManagerTest {
         val events = mutableListOf<NodeMediatorEvent>()
         val manager = CentralNodeManager<TestAction>(
             roomRegistry = registry,
-            scope = this,
+
             onUpstreamAction = { _, _, _ -> },
             onEvent = { events.add(it) },
         )
@@ -266,7 +266,7 @@ class CentralNodeManagerTest {
         val events = mutableListOf<NodeMediatorEvent>()
         var callCount = 0
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
+
             onUpstreamAction = { _, _, _ ->
                 callCount++
                 if (callCount == 1) throw RuntimeException("callback error")
@@ -297,7 +297,7 @@ class CentralNodeManagerTest {
     fun closeDisconnectsAllNodes() = runTest {
         val events = mutableListOf<NodeMediatorEvent>()
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
+
             onUpstreamAction = { _, _, _ -> },
             onEvent = { events.add(it) },
         )
@@ -323,7 +323,7 @@ class CentralNodeManagerTest {
     @Test
     fun broadcastHandlesIndividualSendFailures() = runTest {
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
+
             onUpstreamAction = { _, _, _ -> },
         )
 
@@ -358,9 +358,59 @@ class CentralNodeManagerTest {
     }
 
     @Test
+    fun broadcastToAllRooms() = runTest {
+        val registry = InMemoryRoomRegistry()
+        val manager = CentralNodeManager<TestAction>(
+            roomRegistry = registry,
+
+            onUpstreamAction = { _, _, _ -> },
+        )
+
+        val conn1 = FakeTypedServerConnection()
+        val conn2 = FakeTypedServerConnection()
+        val handleJob1 = launch { manager.handleNode("node-1", conn1) }
+        val handleJob2 = launch { manager.handleNode("node-2", conn2) }
+        yield()
+
+        registry.assignRoom("room-A", "node-1")
+        registry.assignRoom("room-B", "node-1")
+        registry.assignRoom("room-C", "node-2")
+
+        manager.broadcastToAllRooms(TestAction.Message("announcement"))
+
+        // node-1 should receive room-A and room-B
+        assertEquals(2, conn1.sentActions.size)
+        assertTrue(conn1.sentActions.contains(NodeAction<TestAction>("room-A", TestAction.Message("announcement"))))
+        assertTrue(conn1.sentActions.contains(NodeAction<TestAction>("room-B", TestAction.Message("announcement"))))
+
+        // node-2 should receive room-C
+        assertEquals(1, conn2.sentActions.size)
+        assertEquals(NodeAction<TestAction>("room-C", TestAction.Message("announcement")), conn2.sentActions[0])
+
+        handleJob1.cancel()
+        handleJob2.cancel()
+        handleJob1.join()
+        handleJob2.join()
+        manager.close()
+    }
+
+    @Test
+    fun broadcastToAllRoomsWithNoRoomsDoesNothing() = runTest {
+        val manager = CentralNodeManager<TestAction>(
+
+            onUpstreamAction = { _, _, _ -> },
+        )
+
+        // No rooms assigned — should silently do nothing
+        manager.broadcastToAllRooms(TestAction.Message("nobody listening"))
+
+        manager.close()
+    }
+
+    @Test
     fun handleNodeAfterCloseThrows() = runTest {
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
+
             onUpstreamAction = { _, _, _ -> },
         )
 
@@ -375,7 +425,7 @@ class CentralNodeManagerTest {
     @Test
     fun duplicateNodeIdReplacesConnection() = runTest {
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
+
             onUpstreamAction = { _, _, _ -> },
         )
 

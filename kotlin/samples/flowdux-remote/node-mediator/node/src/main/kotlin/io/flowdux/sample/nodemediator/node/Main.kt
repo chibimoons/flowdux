@@ -6,7 +6,7 @@ import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.nodemediator.InMemoryRoomRegistry
 import io.flowdux.remote.nodemediator.NodeMediator
 import io.flowdux.remote.nodemediator.NodeMediatorEvent
-import io.flowdux.remote.nodemediator.typedNodeActionJson
+import io.flowdux.remote.nodemediator.webSocketNodeTransport
 import io.flowdux.remote.serialization.typedJsonAs
 import io.flowdux.remote.server.pattern.createSharedStateRoomServer
 import io.flowdux.sample.nodemediator.shared.ChatAction
@@ -73,16 +73,16 @@ fun main(args: Array<String>) {
     )
 
     // Connect to Central server
-    val centralConnection = KtorWebSocketClientConnection.create(
+    val transport = KtorWebSocketClientConnection.create(
         host = centralHost,
         port = centralPort,
         path = "/node/$nodeId",
-    ).typedNodeActionJson<SharedChatAction>()
+    ).webSocketNodeTransport<SharedChatAction>()
 
     lateinit var mediator: NodeMediator<SharedChatAction>
     mediator = NodeMediator(
         nodeId = nodeId,
-        centralConnection = centralConnection,
+        transport = transport,
         scope = applicationScope,
         onUnknownRoom = { roomId, action ->
             // Dynamic room creation when Central relays to an unknown room
@@ -134,7 +134,7 @@ fun main(args: Array<String>) {
     // Tracks which room each client session belongs to
     val sessionRooms = java.util.concurrent.ConcurrentHashMap<String, String>()
 
-    embeddedServer(CIO, port = localPort) {
+    val server = embeddedServer(CIO, port = localPort) {
         install(WebSockets) {
             pingPeriod = 15.seconds
         }
@@ -210,6 +210,9 @@ fun main(args: Array<String>) {
                                 // Subscribe client to new room state
                                 subscribeToRoom(room)
 
+                                // Brief delay so the client receives initial SyncState
+                                // before JoinRoom modifies the room state. A production
+                                // app should use a state-emission signal instead.
                                 delay(50)
                                 room.store.dispatch(action)
                                 mediator.forwardToCentral(roomId, action)
@@ -250,12 +253,17 @@ fun main(args: Array<String>) {
                 }
             }
         }
-    }.start(wait = true)
-
-    applicationScope.launch {
-        mediator.close()
-        roomServer.close()
     }
+
+    Runtime.getRuntime().addShutdownHook(Thread {
+        println("[$nodeId] Shutting down...")
+        kotlinx.coroutines.runBlocking {
+            mediator.close()
+            roomServer.close()
+        }
+    })
+
+    server.start(wait = true)
 }
 
 private fun roomProcessors() =

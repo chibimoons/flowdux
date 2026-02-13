@@ -30,13 +30,13 @@ Node Mediator 패턴은 **단일 서버의 WebSocket 연결 한계**(~10,000)를
 Central (릴레이 전용 — Store 없음)
     │
     ├── CentralNodeManager (메시지 중계)
-    │     ├── Node A (NodeMediator) → Room Stores, Client Stores
-    │     ├── Node B (NodeMediator) → Room Stores, Client Stores
-    │     └── Node C (NodeMediator) → Room Stores, Client Stores
+    │     ├── Node A (NodeMediator → NodeTransport) → Room Stores, Client Stores
+    │     ├── Node B (NodeMediator → NodeTransport) → Room Stores, Client Stores
+    │     └── Node C (NodeMediator → NodeTransport) → Room Stores, Client Stores
     │
     └── RoomRegistry (room → node 매핑)
 
-Central ↔ Node: 노드당 1개 WebSocket (Central은 relay만 수행)
+Central ↔ Node: NodeTransport 추상화 (WebSocket, Kafka 등)
 Node 내부: 로컬 Room Store에서 상태 관리 + 클라이언트에 브로드캐스트
 ```
 
@@ -121,11 +121,9 @@ import io.flowdux.remote.nodemediator.CentralNodeManager
 import io.flowdux.remote.nodemediator.InMemoryRoomRegistry
 
 val roomRegistry = InMemoryRoomRegistry()
-val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 val centralNodeManager = CentralNodeManager<SharedAction>(
     roomRegistry = roomRegistry,
-    scope = scope,
     onUpstreamAction = { nodeId, roomId, action ->
         // Node에서 올라온 액션을 Central Store에 dispatch
         centralStore.dispatch(action)
@@ -166,8 +164,11 @@ centralNodeManager.sendToRoom("room-1", SyncState(state))
 // 특정 node에 직접 전송
 centralNodeManager.sendToNode("node-A", "room-1", SyncState(state))
 
-// 모든 node에 브로드캐스트
+// 모든 node에 특정 room 브로드캐스트
 centralNodeManager.broadcastToAllNodes("room-1", SyncState(state))
+
+// 전체 room에 브로드캐스트 (전체 공지 등)
+centralNodeManager.broadcastToAllRooms(SystemNotice("서버 점검 안내"))
 ```
 
 ### 4. Central Relay 패턴 (cross-node 릴레이)
@@ -205,17 +206,17 @@ val centralNodeManager = CentralNodeManager<SharedAction>(
 ```kotlin
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.nodemediator.NodeMediator
-import io.flowdux.remote.nodemediator.typedNodeActionJson
+import io.flowdux.remote.nodemediator.webSocketNodeTransport
 
-val centralConnection = KtorWebSocketClientConnection.create(
+val transport = KtorWebSocketClientConnection.create(
     host = "central-server",
     port = 8080,
     path = "/node/node-A",
-).typedNodeActionJson<SharedAction>()
+).webSocketNodeTransport<SharedAction>()
 
 val mediator = NodeMediator(
     nodeId = "node-A",
-    centralConnection = centralConnection,
+    transport = transport,
     scope = scope,
     onEvent = { event -> println("Mediator event: $event") },
 )
@@ -284,13 +285,55 @@ class RedisRoomRegistry(private val redis: RedisClient) : RoomRegistry {
 }
 ```
 
+## 전송 계층 추상화 (NodeTransport)
+
+`NodeMediator`는 `NodeTransport<A>` 인터페이스를 통해 전송 계층과 분리되어 있습니다. 전송 방식을 변경할 때 `NodeMediator` 코드는 수정할 필요 없이 transport 생성 1줄만 교체하면 됩니다.
+
+```kotlin
+interface NodeTransport<A : Action> {
+    val incoming: Flow<NodeAction<A>>
+    suspend fun send(action: NodeAction<A>)
+    suspend fun subscribeRoom(roomId: String)
+    suspend fun unsubscribeRoom(roomId: String)
+    suspend fun connect()
+    suspend fun disconnect()
+}
+```
+
+### WebSocket (기본)
+
+`WebSocketNodeTransport`는 `TypedClientConnection`을 래핑합니다. Central이 라우팅을 담당하므로 `subscribeRoom`/`unsubscribeRoom`은 no-op입니다:
+
+```kotlin
+val transport = KtorWebSocketClientConnection.create(host, port, "/node/node-A")
+    .webSocketNodeTransport<SharedAction>()
+```
+
+### Kafka 마이그레이션 경로
+
+WebSocket → Kafka 전환 시 `KafkaNodeTransport`를 구현하면 됩니다. `subscribeRoom`에서 topic을 subscribe하고, `unsubscribeRoom`에서 unsubscribe합니다:
+
+```kotlin
+// Before (WebSocket):
+val transport = clientConnection.webSocketNodeTransport<SharedAction>()
+
+// After (Kafka):
+val transport = KafkaNodeTransport<SharedAction>(bootstrapServers = "kafka:9092")
+
+// NodeMediator 코드는 동일
+val mediator = NodeMediator(nodeId = "node-A", transport = transport, scope = scope)
+```
+
 ## 직렬화 설정
 
 ### Extension Functions 사용 (권장)
 
 ```kotlin
-// Node-side (클라이언트 연결)
-val physical = clientConnection.typedNodeActionJson<SharedAction>()
+// Node-side — NodeTransport 생성 (NodeMediator에 전달)
+val transport = clientConnection.webSocketNodeTransport<SharedAction>()
+
+// Node-side — TypedClientConnection 생성 (직접 사용 시)
+val typed = clientConnection.typedNodeActionJson<SharedAction>()
 
 // Central-side (서버 연결)
 val physical = serverConnection.typedNodeActionJson<SharedAction>()
@@ -475,6 +518,166 @@ Node 수가 적고(~10개), 대부분의 Node가 같은 room을 공유하는 경
 | ~100만 | Central 1대 + Node N대 | **불필요** | **현재 Node Mediator 구조** |
 | ~1,000만 | Central 샤딩 (room 기반) | **불필요** | Room→Central 라우터 + 복수 Central |
 | ~1억+ | Event Bus | Kafka / Redis 클러스터 | Central 제거, topic 기반 pub/sub |
+
+### 확장 시나리오: 서버 1대에서 시작
+
+물리 서버 1대로 시작하여 트래픽 증가에 따라 확장해 나가는 실전 시나리오입니다. 클라이언트는 nodeId를 알 필요 없이 Node 서버(또는 Load Balancer) 주소로만 접속합니다.
+
+#### Stage 0: 단일 서버 (FlowDux 단독)
+
+```
+┌──────────────────────────┐
+│       물리 서버 1대        │
+│                          │
+│  Ktor Server             │
+│    ├── Store (상태 관리)   │
+│    ├── WS /ws (클라이언트) │
+│    └── Room Store × N    │
+│                          │
+│  Client → :8080/ws       │
+└──────────────────────────┘
+```
+
+- **동접**: ~10,000
+- **외부 인프라**: 없음
+- **코드**: Room Pattern / `handleClient()` 단독
+- **전환 신호**: 동접 5,000~8,000 근접, 응답 지연 증가
+
+#### Stage 1: 단일 서버 + OS 튜닝
+
+코드 변경 없이 OS 설정만 조정합니다:
+
+```bash
+# /etc/sysctl.conf
+net.core.somaxconn = 65535
+fs.file-max = 1000000
+
+# /etc/security/limits.conf
+* soft nofile 100000
+* hard nofile 100000
+```
+
+- **동접**: ~50,000~100,000
+- **코드 변경**: 없음
+- **전환 신호**: 단일 서버 스펙 한계, 장애 시 전체 서비스 중단 (SPOF)
+
+#### Stage 2: Node Mediator 도입 (2~3대)
+
+```
+┌──────────────────┐
+│  서버 1: Central  │
+│  (릴레이 전용)     │
+│  CentralNode     │
+│  Manager         │
+│  + RoomRegistry  │
+└──────┬───────────┘
+       │ WS 1개씩
+  ┌────┴────┐
+  │         │
+┌─┴──┐  ┌──┴─┐
+│서버2│  │서버3│
+│Node│  │Node│
+│ A  │  │ B  │
+│~10K│  │~10K│
+└────┘  └────┘
+```
+
+- **동접**: ~20,000~30,000
+- **외부 인프라**: 없음 (FlowDux만으로 구성)
+- **코드 변경**: 기존 Room Store 유지, `NodeMediator` + `webSocketNodeTransport` 추가
+- **전환 신호**: Node 10대 이상, Central CPU 포화
+
+#### Stage 3: Node 수평 확장 (10~50대)
+
+```
+             Central (서버 1대)
+                  │
+     ┌────┬──────┼──────┬────┐
+   Node  Node  Node  Node  Node ...
+   ×10K  ×10K  ×10K  ×10K  ×10K
+```
+
+- **동접**: ~100,000~500,000
+- **외부 인프라**: 없음
+- **코드 변경**: 없음 (Node 서버 인스턴스 추가만)
+- Node 앞에 L7 Load Balancer 배치 → 클라이언트 분산
+- **전환 신호**: Central 1대의 relay throughput 한계
+
+#### Stage 4: Central 샤딩 (50~100대)
+
+```
+           L7 Router (room 기반)
+          ┌────────┴────────┐
+     Central-A          Central-B
+     room 1~500         room 501~1000
+       │  │               │  │
+     Node Node          Node Node ...
+```
+
+- **동접**: ~1,000만
+- **외부 인프라**: 없음 (L7 라우터만 추가)
+- **코드 변경**: Node가 room에 따라 해당 Central에 연결하도록 설정 변경
+- **전환 신호**: Central 샤드 수십 개 이상, 운영 복잡도 급증
+
+#### Stage 5: Kafka 도입 (100대+)
+
+```
+           ┌─────────────────┐
+           │  Kafka Cluster  │  ← 여기서 처음으로 외부 인프라 등장
+           │  (매니지드 서비스) │
+           └──┬────┬────┬───┘
+              │    │    │
+           Node  Node  Node × 100+
+```
+
+- **동접**: ~1억
+- **외부 인프라**: Kafka 클러스터 (AWS MSK, Confluent Cloud 등)
+- **코드 변경**: transport 1줄만 교체
+- Central 서버 제거 — Kafka가 대체
+- 공지: Admin이 `__broadcast` topic에 publish
+
+```kotlin
+// Before (Stage 2~4):
+val transport = clientConnection.webSocketNodeTransport<SharedAction>()
+
+// After (Stage 5):
+val transport = KafkaNodeTransport<SharedAction>(bootstrapServers = "kafka:9092")
+
+// NodeMediator 코드 동일
+val mediator = NodeMediator(nodeId, transport, scope)
+```
+
+#### 시나리오 요약
+
+| Stage | 서버 수 | 동접 | 외부 인프라 | 코드 변경 |
+|-------|--------|------|-----------|----------|
+| **0** | 1대 | ~10K | 없음 | — |
+| **1** | 1대 (튜닝) | ~100K | 없음 | 없음 |
+| **2** | 2~3대 | ~30K | 없음 | NodeMediator 추가 |
+| **3** | 10~50대 | ~500K | 없음 | 없음 (Node 추가만) |
+| **4** | 50~100대 | ~1,000만 | 없음 | Central 라우팅 설정 |
+| **5** | 100대+ | ~1억 | Kafka | transport 1줄 교체 |
+
+> **대안: 처음부터 Central + Node로 시작하기**
+>
+> Stage 0~1을 건너뛰고 서버 1대에서 Central과 Node를 함께 실행하는 방법도 있습니다.
+> localhost 경유 오버헤드는 sub-ms 수준으로 무시할 수 있으며, 확장 시 코드 변경 없이
+> Central을 별도 서버로 분리하고 Node 서버를 추가하기만 하면 됩니다.
+>
+> ```
+> ┌──────────────────────────────┐
+> │         물리 서버 1대          │
+> │                              │
+> │  [Central]  ←── localhost ──  [Node]  ←── Client
+> │  :8080                       :8081
+> └──────────────────────────────┘
+>
+> # 확장 시: 환경변수만 변경
+> Node-A: CENTRAL_HOST=10.0.0.1  (기존 서버)
+> Node-B: CENTRAL_HOST=10.0.0.1  (신규 서버 추가)
+> ```
+>
+> 초기 복잡도가 약간 높지만 마이그레이션 비용이 0이므로, 확장을 예상하는 경우 권장합니다.
 
 ## 제약사항
 

@@ -1,7 +1,6 @@
 package io.flowdux.remote.nodemediator
 
 import io.flowdux.Action
-import io.flowdux.remote.TypedClientConnection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -21,12 +20,12 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  *
  * Usage:
  * ```kotlin
- * val centralConn = KtorWebSocketClientConnection.create(centralHost, centralPort, "/node")
- *     .typedNodeActionJson<SharedAction>()
+ * val transport = KtorWebSocketClientConnection.create(centralHost, centralPort, "/node")
+ *     .webSocketNodeTransport<SharedAction>()
  *
  * val mediator = NodeMediator(
  *     nodeId = "node-1",
- *     centralConnection = centralConn,
+ *     transport = transport,
  *     scope = scope,
  *     onEvent = { event -> logger.info("$event") },
  * )
@@ -43,7 +42,7 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  *
  * @param A The type of actions being mediated
  * @param nodeId Unique identifier for this node
- * @param centralConnection The connection to the Central server carrying [NodeAction] messages
+ * @param transport The transport layer for communicating with the Central server
  * @param scope The coroutine scope for the routing job
  * @param onUnknownRoom Optional callback invoked when an action arrives for an unregistered room.
  *        This allows dynamic room creation on the node.
@@ -54,7 +53,7 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 @OptIn(ExperimentalAtomicApi::class)
 class NodeMediator<A : Action>(
     private val nodeId: String,
-    private val centralConnection: TypedClientConnection<NodeAction<A>>,
+    private val transport: NodeTransport<A>,
     private val scope: CoroutineScope,
     private val onUnknownRoom: (suspend (roomId: String, action: A) -> Unit)? = null,
     private val onEvent: ((NodeMediatorEvent) -> Unit)? = null,
@@ -86,7 +85,7 @@ class NodeMediator<A : Action>(
         connectJob = scope.launch {
             var connectFailed = false
             try {
-                centralConnection.connect()
+                transport.connect()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -128,14 +127,14 @@ class NodeMediator<A : Action>(
         if (connectSnapshot != null && callerJob != connectSnapshot) {
             connectSnapshot.join()
         }
-        centralConnection.disconnect()
+        transport.disconnect()
     }
 
     private fun startRouting() {
         routingJob = scope.launch {
             var transportError: Exception? = null
             try {
-                centralConnection.incoming.collect { nodeAction ->
+                transport.incoming.collect { nodeAction ->
                     val roomId = nodeAction.roomId
                     val handler = mutex.withLock { rooms[roomId] }
                     if (handler != null) {
@@ -168,7 +167,7 @@ class NodeMediator<A : Action>(
                 }
             } finally {
                 if (transportError != null) {
-                    centralConnection.disconnect()
+                    transport.disconnect()
                 }
                 connecting.store(false)
             }
@@ -186,6 +185,7 @@ class NodeMediator<A : Action>(
         mutex.withLock {
             rooms[roomId] = handler
         }
+        transport.subscribeRoom(roomId)
     }
 
     /**
@@ -197,6 +197,7 @@ class NodeMediator<A : Action>(
         mutex.withLock {
             rooms.remove(roomId)
         }
+        transport.unsubscribeRoom(roomId)
     }
 
     /**
@@ -207,7 +208,7 @@ class NodeMediator<A : Action>(
      */
     suspend fun forwardToCentral(roomId: String, action: A) {
         check(!closed.load()) { "NodeMediator is closed" }
-        centralConnection.send(NodeAction(roomId, action))
+        transport.send(NodeAction(roomId, action))
     }
 
     /**
@@ -253,7 +254,7 @@ class NodeMediator<A : Action>(
         if (connectSnapshot != null && callerJob != connectSnapshot) {
             connectSnapshot.join()
         }
-        centralConnection.disconnect()
+        transport.disconnect()
     }
 
     private fun safeOnEvent(event: NodeMediatorEvent) {

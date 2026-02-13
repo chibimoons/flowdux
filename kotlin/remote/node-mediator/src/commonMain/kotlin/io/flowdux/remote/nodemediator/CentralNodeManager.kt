@@ -3,7 +3,6 @@ package io.flowdux.remote.nodemediator
 import io.flowdux.Action
 import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
@@ -22,7 +21,6 @@ import kotlinx.coroutines.withContext
  * val roomRegistry = InMemoryRoomRegistry()
  * val manager = CentralNodeManager<SharedAction>(
  *     roomRegistry = roomRegistry,
- *     scope = scope,
  *     onUpstreamAction = { nodeId, roomId, action ->
  *         centralStore.dispatch(action)
  *     },
@@ -42,14 +40,12 @@ import kotlinx.coroutines.withContext
  *
  * @param A The type of actions being managed
  * @param roomRegistry Registry mapping rooms to nodes (for [sendToRoom])
- * @param scope The coroutine scope (unused, kept for API consistency)
  * @param onUpstreamAction Callback invoked when a node sends an action upstream.
  *        Receives the nodeId, roomId, and the action.
  * @param onEvent Optional callback for manager events (node connect/disconnect, errors).
  */
 class CentralNodeManager<A : Action>(
     private val roomRegistry: RoomRegistry = InMemoryRoomRegistry(),
-    @Suppress("unused") private val scope: CoroutineScope,
     private val onUpstreamAction: suspend (nodeId: String, roomId: String, action: A) -> Unit,
     private val onEvent: ((NodeMediatorEvent) -> Unit)? = null,
 ) {
@@ -153,6 +149,27 @@ class CentralNodeManager<A : Action>(
         for (entry in entries) {
             try {
                 entry.connection.send(NodeAction(roomId, action))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Individual send failure should not stop broadcasting
+            }
+        }
+    }
+
+    /**
+     * Broadcasts an action to every registered room across all nodes.
+     *
+     * Iterates all room assignments in [roomRegistry] and sends the action
+     * to each room's owning node. Individual send failures are silently ignored.
+     *
+     * @param action The action to broadcast to all rooms
+     */
+    suspend fun broadcastToAllRooms(action: A) {
+        val assignments = roomRegistry.getAllAssignments()
+        for ((roomId, nodeId) in assignments) {
+            try {
+                sendToNode(nodeId, roomId, action)
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {

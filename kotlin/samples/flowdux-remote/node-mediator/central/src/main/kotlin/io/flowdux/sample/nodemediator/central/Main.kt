@@ -39,7 +39,6 @@ fun main() {
     lateinit var manager: CentralNodeManager<SharedChatAction>
     manager = CentralNodeManager(
         roomRegistry = roomRegistry,
-        scope = applicationScope,
         onUpstreamAction = { nodeId, roomId, action ->
             // Relay asynchronously to avoid CancellationException propagation
             // back through handleNode's collect, which would kill the sender's connection.
@@ -95,7 +94,7 @@ fun main() {
     )
     println()
 
-    embeddedServer(CIO, port = 8080) {
+    val server = embeddedServer(CIO, port = 8080) {
         install(WebSockets) {
             pingPeriod = 15.seconds
         }
@@ -117,7 +116,12 @@ fun main() {
                 manager.handleNode(nodeId, connection)
             }
         }
-    }.start(wait = true)
+    }
 
-    applicationScope.launch { manager.close() }
+    Runtime.getRuntime().addShutdownHook(Thread {
+        println("[Central] Shutting down...")
+        kotlinx.coroutines.runBlocking { manager.close() }
+    })
+
+    server.start(wait = true)
 }

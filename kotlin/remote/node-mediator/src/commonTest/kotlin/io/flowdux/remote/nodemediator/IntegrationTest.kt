@@ -79,13 +79,12 @@ class IntegrationTest {
 
         val manager = CentralNodeManager<TestAction>(
             roomRegistry = registry,
-            scope = this,
             onUpstreamAction = { _, _, _ -> },
         )
 
         val mediator = NodeMediator<TestAction>(
             nodeId = "node-1",
-            centralConnection = link.clientSide,
+            transport = WebSocketNodeTransport(link.clientSide),
             scope = this,
         )
 
@@ -116,12 +115,11 @@ class IntegrationTest {
     }
 
     @Test
-    fun nodeToentralUpstreamRouting() = runTest {
+    fun nodeToCentralUpstreamRouting() = runTest {
         val link = LinkedConnection()
         val upstreamReceived = mutableListOf<Triple<String, String, TestAction>>()
 
         val manager = CentralNodeManager<TestAction>(
-            scope = this,
             onUpstreamAction = { nodeId, roomId, action ->
                 upstreamReceived.add(Triple(nodeId, roomId, action))
             },
@@ -129,7 +127,7 @@ class IntegrationTest {
 
         val mediator = NodeMediator<TestAction>(
             nodeId = "node-1",
-            centralConnection = link.clientSide,
+            transport = WebSocketNodeTransport(link.clientSide),
             scope = this,
         )
 
@@ -168,7 +166,6 @@ class IntegrationTest {
         lateinit var manager: CentralNodeManager<TestAction>
         manager = CentralNodeManager<TestAction>(
             roomRegistry = registry,
-            scope = this,
             onUpstreamAction = { _, roomId, action ->
                 // Central relays upstream action to the target room's node
                 manager.sendToRoom(roomId, action)
@@ -177,12 +174,12 @@ class IntegrationTest {
 
         val mediatorA = NodeMediator<TestAction>(
             nodeId = "node-A",
-            centralConnection = linkA.clientSide,
+            transport = WebSocketNodeTransport(linkA.clientSide),
             scope = this,
         )
         val mediatorB = NodeMediator<TestAction>(
             nodeId = "node-B",
-            centralConnection = linkB.clientSide,
+            transport = WebSocketNodeTransport(linkB.clientSide),
             scope = this,
         )
 
@@ -224,7 +221,6 @@ class IntegrationTest {
 
         val manager = CentralNodeManager<TestAction>(
             roomRegistry = registry,
-            scope = this,
             onUpstreamAction = { _, _, _ -> },
             onEvent = { events.add(it) },
         )
@@ -251,7 +247,7 @@ class IntegrationTest {
 
         val mediator = NodeMediator<TestAction>(
             nodeId = "node-1",
-            centralConnection = link2.clientSide,
+            transport = WebSocketNodeTransport(link2.clientSide),
             scope = this,
         )
 
@@ -292,18 +288,17 @@ class IntegrationTest {
 
         val manager = CentralNodeManager<TestAction>(
             roomRegistry = registry,
-            scope = this,
             onUpstreamAction = { _, _, _ -> },
         )
 
         val mediatorA = NodeMediator<TestAction>(
             nodeId = "node-A",
-            centralConnection = linkA.clientSide,
+            transport = WebSocketNodeTransport(linkA.clientSide),
             scope = this,
         )
         val mediatorB = NodeMediator<TestAction>(
             nodeId = "node-B",
-            centralConnection = linkB.clientSide,
+            transport = WebSocketNodeTransport(linkB.clientSide),
             scope = this,
         )
 
@@ -355,7 +350,6 @@ class IntegrationTest {
 
         val manager = CentralNodeManager<TestAction>(
             roomRegistry = registry,
-            scope = this,
             onUpstreamAction = { nodeId, roomId, action ->
                 centralReceived.add(Triple(nodeId, roomId, action))
             },
@@ -363,7 +357,7 @@ class IntegrationTest {
 
         val mediator = NodeMediator<TestAction>(
             nodeId = "node-1",
-            centralConnection = link.clientSide,
+            transport = WebSocketNodeTransport(link.clientSide),
             scope = this,
         )
 

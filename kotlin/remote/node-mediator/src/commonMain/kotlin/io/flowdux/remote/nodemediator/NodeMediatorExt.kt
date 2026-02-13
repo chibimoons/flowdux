@@ -54,3 +54,23 @@ inline fun <reified A : Action> ServerConnection.typedNodeActionJson(
     val nodeCodec = nodeRoutedActionCodecOf<A>(json)
     return typed(nodeCodec, JsonMessageCodec())
 }
+
+/**
+ * Creates a [WebSocketNodeTransport] for [NodeAction] using JSON serialization.
+ *
+ * Use this when creating a [NodeMediator] with a WebSocket connection:
+ * ```kotlin
+ * val transport = KtorWebSocketClientConnection.create(host, port, "/node")
+ *     .webSocketNodeTransport<SharedAction>()
+ *
+ * val mediator = NodeMediator(nodeId, transport, scope)
+ * ```
+ *
+ * @param json Custom [Json] instance for action serialization. Defaults to
+ *   [SerializableActionCodec.DefaultJson] (with `classDiscriminator = "type"`).
+ */
+inline fun <reified A : Action> ClientConnection.webSocketNodeTransport(
+    json: Json = SerializableActionCodec.DefaultJson,
+): NodeTransport<A> {
+    return WebSocketNodeTransport(typedNodeActionJson<A>(json))
+}
