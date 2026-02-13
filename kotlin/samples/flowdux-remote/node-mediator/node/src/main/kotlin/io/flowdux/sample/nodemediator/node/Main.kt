@@ -27,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Node Mediator Demo — Node Server
@@ -146,7 +147,9 @@ fun main(args: Array<String>) {
     val sessionRooms = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     embeddedServer(CIO, port = localPort) {
-        install(WebSockets)
+        install(WebSockets) {
+            pingPeriod = 15.seconds
+        }
 
         routing {
             get("/rooms") {

@@ -18,6 +18,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Node Mediator Demo — Central Server
@@ -40,12 +41,19 @@ fun main() {
         roomRegistry = roomRegistry,
         scope = applicationScope,
         onUpstreamAction = { nodeId, roomId, action ->
-            // Relay the action to all OTHER nodes (exclude sender)
+            // Relay asynchronously to avoid CancellationException propagation
+            // back through handleNode's collect, which would kill the sender's connection.
             println("[Central] Upstream from node=$nodeId room=$roomId: $action")
-            val allNodes = manager.connectedNodeIds()
-            for (targetNodeId in allNodes) {
-                if (targetNodeId != nodeId) {
-                    manager.sendToNode(targetNodeId, roomId, action)
+            applicationScope.launch {
+                val allNodes = manager.connectedNodeIds()
+                for (targetNodeId in allNodes) {
+                    if (targetNodeId != nodeId) {
+                        try {
+                            manager.sendToNode(targetNodeId, roomId, action)
+                        } catch (_: Exception) {
+                            println("[Central] Failed to relay to $targetNodeId")
+                        }
+                    }
                 }
             }
         },
@@ -88,7 +96,9 @@ fun main() {
     println()
 
     embeddedServer(CIO, port = 8080) {
-        install(WebSockets)
+        install(WebSockets) {
+            pingPeriod = 15.seconds
+        }
 
         routing {
             get("/stats") {
