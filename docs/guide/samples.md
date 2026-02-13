@@ -525,9 +525,9 @@ curl -X POST http://localhost:8080/winner
 
 ## Remote Node Mediator Sample
 
-**학습 포인트:** CentralNodeManager, NodeMediator, InMemoryRoomRegistry, 분산 노드 라우팅
+**학습 포인트:** CentralNodeManager, NodeMediator, InMemoryRoomRegistry, 분산 노드 라우팅, 멀티룸
 
-Central 서버가 여러 Node 서버를 관리하는 분산 채팅 예제입니다. 각 Node는 `NodeMediator`로 Central에 연결하고, 로컬 클라이언트를 처리합니다. Cross-node 메시지는 Central을 통해 릴레이됩니다.
+Central 서버가 여러 Node 서버를 관리하는 분산 채팅 예제입니다. 각 Node는 `NodeMediator`로 Central에 연결하고, 로컬 클라이언트를 처리합니다. 클라이언트는 `/join <room>`으로 방을 전환할 수 있으며, cross-node 메시지는 Central을 통해 릴레이됩니다.
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -539,6 +539,10 @@ Central 서버가 여러 Node 서버를 관리하는 분산 채팅 예제입니�
 │ Node (:8081)│     │ Node (:8082)│
 │ NodeMediator│     │ NodeMediator│
 │ RoomServer  │     │ RoomServer  │
+│ ┌─────────┐ │     │ ┌─────────┐ │
+│ │  lobby  │ │     │ │  lobby  │ │
+│ │ game-1  │ │     │ │ game-1  │ │
+│ └─────────┘ │     │ └─────────┘ │
 └──────┬──────┘     └──────┬──────┘
        │ WS /ws            │ WS /ws
    Client A             Client B
@@ -564,13 +568,45 @@ Central 서버가 여러 Node 서버를 관리하는 분산 채팅 예제입니�
 ./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Bob localhost 8082"
 ```
 
+### 클라이언트 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `/join <room>` | 다른 방으로 이동 (기존 방 자동 퇴장) |
+| `/users` | 현재 방의 접속 유저 목록 |
+| `/room` | 현재 방 이름 확인 |
+| `/quit` | 종료 |
+
 ### 데모 시나리오
+
+**기본: cross-node 채팅**
 
 1. Central 서버 시작 (port 8080)
 2. Node 서버 2개 시작 (port 8081, 8082) — 각 Node가 Central에 WebSocket 연결
 3. Alice: node-1에 접속 → `lobby` room 자동 생성
 4. Bob: node-2에 접속 → node-2에도 `lobby` room 생성 (같은 room, 다른 Node)
-5. Alice가 메시지 전송 → node-1 로컬 반영 → Central 릴레이 → node-2 반영 → Bob에게 전달
+5. Alice가 메시지 전송 → Bob에게 Central 통해 전달
+
+**멀티룸: 방 전환과 격리**
+
+6. Alice: `/join game-1` → lobby 자동 퇴장, game-1 입장
+7. Bob: lobby에서 메시지 전송 → Alice에게 안 감 (방 격리)
+8. Bob: `/join game-1` → node-2에 game-1이 Central 릴레이로 자동 생성
+9. Bob: game-1에서 메시지 전송 → Alice에게 전달 (같은 방, 다른 Node)
+
+```
+시간  Alice (node-1)           Bob (node-2)
+ │    lobby에서 입장            lobby에서 입장
+ │    "Hello!" ─────────────► "Hello!" 수신 (cross-node)
+ │    /join game-1
+ │    lobby 퇴장 ──────────► "Alice left" 표시
+ │    game-1 입장
+ │                              "Hi!" (lobby에서) ──✗── Alice에게 안 감
+ │                              /join game-1
+ │                              lobby 퇴장, game-1 입장
+ │    "Bob joined" 표시 ◄──── game-1 입장
+ │                              "Hey!" ────────────► Alice에게 전달
+```
 
 ### 내부 동작 워크스루
 
@@ -631,22 +667,33 @@ Alice (Client)                Node-1                    Central                 
 | **Node (NodeMediator)** | Node 서버 | Central과 WS 연결, `forwardToCentral()`로 상향 전송, room handler로 하향 수신 |
 | **Central (NodeManager)** | Central 서버 | Node 연결 관리, `onUpstreamAction`에서 발신 Node 제외 후 비동기 릴레이 |
 
-#### 핵심 코드 흐름 (Node)
+#### 핵심 코드 흐름 (Node — 방 전환)
 
 ```kotlin
-// 클라이언트가 SendMessage를 보내면:
-is SharedChatAction.SendMessage -> {
-    val room = roomServer.getRoom(roomId)
+is SharedChatAction.JoinRoom -> {
+    val roomId = action.roomId  // 클라이언트가 지정한 방
 
-    // 1. 로컬 store에 dispatch → Processor → Reducer → 상태 반영
+    // 기존 방이 있으면 자동 퇴장
+    val oldRoomId = sessionRooms[sessionId]
+    if (oldRoomId != null && oldRoomId != roomId) {
+        val oldRoom = roomServer.getRoom(oldRoomId)
+        oldRoom?.store?.dispatch(SharedChatAction.LeaveRoom(action.user))
+        mediator.forwardToCentral(oldRoomId, SharedChatAction.LeaveRoom(action.user))
+    }
+
+    // 새 방 생성/참여 + Central 등록
+    val room = roomServer.getOrCreateRoom(roomId)
+    if (!mediator.hasRoom(roomId)) {
+        mediator.registerRoom(roomId) { room.store.dispatch(it) }
+    }
+
+    subscribeToRoom(room)  // 클라이언트에 새 방 상태 전송
     room.store.dispatch(action)
-
-    // 2. Central로 전달 → 다른 Node에 릴레이됨
     mediator.forwardToCentral(roomId, action)
 }
 ```
 
-#### 핵심 코드 흐름 (Central)
+#### 핵심 코드 흐름 (Central — 릴레이)
 
 ```kotlin
 onUpstreamAction = { nodeId, roomId, action ->
@@ -660,6 +707,10 @@ onUpstreamAction = { nodeId, roomId, action ->
     }
 }
 ```
+
+#### 방 격리 원리
+
+Central은 `NodeAction(roomId, action)` 형태로 메시지를 중계합니다. 수신 Node의 `NodeMediator`는 roomId로 등록된 handler를 찾아 해당 room store에만 dispatch합니다. 다른 room의 store에는 영향을 주지 않으므로, 같은 Node에 여러 room이 있어도 메시지가 격리됩니다.
 
 자세한 패턴 설명은 [Node Mediator Pattern](./pattern-node-mediator.md)을 참조하세요.
 
