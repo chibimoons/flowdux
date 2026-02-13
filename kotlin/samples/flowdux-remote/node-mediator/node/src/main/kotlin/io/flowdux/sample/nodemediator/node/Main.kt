@@ -94,7 +94,7 @@ fun main(args: Array<String>) {
     nodeRoomServer.connect()
 
     // Periodic cleanup of empty rooms
-    applicationScope.launch {
+    val cleanupJob = applicationScope.launch {
         kotlinx.coroutines.delay(30_000)
         while (isActive) {
             val destroyed = nodeRoomServer.cleanupEmptyRooms()
@@ -157,6 +157,7 @@ fun main(args: Array<String>) {
 
     Runtime.getRuntime().addShutdownHook(Thread {
         println("[$nodeId] Shutting down...")
+        cleanupJob.cancel()
         kotlinx.coroutines.runBlocking {
             nodeRoomServer.close()
         }
