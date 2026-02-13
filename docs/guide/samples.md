@@ -18,6 +18,7 @@ FlowDux 샘플 앱 가이드입니다. 각 샘플은 특정 기능이나 패턴�
 | [remote-poker](#remote-poker-sample) | Per-Client Store | JVM | 비공개 상태 관리 (포커) |
 | [remote-auth](#remote-auth-sample) | In-Band WebSocket 인증 | JVM | 토큰 기반 인증 채팅 |
 | [remote-multiplexer](#remote-multiplexer-sample) | Connection Multiplexer | JVM | 단일 WS, 다중 방 동시 참여 |
+| [remote-node-mediator](#remote-node-mediator-sample) | Node Mediator | JVM | Central↔Node 분산 채팅 |
 
 ---
 
@@ -522,6 +523,59 @@ curl -X POST http://localhost:8080/winner
 
 ---
 
+## Remote Node Mediator Sample
+
+**학습 포인트:** CentralNodeManager, NodeMediator, InMemoryRoomRegistry, 분산 노드 라우팅
+
+Central 서버가 여러 Node 서버를 관리하는 분산 채팅 예제입니다. 각 Node는 `NodeMediator`로 Central에 연결하고, 로컬 클라이언트를 처리합니다. Cross-node 메시지는 Central을 통해 릴레이됩니다.
+
+```
+┌─────────────────────────────────────────────┐
+│            Central (:8080)                   │
+│  CentralNodeManager + InMemoryRoomRegistry  │
+└──────┬───────────────────┬──────────────────┘
+       │ WS /node/node-1   │ WS /node/node-2
+┌──────▼──────┐     ┌──────▼──────┐
+│ Node (:8081)│     │ Node (:8082)│
+│ NodeMediator│     │ NodeMediator│
+│ RoomServer  │     │ RoomServer  │
+└──────┬──────┘     └──────┬──────┘
+       │ WS /ws            │ WS /ws
+   Client A             Client B
+```
+
+### Central 서버 시작
+
+```bash
+./gradlew :kotlin:sample-remote-node-mediator:central:run
+```
+
+### Node 서버 시작 (여러 터미널에서)
+
+```bash
+./gradlew :kotlin:sample-remote-node-mediator:node:run --args="node-1 8081"
+./gradlew :kotlin:sample-remote-node-mediator:node:run --args="node-2 8082"
+```
+
+### 클라이언트 실행
+
+```bash
+./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Alice localhost 8081"
+./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Bob localhost 8082"
+```
+
+### 데모 시나리오
+
+1. Central 서버 시작 (port 8080)
+2. Node 서버 2개 시작 (port 8081, 8082)
+3. Alice: node-1에 접속 → 자동 room 생성
+4. Bob: node-2에 접속 → 별도 room 생성
+5. 각 Node의 메시지가 Central을 통해 다른 Node로 릴레이
+
+자세한 패턴 설명은 [Node Mediator Pattern](./pattern-node-mediator.md)을 참조하세요.
+
+---
+
 ## 관련 문서
 
 - [Server Patterns Overview](./server-patterns.md) — 패턴 선택 가이드 (Single Client, Shared State, Room, Per-Client)
@@ -531,4 +585,5 @@ curl -X POST http://localhost:8080/winner
 - [Room Pattern](./pattern-room.md) — 다중 방 관리 패턴 상세
 - [Per-Client Pattern](./pattern-per-client.md) — 비공개 상태 관리 패턴
 - [Multiplexer Pattern](./pattern-multiplexer.md) — 단일 WebSocket 다중 방 패턴
+- [Node Mediator Pattern](./pattern-node-mediator.md) — Central↔Node 분산 라우팅 패턴
 - [FlowDux Remote vs Raw WebSocket](./flowdux-remote-vs-raw.md) — Use Case별 비교 및 선택 가이드

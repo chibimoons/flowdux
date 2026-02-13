@@ -183,13 +183,15 @@ Central Store + Room Stores + Client Stores
 
 ### 멀티 노드 (1만 ~ 10만)
 
+[NodeMediator](../guide/pattern-node-mediator.md)를 사용하여 Central Store와 다수의 Node를 연결합니다.
+
 ```
 Central Store ←→ Node A (Room 1~100, Client Store 3만개)
               ←→ Node B (Room 101~200, Client Store 3만개)
               ←→ Node C (Room 201~300, Client Store 3만개)
 
-노드 간 통신: WebSocket / gRPC
-Central Store 관점: 연결 3개
+노드 간 통신: NodeMediator (WebSocket, NodeAction 프로토콜)
+Central Store 관점: 연결 3개 (CentralNodeManager)
 ```
 
 ### 대규모 (10만 이상)

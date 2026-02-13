@@ -284,8 +284,9 @@ fun main() {
 |-------|-------|----------------|
 | Current | ~10k | Sequential broadcast |
 | Stage 1 | ~100k | Parallel broadcast (`BroadcastConfig`) |
-| Stage 2 | ~1M | Custom `SessionRegistry` (Redis) |
-| Stage 3 | ~10M+ | Kafka + Redis Cluster |
+| Stage 2 | ~100k+ | [Node Mediator](./pattern-node-mediator.md) (수평 확장) |
+| Stage 3 | ~1M | Custom `SessionRegistry` (Redis) |
+| Stage 4 | ~10M+ | Kafka + Redis Cluster |
 
 ## Sample Application
 
@@ -313,3 +314,4 @@ Test endpoints:
 - [Server Patterns Overview](./server-patterns.md) — Pattern selection guide
 - [Remote State Sync](./remote.md) — Basic client-server setup
 - [Room Pattern](./pattern-room.md) — Multi-room management
+- [Node Mediator Pattern](./pattern-node-mediator.md) — Horizontal scaling across nodes
