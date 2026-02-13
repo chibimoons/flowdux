@@ -181,7 +181,7 @@ Central Store + Room Stores + Client Stores
 모두 같은 프로세스에서 실행
 ```
 
-### 멀티 노드 (1만 ~ 10만)
+### 멀티 노드 (~100만)
 
 [NodeMediator](../guide/pattern-node-mediator.md)를 사용하여 Central Store와 다수의 Node를 연결합니다.
 
@@ -194,10 +194,29 @@ Central Store ←→ Node A (Room 1~100, Client Store 3만개)
 Central Store 관점: 연결 3개 (CentralNodeManager)
 ```
 
-### 대규모 (10만 이상)
+- 보수적: 100 nodes × 10K clients = **100만** 동시 연결
+- 적극적 (OS 튜닝): 500 nodes × 50K clients = **2,500만** 동시 연결
+- 병목: Central의 메시지 중계 throughput (relay fan-out이 Node 수에 비례)
+
+### Central 샤딩 (~1,000만)
+
+단일 Central이 병목이 되면 room 기반으로 Central을 분할합니다:
 
 ```
-Central Store → Event Bus (Kafka 등) → Nodes
+Router (L7 LB)
+  ├── room 1~1000  → Central-A ←→ Node 1~50
+  ├── room 1001~2000 → Central-B ←→ Node 51~100
+  └── room 2001~3000 → Central-C ←→ Node 101~150
+```
+
+Central 수에 비례하여 throughput이 선형 증가합니다.
+
+### 대규모 (~1억+)
+
+Central↔Node 간 WebSocket을 Event Bus로 대체하면 Central이 stateless가 됩니다:
+
+```
+Node ──► Kafka / Redis Streams ◄── Node
 
 Room Store 분산:
   - 활성 방은 메모리에 유지
@@ -208,7 +227,8 @@ Room Store 분산:
 ### 확장 병목 순서
 
 1. WebSocket 연결 수 (파일 디스크립터, OS 튜닝)
-2. 브로드캐스트 fan-out (O(N) 직렬화/전송)
-3. 네트워크 대역폭 (클라이언트수 × 메시지크기 × 빈도)
-4. GC 압력 (JVM, 다수 소형 객체)
-5. Store 메모리 (가장 마지막에 문제됨)
+2. Central relay throughput (Node 수 × 메시지 빈도)
+3. 브로드캐스트 fan-out (O(N) 직렬화/전송)
+4. 네트워크 대역폭 (클라이언트수 × 메시지크기 × 빈도)
+5. GC 압력 (JVM, 다수 소형 객체)
+6. Store 메모리 (가장 마지막에 문제됨)

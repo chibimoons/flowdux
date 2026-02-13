@@ -340,10 +340,87 @@ Node                              Central
   │                                  │   → 레지스트리 정리
 ```
 
+## 용량 한계와 확장 전략
+
+### 계층별 연결 한계
+
+| 계층 | 연결 한계 | 병목 요인 |
+|------|----------|----------|
+| **Central ← Node** | ~수백~수천 | 노드당 WS 1개라 연결 수는 여유. **메시지 throughput**이 실제 병목 |
+| **Node ← Client** | ~10K (기본) / ~50K-100K (OS 튜닝) | 파일 디스크립터, 메모리, broadcast fan-out |
+
+### 최대 처리 용량
+
+```
+보수적: 100 nodes × 10K clients/node = 100만 동시 연결
+적극적: 500 nodes × 50K clients/node = 2,500만 동시 연결
+```
+
+단, **연결 수 ≠ 처리 용량**입니다. Central의 메시지 중계 throughput이 실제 한계를 결정합니다:
+
+```
+Room "lobby"에 10개 Node의 유저가 참여 중
+→ 메시지 1건 = Central이 9개 Node에 relay
+→ 초당 1,000건 메시지 = Central이 초당 9,000건 send
+
+Node가 많아질수록 Central의 relay 부하가 선형 증가
+```
+
+### Central 한계 도달 시 확장 전략
+
+#### 계층 추가 (비권장)
+
+```
+Client → Node → Sub-Central → Central
+```
+
+Node 레이어를 한 단계 더 추가하는 방식은 레이턴시가 2배로 늘고 구조 복잡도가 급증하며, Central 병목은 해결되지 않습니다.
+
+#### 1. Room 기반 Central 샤딩 (가장 실용적)
+
+```
+Central-A: room 1~1000 담당
+Central-B: room 1001~2000 담당
+Central-C: room 2001~3000 담당
+
+Router (L7 Load Balancer)
+  ├── room=lobby  → Central-A
+  ├── room=game-1 → Central-B
+  └── room=game-2 → Central-C
+```
+
+Room 단위로 Central을 분할하면 throughput이 Central 수만큼 선형 증가합니다. Node는 자신이 가진 room에 해당하는 Central에만 연결합니다.
+
+#### 2. Event Bus 도입 (대규모)
+
+```
+현재:  Node ──WS──► Central ──WS──► Node
+변경:  Node ──► Kafka / Redis Streams ◄── Node
+```
+
+Central↔Node 간 WebSocket을 Event Bus로 대체하면 Central이 stateless가 되어 수평 확장이 가능해집니다. 각 Node가 자신의 room topic을 subscribe하고, 메시지를 publish하는 구조입니다.
+
+#### 3. Direct Mesh (특수 케이스)
+
+```
+같은 room을 공유하는 Node끼리 직접 연결
+Central을 거치지 않아 레이턴시/throughput 최적
+```
+
+Node 수가 적고(~10개), 대부분의 Node가 같은 room을 공유하는 경우에 적합합니다. Node 수가 많으면 mesh 연결 수가 O(N²)로 폭증하는 단점이 있습니다.
+
+### 확장 단계 요약
+
+| 규모 | 아키텍처 | 구현 |
+|------|----------|------|
+| ~100만 | Central 1대 + Node N대 | **현재 Node Mediator 구조** |
+| ~1,000만 | Central 샤딩 (room 기반) | Room→Central 라우터 + 복수 Central |
+| ~1억+ | Event Bus (Kafka/Redis Streams) | Central stateless화, topic 기반 pub/sub |
+
 ## 제약사항
 
 - **Room migration 미지원** — 실행 중 room을 다른 node로 이동하는 기능은 제공하지 않습니다
-- **Central 단일 장애점** — Central Store가 다운되면 모든 node가 영향받습니다
+- **Central 단일 장애점** — Central이 다운되면 모든 node가 영향받습니다 (Central 샤딩 또는 Event Bus로 해결)
 - **Event Bus 미지원** — Kafka/Redis Streams 기반 확장은 향후 별도 모듈로 제공 예정
 
 ## 다른 패턴으로 전환
