@@ -10,7 +10,7 @@
 INPUT=$(cat)
 
 # Fast exit: check raw JSON for git keywords before parsing
-if ! echo "$INPUT" | grep -qE '"git push|"gh pr create|"git tag'; then
+if ! echo "$INPUT" | grep -qE 'git push|gh pr create|git tag'; then
   exit 0
 fi
 
