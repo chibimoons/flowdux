@@ -18,8 +18,10 @@ import io.ktor.server.engine.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -77,14 +79,19 @@ fun main(args: Array<String>) {
         path = "/node/$nodeId",
     ).typedNodeActionJson<SharedChatAction>()
 
-    val mediator = NodeMediator(
+    lateinit var mediator: NodeMediator<SharedChatAction>
+    mediator = NodeMediator(
         nodeId = nodeId,
         centralConnection = centralConnection,
         scope = applicationScope,
         onUnknownRoom = { roomId, action ->
-            // Dynamic room creation when Central sends to an unknown room
+            // Dynamic room creation when Central relays to an unknown room
             println("[$nodeId] Unknown room from Central: $roomId, creating...")
             val room = roomServer.getOrCreateRoom(roomId)
+            // Register so subsequent actions route to the handler directly
+            mediator.registerRoom(roomId) { centralAction ->
+                room.store.dispatch(centralAction)
+            }
             room.store.dispatch(action)
         },
         onEvent = { event ->
@@ -135,6 +142,9 @@ fun main(args: Array<String>) {
     )
     println()
 
+    // Tracks which room each client session belongs to
+    val sessionRooms = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     embeddedServer(CIO, port = localPort) {
         install(WebSockets)
 
@@ -151,59 +161,72 @@ fun main(args: Array<String>) {
                 val connection = KtorWebSocketServerConnection(this)
                     .typedJsonAs<SharedChatAction, ChatAction>()
 
+                // Manually subscribe client to room state (instead of handleClient
+                // which would compete for connection.incoming).
+                var stateJob: Job? = null
+
                 try {
-                    // Listen for client actions
                     connection.incoming.collect { action ->
                         when (action) {
                             is SharedChatAction.JoinRoom -> {
-                                val roomId = "room-${action.user}"
+                                val roomId = "lobby"
                                 val room = roomServer.getOrCreateRoom(roomId)
+                                sessionRooms[sessionId] = roomId
 
                                 // Register room with Central if not already
                                 if (!mediator.hasRoom(roomId)) {
                                     mediator.registerRoom(roomId) { centralAction ->
-                                        // Central → Node: dispatch to local room store
                                         room.store.dispatch(centralAction)
                                     }
                                     localRegistry.assignRoom(roomId, nodeId)
                                 }
 
-                                // Handle this client in the room
-                                applicationScope.launch {
-                                    room.handleClient(sessionId, connection)
+                                // Subscribe client to room state changes
+                                stateJob = applicationScope.launch {
+                                    room.store.state.collect { state ->
+                                        val syncAction = SharedChatAction.SyncState(
+                                            RoomState(
+                                                roomId = state.roomId,
+                                                messages = state.messages,
+                                                users = state.users,
+                                                lastEvent = state.lastEvent,
+                                            )
+                                        )
+                                        try {
+                                            connection.send(syncAction)
+                                        } catch (e: CancellationException) {
+                                            throw e
+                                        } catch (_: Exception) {
+                                            // Client disconnected
+                                        }
+                                    }
                                 }
+
                                 delay(50)
                                 room.store.dispatch(action)
-
-                                // Forward to Central for cross-node visibility
                                 mediator.forwardToCentral(roomId, action)
                             }
 
                             is SharedChatAction.SendMessage -> {
-                                // Find the room this client is in and dispatch + forward
-                                val roomIds = roomServer.roomIds()
-                                for (roomId in roomIds) {
-                                    val room = roomServer.getRoom(roomId) ?: continue
-                                    room.store.dispatch(action)
-                                    mediator.forwardToCentral(roomId, action)
-                                    break
-                                }
+                                val roomId = sessionRooms[sessionId] ?: return@collect
+                                val room = roomServer.getRoom(roomId) ?: return@collect
+                                room.store.dispatch(action)
+                                mediator.forwardToCentral(roomId, action)
                             }
 
                             is SharedChatAction.LeaveRoom -> {
-                                val roomIds = roomServer.roomIds()
-                                for (roomId in roomIds) {
-                                    val room = roomServer.getRoom(roomId) ?: continue
-                                    room.store.dispatch(action)
-                                    mediator.forwardToCentral(roomId, action)
-                                    break
-                                }
+                                val roomId = sessionRooms.remove(sessionId) ?: return@collect
+                                val room = roomServer.getRoom(roomId) ?: return@collect
+                                room.store.dispatch(action)
+                                mediator.forwardToCentral(roomId, action)
                             }
 
                             else -> {}
                         }
                     }
                 } finally {
+                    stateJob?.cancel()
+                    sessionRooms.remove(sessionId)
                     println("[$nodeId] Client disconnected: $sessionId")
                 }
             }

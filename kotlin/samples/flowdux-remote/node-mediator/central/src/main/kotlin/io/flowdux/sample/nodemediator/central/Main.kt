@@ -40,9 +40,14 @@ fun main() {
         roomRegistry = roomRegistry,
         scope = applicationScope,
         onUpstreamAction = { nodeId, roomId, action ->
-            // Relay the action to the room's owner node
+            // Relay the action to all OTHER nodes (exclude sender)
             println("[Central] Upstream from node=$nodeId room=$roomId: $action")
-            manager.sendToRoom(roomId, action)
+            val allNodes = manager.connectedNodeIds()
+            for (targetNodeId in allNodes) {
+                if (targetNodeId != nodeId) {
+                    manager.sendToNode(targetNodeId, roomId, action)
+                }
+            }
         },
         onEvent = { event ->
             when (event) {
