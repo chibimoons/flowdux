@@ -24,7 +24,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
@@ -111,20 +110,9 @@ fun main(args: Array<String>) {
     // Connect to Central
     mediator.connect()
 
-    // Periodic cleanup
-    applicationScope.launch {
-        while (isActive) {
-            delay(30_000)
-            val destroyed = roomServer.cleanupEmptyRooms()
-            if (destroyed.isNotEmpty()) {
-                println("[$nodeId] Cleaned up empty rooms: $destroyed")
-                destroyed.forEach { roomId ->
-                    mediator.unregisterRoom(roomId)
-                    localRegistry.unassignRoom(roomId)
-                }
-            }
-        }
-    }
+    // Note: No periodic cleanupEmptyRooms — since we manage client sessions manually
+    // (not via handleClient), the room server has no session tracking and would
+    // incorrectly consider all rooms empty.
 
     println(
         """
