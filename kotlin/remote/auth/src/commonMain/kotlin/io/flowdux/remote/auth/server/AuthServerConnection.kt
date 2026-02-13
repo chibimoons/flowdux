@@ -81,7 +81,8 @@ class AuthServerConnection<P : AuthPrincipal>(
 
                 repeat(config.maxAuthAttempts) {
                     val message = rawChannel.receiveCatching().getOrNull()
-                        ?: return@withTimeoutOrNull AuthResult.Failure("Connection closed before auth")
+                        ?: return@withTimeoutOrNull (lastFailure
+                            ?: AuthResult.Failure("Connection closed before auth"))
 
                     if (!AuthProtocol.isAuthMessage(message)) {
                         val reason = "Expected auth message, got: ${message.take(50)}"

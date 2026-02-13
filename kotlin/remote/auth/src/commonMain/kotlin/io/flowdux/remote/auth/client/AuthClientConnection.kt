@@ -116,8 +116,9 @@ class AuthClientConnection(
                                         authSignal.trySend(Unit)
                                     }
                                 }
-                            } catch (_: Exception) {
-                                // Malformed auth message — treat as auth failure
+                            } catch (e: Exception) {
+                                // Malformed auth message — treat as terminal auth failure
+                                _authErrorReason.value = "Malformed auth response: ${e.message}"
                                 authSignal.trySend(Unit)
                             }
                         } else if (_connectionState.value == ConnectionState.CONNECTED) {
@@ -174,7 +175,17 @@ class AuthClientConnection(
 
         val originalErrorReason = _authErrorReason.value
         _authErrorReason.value = null
-        delegate.send(AuthProtocol.encodeAuthRequest(newToken))
+        try {
+            delegate.send(AuthProtocol.encodeAuthRequest(newToken))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Transport closed (e.g., server maxAuthAttempts=1) — treat as refresh failure
+            if (_authErrorReason.value == null) {
+                _authErrorReason.value = originalErrorReason
+            }
+            return false
+        }
 
         val result = withTimeoutOrNull(config.handshakeTimeout) {
             authSignal.receiveCatching().getOrNull()
