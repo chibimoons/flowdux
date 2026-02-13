@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-class RoutedActionCodecTest {
+class RoutedActionSerializationTest {
 
     @Serializable
     sealed interface TestAction : Action {
