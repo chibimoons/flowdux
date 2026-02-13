@@ -2,7 +2,6 @@ package io.flowdux.sample.nodemediator.node
 
 import io.flowdux.State
 import io.flowdux.buildReducer
-import io.flowdux.sample.nodemediator.shared.ChatAction
 import io.flowdux.sample.nodemediator.shared.ChatEvent
 import io.flowdux.sample.nodemediator.shared.ChatMessage
 import io.flowdux.sample.nodemediator.shared.SharedChatAction
@@ -22,7 +21,7 @@ data class ServerRoomState(
  * Server-side reducer for room state.
  * Handles SharedChatAction directly without intermediate server-only actions.
  */
-val serverRoomReducer = buildReducer<ServerRoomState, ChatAction> {
+val serverRoomReducer = buildReducer<ServerRoomState, SharedChatAction> {
     on<SharedChatAction.SendMessage> { state, action ->
         state.copy(
             messages = state.messages + ChatMessage(action.user, action.text),

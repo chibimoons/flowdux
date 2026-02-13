@@ -68,7 +68,7 @@ Client A       Node-1         Central        Node-2       Client B
 (Alice)     (NodeMediator)  (NodeManager)  (NodeMediator)   (Bob)
    │              │               │              │             │
    │─ SendMessage►│               │              │             │
-   │  (WS /ws)    │               │              │             │
+   │(WS /ws/{id}) │               │              │             │
    │              │─ dispatch()   │              │             │
    │              │  (로컬 반영)   │              │             │
    │              │               │              │             │
@@ -87,7 +87,7 @@ Client A       Node-1         Central        Node-2       Client B
 
 **단계별 설명:**
 
-1. **Client → Node** — Alice가 `SendMessage`를 Node-1의 WS `/ws`로 전송
+1. **Client → Node** — Alice가 `SendMessage`를 Node-1의 WS `/ws/{roomId}`로 전송
 2. **Node 로컬 처리** — Node-1이 로컬 room store에 `dispatch()` → Processor가 `ServerRoomAction.MessageReceived`로 변환 → Reducer가 상태 반영
 3. **Node → Central** — `mediator.forwardToCentral(roomId, action)` → `NodeAction`으로 래핑하여 Central로 전송
 4. **Central 릴레이** — `onUpstreamAction` 콜백에서 발신 Node(node-1)를 **제외**하고 나머지 Node에 비동기 릴레이
@@ -201,7 +201,73 @@ val centralNodeManager = CentralNodeManager<SharedAction>(
 
 ## Node-side 구성
 
-### 1. NodeMediator 생성 및 연결
+### NodeRoomServer (권장)
+
+`NodeRoomServer`는 `NodeMediator`(Central 연동)와 `RoomServer`(클라이언트 세션 관리)를 조합한 고수준 API입니다. 세션 추적, 상태 브로드캐스트, Central 포워딩, disconnect 정리를 자동화합니다.
+
+```kotlin
+import io.flowdux.remote.ktor.KtorWebSocketClientConnection
+import io.flowdux.remote.nodemediator.NodeRoomServer
+import io.flowdux.remote.nodemediator.webSocketNodeTransport
+import io.flowdux.remote.server.pattern.createSharedStateRoomServer
+
+// 1. Room Server 생성
+val roomServer = createSharedStateRoomServer(
+    initialStateFactory = { roomId -> MyState(roomId = roomId) },
+    reducer = myReducer,
+    stateMapper = { state -> SyncState(state) },
+    scope = applicationScope,
+)
+
+// 2. Central 연결용 Transport 생성
+val transport = KtorWebSocketClientConnection.create(
+    host = "central-server",
+    port = 8080,
+    path = "/node/node-A",
+).webSocketNodeTransport<SharedAction>()
+
+// 3. NodeRoomServer 생성 및 연결
+val nodeRoomServer = NodeRoomServer(
+    nodeId = "node-A",
+    transport = transport,
+    roomServer = roomServer,
+    scope = applicationScope,
+    onEvent = { event -> println("Event: $event") },
+)
+nodeRoomServer.connect()
+
+// 4. 클라이언트 처리 — URL 기반 라우팅
+webSocket("/ws/{roomId}") {
+    val roomId = call.parameters["roomId"]!!
+    val username = call.request.queryParameters["user"] ?: "anonymous"
+    val sessionId = UUID.randomUUID().toString()
+    val connection = KtorWebSocketServerConnection(this)
+        .typedJson<SharedAction>()
+
+    try {
+        nodeRoomServer.handleClient(roomId, sessionId, connection)
+    } finally {
+        withContext(NonCancellable) {
+            nodeRoomServer.dispatchAndForward(roomId, LeaveRoom(username))
+            nodeRoomServer.destroyRoomIfEmpty(roomId)
+        }
+    }
+}
+```
+
+`handleClient` 내부에서:
+- Room이 없으면 자동 생성
+- Mediator에 room 등록 (Central에서 오는 액션 수신)
+- 클라이언트의 incoming action을 자동으로 Central에 포워딩
+- `SharedStateServer.handleClient`로 세션 관리 및 상태 브로드캐스트
+
+Central이 모르는 room에 액션을 릴레이하면 `onUnknownRoom` 콜백으로 자동 생성됩니다.
+
+### NodeMediator (저수준 API)
+
+`NodeRoomServer`를 사용하지 않고 직접 제어가 필요한 경우:
+
+#### 1. NodeMediator 생성 및 연결
 
 ```kotlin
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
@@ -223,7 +289,7 @@ val mediator = NodeMediator(
 mediator.connect()
 ```
 
-### 2. Room Handler 등록
+#### 2. Room Handler 등록
 
 ```kotlin
 // Room의 Store에 Central에서 온 액션을 dispatch
@@ -235,7 +301,7 @@ mediator.registerRoom("room-1") { action ->
 mediator.unregisterRoom("room-1")
 ```
 
-### 3. Central로 액션 전달 (상향)
+#### 3. Central로 액션 전달 (상향)
 
 ```kotlin
 // 로컬 Store에서 Central 전파가 필요한 액션이 발생했을 때
