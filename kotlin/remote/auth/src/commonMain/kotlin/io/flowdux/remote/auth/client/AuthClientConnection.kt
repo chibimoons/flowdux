@@ -22,7 +22,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * During [connect], this connection:
  * 1. Opens the underlying transport connection
- * 2. Sends an auth token (from [credentialProvider])
+ * 2. Sends an auth token (from [tokenProvider])
  * 3. Waits for the server's auth response
  * 4. If auth fails and [refreshProvider] is set, refreshes the token and retries once
  * 5. Forwards non-auth messages to [incoming] (only after auth succeeds)
@@ -44,14 +44,14 @@ import kotlinx.coroutines.withTimeoutOrNull
  * ```
  *
  * @param delegate The underlying transport connection
- * @param credentialProvider Provides the initial auth token
+ * @param tokenProvider Suspend lambda that provides the initial auth token
  * @param config Auth handshake configuration (timeout, etc.)
  * @param refreshProvider Optional lambda to obtain a new token when auth is rejected.
  *   Called at most once per [connect] attempt. Returns the new token, or null to skip retry.
  */
 class AuthClientConnection(
     private val delegate: ClientConnection,
-    private val credentialProvider: CredentialProvider,
+    private val tokenProvider: suspend () -> String,
     private val config: AuthConfig = AuthConfig(),
     private val refreshProvider: (suspend () -> String?)? = null,
 ) : ClientConnection {
@@ -86,7 +86,7 @@ class AuthClientConnection(
                 delegate.connectionState.first { it == ConnectionState.CONNECTED }
 
                 // 3. Send auth token
-                val token = credentialProvider.provide()
+                val token = tokenProvider()
                 delegate.send(AuthProtocol.encodeAuthRequest(token))
 
                 // 4. Start message forwarding (filters auth messages)

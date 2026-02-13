@@ -72,9 +72,9 @@ Ktor 레벨 인증 패턴은 [WebSocket Authentication Guide](./websocket-authen
 │  │  Client              │  │  Server                  │   │
 │  │  (.auth.client)      │  │  (.auth.server)          │   │
 │  │                      │  │                          │   │
-│  │  CredentialProvider  │  │  AuthPrincipal           │   │
-│  │  AuthClientConnection│  │  AuthVerifier            │   │
-│  │  .withAuth()         │  │  AuthResult              │   │
+│  │  AuthClientConnection│  │  AuthPrincipal           │   │
+│  │  .withAuth()         │  │  AuthVerifier            │   │
+│  │                      │  │  AuthResult              │   │
 │  │                      │  │  AuthServerConnection    │   │
 │  │                      │  │  .withAuth()             │   │
 │  │                      │  │  .getOrElse()            │   │
@@ -230,7 +230,7 @@ val connection = KtorWebSocketClientConnection.create(
 
 ### 2. Token Provider 패턴
 
-정적 토큰 외에 동적 토큰을 위한 5가지 오버로드를 제공한다.
+정적 토큰 외에 동적 토큰을 위한 3가지 오버로드를 제공한다.
 
 ```kotlin
 // 1. Static token — 테스트, 데모용
@@ -239,10 +239,7 @@ val connection = KtorWebSocketClientConnection.create(
 // 2. Lambda — 동적 토큰
 .withAuth { tokenStore.getAccessToken() }
 
-// 3. CredentialProvider — 재사용 가능한 인터페이스
-.withAuth(CredentialProvider { oauthClient.getToken() })
-
-// 4. Lambda + refresh — 토큰 갱신 지원
+// 3. Lambda + refresh — 토큰 갱신 지원
 .withAuth(
     token = { tokenStore.getAccessToken() },
     refresh = {
@@ -250,12 +247,6 @@ val connection = KtorWebSocketClientConnection.create(
         tokenStore.save(newTokens)
         newTokens.accessToken
     },
-)
-
-// 5. CredentialProvider + refresh
-.withAuth(
-    provider = myCredentialProvider,
-    refresh = { api.refreshToken().accessToken },
 )
 ```
 
@@ -437,8 +428,7 @@ kotlin/remote/auth/src/commonMain/kotlin/io/flowdux/remote/auth/
 ├── AuthenticationException.kt    # 인증 실패 예외
 ├── client/
 │   ├── AuthClientConnection.kt   # ClientConnection decorator
-│   ├── ClientAuthExt.kt          # .withAuth() extensions (5 overloads)
-│   └── CredentialProvider.kt     # token provider interface
+│   └── ClientAuthExt.kt          # .withAuth() extensions (3 overloads)
 └── server/
     ├── AuthPrincipal.kt          # identity marker interface
     ├── AuthResult.kt             # Success/Failure + getOrElse()

@@ -24,7 +24,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "valid-token" },
+            tokenProvider = {"valid-token" },
         )
 
         // Launch connect in background (it suspends for connection lifetime)
@@ -50,7 +50,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "token" },
+            tokenProvider = {"token" },
         )
 
         val connectJob = launch { authConn.connect() }
@@ -83,7 +83,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "bad-token" },
+            tokenProvider = {"bad-token" },
         )
 
         val ex = assertFailsWith<AuthenticationException> {
@@ -102,7 +102,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "token" },
+            tokenProvider = {"token" },
             config = AuthConfig(handshakeTimeout = 100.milliseconds),
         )
 
@@ -118,7 +118,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "token" },
+            tokenProvider = {"token" },
         )
 
         val connectJob = launch { authConn.connect() }
@@ -151,7 +151,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "token" },
+            tokenProvider = {"token" },
         )
 
         val connectJob = launch { authConn.connect() }
@@ -173,7 +173,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "token" },
+            tokenProvider = {"token" },
         )
 
         val connectJob = launch { authConn.connect() }
@@ -204,7 +204,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "bad-token" },
+            tokenProvider = {"bad-token" },
         )
 
         launch {
@@ -220,7 +220,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "bad-token" },
+            tokenProvider = {"bad-token" },
         )
 
         // Connect and fail auth
@@ -243,7 +243,7 @@ class AuthClientConnectionTest {
         var refreshCalled = false
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "expired-token" },
+            tokenProvider = {"expired-token" },
             refreshProvider = {
                 refreshCalled = true
                 "fresh-token"
@@ -276,7 +276,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "expired-token" },
+            tokenProvider = {"expired-token" },
             refreshProvider = { null },
         )
 
@@ -295,7 +295,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "expired-token" },
+            tokenProvider = {"expired-token" },
             refreshProvider = { throw RuntimeException("Refresh server down") },
         )
 
@@ -314,7 +314,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "expired-token" },
+            tokenProvider = {"expired-token" },
             refreshProvider = { "also-bad-token" },
         )
 
@@ -338,7 +338,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "expired-token" },
+            tokenProvider = {"expired-token" },
             refreshProvider = { "fresh-token" },
         )
 
@@ -368,7 +368,7 @@ class AuthClientConnectionTest {
         val mock = MockClientConnection()
         val authConn = AuthClientConnection(
             delegate = mock,
-            credentialProvider = CredentialProvider { "expired-token" },
+            tokenProvider = {"expired-token" },
             config = AuthConfig(handshakeTimeout = 200.milliseconds),
             refreshProvider = { "fresh-token" },
         )
