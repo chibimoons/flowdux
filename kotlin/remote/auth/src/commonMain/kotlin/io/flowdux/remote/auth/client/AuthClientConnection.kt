@@ -63,8 +63,8 @@ class AuthClientConnection(
     private val messageChannel = Channel<String>(Channel.UNLIMITED)
     override val incoming: Flow<String> = messageChannel.receiveAsFlow()
 
-    /** Captured auth error reason from the server (if auth failed). */
-    private var authErrorReason: String? = null
+    /** Captured auth error reason from the server (if auth failed). Thread-safe via StateFlow. */
+    private val _authErrorReason = MutableStateFlow<String?>(null)
 
     override suspend fun send(message: String) {
         // Gate sends until auth handshake completes
@@ -100,7 +100,7 @@ class AuthClientConnection(
                                         _connectionState.value = ConnectionState.CONNECTED
 
                                     is AuthProtocolResponse.Error -> {
-                                        authErrorReason = response.reason
+                                        _authErrorReason.value = response.reason
                                         _connectionState.value = ConnectionState.DISCONNECTED
                                     }
                                 }
@@ -131,7 +131,7 @@ class AuthClientConnection(
                 if (_connectionState.value != ConnectionState.CONNECTED) {
                     val refreshed = tryRefresh()
                     if (!refreshed) {
-                        val reason = authErrorReason ?: "unknown reason"
+                        val reason = _authErrorReason.value ?: "unknown reason"
                         delegate.disconnect()
                         throw AuthenticationException("Authentication rejected by server: $reason")
                     }
@@ -154,15 +154,15 @@ class AuthClientConnection(
     private suspend fun tryRefresh(): Boolean {
         val refresh = refreshProvider ?: return false
         val newToken = try {
-            refresh()
+            withTimeoutOrNull(config.handshakeTimeout) { refresh() }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             return false
         } ?: return false
 
-        val originalErrorReason = authErrorReason
-        authErrorReason = null
+        val originalErrorReason = _authErrorReason.value
+        _authErrorReason.value = null
         _connectionState.value = ConnectionState.CONNECTING
         delegate.send(AuthProtocol.encodeAuthRequest(newToken))
 
@@ -171,8 +171,8 @@ class AuthClientConnection(
         }
         if (result == null || _connectionState.value != ConnectionState.CONNECTED) {
             // Restore original error reason if no new error was set (e.g., timeout)
-            if (authErrorReason == null) {
-                authErrorReason = originalErrorReason
+            if (_authErrorReason.value == null) {
+                _authErrorReason.value = originalErrorReason
             }
             return false
         }
