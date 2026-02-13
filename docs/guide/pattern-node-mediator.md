@@ -56,6 +56,43 @@ Central Store → CentralNodeManager.sendToRoom(roomId, action)
     → onUpstreamAction 콜백으로 전달
 ```
 
+### End-to-End 메시지 흐름
+
+Alice(Node-1)가 메시지를 보내면 Bob(Node-2)이 받기까지의 전체 경로:
+
+```
+Client A       Node-1         Central        Node-2       Client B
+(Alice)     (NodeMediator)  (NodeManager)  (NodeMediator)   (Bob)
+   │              │               │              │             │
+   │─ SendMessage►│               │              │             │
+   │  (WS /ws)    │               │              │             │
+   │              │─ dispatch()   │              │             │
+   │              │  (로컬 반영)   │              │             │
+   │              │               │              │             │
+   │              │─ forward() ──►│              │             │
+   │              │  NodeAction   │              │             │
+   │              │               │              │             │
+   │              │               │─ relay() ───►│             │
+   │              │               │ (발신자 제외)  │             │
+   │              │               │              │             │
+   │              │               │              │─ dispatch() │
+   │              │               │              │  (로컬 반영)  │
+   │              │               │              │             │
+   │◄─ SyncState ─│               │              │─ SyncState─►│
+   │              │               │              │             │
+```
+
+**단계별 설명:**
+
+1. **Client → Node** — Alice가 `SendMessage`를 Node-1의 WS `/ws`로 전송
+2. **Node 로컬 처리** — Node-1이 로컬 room store에 `dispatch()` → Processor가 `ServerRoomAction.MessageReceived`로 변환 → Reducer가 상태 반영
+3. **Node → Central** — `mediator.forwardToCentral(roomId, action)` → `NodeAction`으로 래핑하여 Central로 전송
+4. **Central 릴레이** — `onUpstreamAction` 콜백에서 발신 Node(node-1)를 **제외**하고 나머지 Node에 비동기 릴레이
+5. **Central → Node** — Node-2가 `NodeAction`을 수신 → 등록된 room handler가 로컬 store에 `dispatch()`
+6. **Node → Client** — 각 Node의 store 상태 변경 → `SyncState` 액션으로 연결된 클라이언트에 브로드캐스트
+
+> **핵심:** 각 Node는 자체 room store를 독립적으로 운영합니다. Central은 상태를 관리하지 않고 **액션만 중계**합니다.
+
 ## NodeAction 프로토콜
 
 Central ↔ Node 간 모든 메시지는 `NodeAction`으로 래핑됩니다:
@@ -129,6 +166,34 @@ centralNodeManager.sendToNode("node-A", "room-1", SyncState(state))
 // 모든 node에 브로드캐스트
 centralNodeManager.broadcastToAllNodes("room-1", SyncState(state))
 ```
+
+### 4. Central Relay 패턴 (cross-node 릴레이)
+
+Node에서 올라온 액션을 다른 Node로 릴레이하는 일반적인 패턴입니다:
+
+```kotlin
+val centralNodeManager = CentralNodeManager<SharedAction>(
+    // ...
+    onUpstreamAction = { nodeId, roomId, action ->
+        // 비동기 릴레이 — CancellationException이 발신 Node의
+        // handleNode을 중단시키지 않도록 별도 코루틴에서 실행
+        scope.launch {
+            val allNodes = centralNodeManager.connectedNodeIds()
+            for (targetNodeId in allNodes) {
+                if (targetNodeId != nodeId) {  // 발신 Node 제외
+                    try {
+                        centralNodeManager.sendToNode(targetNodeId, roomId, action)
+                    } catch (_: Exception) {
+                        // 개별 Node 전송 실패는 무시 (다른 Node 전송 계속)
+                    }
+                }
+            }
+        }
+    },
+)
+```
+
+> **주의:** `onUpstreamAction`은 `handleNode`의 `incoming.collect` 안에서 동기적으로 호출됩니다. `sendToNode()`가 던지는 `CancellationException`이 발신 Node의 collect를 중단시킬 수 있으므로, 반드시 `scope.launch { }` 안에서 비동기로 릴레이해야 합니다.
 
 ## Node-side 구성
 

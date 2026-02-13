@@ -567,10 +567,99 @@ Central 서버가 여러 Node 서버를 관리하는 분산 채팅 예제입니�
 ### 데모 시나리오
 
 1. Central 서버 시작 (port 8080)
-2. Node 서버 2개 시작 (port 8081, 8082)
-3. Alice: node-1에 접속 → 자동 room 생성
-4. Bob: node-2에 접속 → 별도 room 생성
-5. 각 Node의 메시지가 Central을 통해 다른 Node로 릴레이
+2. Node 서버 2개 시작 (port 8081, 8082) — 각 Node가 Central에 WebSocket 연결
+3. Alice: node-1에 접속 → `lobby` room 자동 생성
+4. Bob: node-2에 접속 → node-2에도 `lobby` room 생성 (같은 room, 다른 Node)
+5. Alice가 메시지 전송 → node-1 로컬 반영 → Central 릴레이 → node-2 반영 → Bob에게 전달
+
+### 내부 동작 워크스루
+
+Alice가 node-1에서 "Hello!"를 보내면 Bob이 node-2에서 받기까지:
+
+```
+Alice (Client)                Node-1                    Central                   Node-2                    Bob (Client)
+     │                          │                          │                         │                          │
+     │── SendMessage ──────────►│                          │                         │                          │
+     │   {user:"Alice",         │                          │                         │                          │
+     │    text:"Hello!"}        │                          │                         │                          │
+     │                          │                          │                         │                          │
+     │                   ┌──────┴──────┐                   │                         │                          │
+     │                   │ 1. dispatch │                   │                         │                          │
+     │                   │ Processor:  │                   │                         │                          │
+     │                   │  SendMessage│                   │                         │                          │
+     │                   │  → Message  │                   │                         │                          │
+     │                   │    Received │                   │                         │                          │
+     │                   │ Reducer:    │                   │                         │                          │
+     │                   │  messages+= │                   │                         │                          │
+     │                   └──────┬──────┘                   │                         │                          │
+     │                          │                          │                         │                          │
+     │                          │── forwardToCentral() ───►│                         │                          │
+     │                          │   NodeAction(            │                         │                          │
+     │                          │     roomId="lobby",      │                         │                          │
+     │                          │     action=SendMessage)  │                         │                          │
+     │                          │                          │                         │                          │
+     │                          │                   ┌──────┴──────┐                  │                          │
+     │                          │                   │onUpstream   │                  │                          │
+     │                          │                   │ node-1 제외  │                  │                          │
+     │                          │                   │ async relay │                  │                          │
+     │                          │                   └──────┬──────┘                  │                          │
+     │                          │                          │                         │                          │
+     │                          │                          │── sendToNode(node-2) ──►│                          │
+     │                          │                          │   NodeAction(           │                          │
+     │                          │                          │     roomId="lobby",     │                          │
+     │                          │                          │     action=SendMessage) │                          │
+     │                          │                          │                         │                          │
+     │                          │                          │                  ┌──────┴──────┐                   │
+     │                          │                          │                  │ roomHandler │                   │
+     │                          │                          │                  │ dispatch()  │                   │
+     │                          │                          │                  │ Processor → │                   │
+     │                          │                          │                  │ Reducer     │                   │
+     │                          │                          │                  └──────┬──────┘                   │
+     │                          │                          │                         │                          │
+     │◄── SyncState ───────────│                          │                         │── SyncState ────────────►│
+     │    {messages:[...],      │                          │                         │   {messages:[...],       │
+     │     users:[Alice,Bob]}   │                          │                         │    users:[Alice,Bob]}    │
+     │                          │                          │                         │                          │
+```
+
+#### 각 컴포넌트의 역할
+
+| 컴포넌트 | 위치 | 역할 |
+|----------|------|------|
+| **Client** | 클라이언트 프로세스 | `SyncMiddleware`로 Node에 WS 연결, `SharedChatAction` 송수신 |
+| **Node (RoomServer)** | Node 서버 | `createSharedStateRoomServer()`로 로컬 room store 관리. Processor가 `SharedChatAction` → `ServerRoomAction` 변환, Reducer가 상태 반영 |
+| **Node (NodeMediator)** | Node 서버 | Central과 WS 연결, `forwardToCentral()`로 상향 전송, room handler로 하향 수신 |
+| **Central (NodeManager)** | Central 서버 | Node 연결 관리, `onUpstreamAction`에서 발신 Node 제외 후 비동기 릴레이 |
+
+#### 핵심 코드 흐름 (Node)
+
+```kotlin
+// 클라이언트가 SendMessage를 보내면:
+is SharedChatAction.SendMessage -> {
+    val room = roomServer.getRoom(roomId)
+
+    // 1. 로컬 store에 dispatch → Processor → Reducer → 상태 반영
+    room.store.dispatch(action)
+
+    // 2. Central로 전달 → 다른 Node에 릴레이됨
+    mediator.forwardToCentral(roomId, action)
+}
+```
+
+#### 핵심 코드 흐름 (Central)
+
+```kotlin
+onUpstreamAction = { nodeId, roomId, action ->
+    // 비동기 릴레이 (발신 Node 제외)
+    scope.launch {
+        for (targetNodeId in manager.connectedNodeIds()) {
+            if (targetNodeId != nodeId) {
+                manager.sendToNode(targetNodeId, roomId, action)
+            }
+        }
+    }
+}
+```
 
 자세한 패턴 설명은 [Node Mediator Pattern](./pattern-node-mediator.md)을 참조하세요.
 
