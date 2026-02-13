@@ -45,6 +45,9 @@ project(":kotlin:flowdux-remote-auth").projectDir = file("kotlin/remote/auth")
 include(":kotlin:flowdux-remote-multiplexer")
 project(":kotlin:flowdux-remote-multiplexer").projectDir = file("kotlin/remote/multiplexer")
 
+include(":kotlin:flowdux-remote-node-mediator")
+project(":kotlin:flowdux-remote-node-mediator").projectDir = file("kotlin/remote/node-mediator")
+
 // ── Samples: flowdux ──
 include(":kotlin:sample-jvm")
 project(":kotlin:sample-jvm").projectDir = file("kotlin/samples/flowdux/jvm")
@@ -114,6 +117,19 @@ project(":kotlin:sample-remote-multiplexer:server").projectDir = file("kotlin/sa
 
 include(":kotlin:sample-remote-multiplexer:client")
 project(":kotlin:sample-remote-multiplexer:client").projectDir = file("kotlin/samples/flowdux-remote/multiplexer/client")
+
+include(":kotlin:sample-remote-node-mediator:shared")
+project(":kotlin:sample-remote-node-mediator").projectDir = file("kotlin/samples/flowdux-remote/node-mediator")
+project(":kotlin:sample-remote-node-mediator:shared").projectDir = file("kotlin/samples/flowdux-remote/node-mediator/shared")
+
+include(":kotlin:sample-remote-node-mediator:central")
+project(":kotlin:sample-remote-node-mediator:central").projectDir = file("kotlin/samples/flowdux-remote/node-mediator/central")
+
+include(":kotlin:sample-remote-node-mediator:node")
+project(":kotlin:sample-remote-node-mediator:node").projectDir = file("kotlin/samples/flowdux-remote/node-mediator/node")
+
+include(":kotlin:sample-remote-node-mediator:client")
+project(":kotlin:sample-remote-node-mediator:client").projectDir = file("kotlin/samples/flowdux-remote/node-mediator/client")
 
 // ── Samples: flowdux-remote (auth) ──
 include(":kotlin:sample-remote-auth:server")

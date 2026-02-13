@@ -18,6 +18,7 @@ FlowDux 샘플 앱 가이드입니다. 각 샘플은 특정 기능이나 패턴�
 | [remote-poker](#remote-poker-sample) | Per-Client Store | JVM | 비공개 상태 관리 (포커) |
 | [remote-auth](#remote-auth-sample) | In-Band WebSocket 인증 | JVM | 토큰 기반 인증 채팅 |
 | [remote-multiplexer](#remote-multiplexer-sample) | Connection Multiplexer | JVM | 단일 WS, 다중 방 동시 참여 |
+| [remote-node-mediator](#remote-node-mediator-sample) | Node Mediator | JVM | Central↔Node 분산 채팅 |
 
 ---
 
@@ -522,6 +523,199 @@ curl -X POST http://localhost:8080/winner
 
 ---
 
+## Remote Node Mediator Sample
+
+**학습 포인트:** CentralNodeManager, NodeMediator, InMemoryRoomRegistry, 분산 노드 라우팅, 멀티룸
+
+Central 서버가 여러 Node 서버를 관리하는 분산 채팅 예제입니다. 각 Node는 `NodeMediator`로 Central에 연결하고, 로컬 클라이언트를 처리합니다. 클라이언트는 `/join <room>`으로 방을 전환할 수 있으며, cross-node 메시지는 Central을 통해 릴레이됩니다.
+
+```
+┌─────────────────────────────────────────────┐
+│            Central (:8080)                   │
+│  CentralNodeManager + InMemoryRoomRegistry  │
+└──────┬───────────────────┬──────────────────┘
+       │ WS /node/node-1   │ WS /node/node-2
+┌──────▼──────┐     ┌──────▼──────┐
+│ Node (:8081)│     │ Node (:8082)│
+│ NodeMediator│     │ NodeMediator│
+│ RoomServer  │     │ RoomServer  │
+│ ┌─────────┐ │     │ ┌─────────┐ │
+│ │  lobby  │ │     │ │  lobby  │ │
+│ │ game-1  │ │     │ │ game-1  │ │
+│ └─────────┘ │     │ └─────────┘ │
+└──────┬──────┘     └──────┬──────┘
+       │ WS /ws            │ WS /ws
+   Client A             Client B
+```
+
+### Central 서버 시작
+
+```bash
+./gradlew :kotlin:sample-remote-node-mediator:central:run
+```
+
+### Node 서버 시작 (여러 터미널에서)
+
+```bash
+./gradlew :kotlin:sample-remote-node-mediator:node:run --args="node-1 8081"
+./gradlew :kotlin:sample-remote-node-mediator:node:run --args="node-2 8082"
+```
+
+### 클라이언트 실행
+
+```bash
+./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Alice localhost 8081"
+./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Bob localhost 8082"
+```
+
+### 클라이언트 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `/join <room>` | 다른 방으로 이동 (기존 방 자동 퇴장) |
+| `/users` | 현재 방의 접속 유저 목록 |
+| `/room` | 현재 방 이름 확인 |
+| `/quit` | 종료 |
+
+### 데모 시나리오
+
+**기본: cross-node 채팅**
+
+1. Central 서버 시작 (port 8080)
+2. Node 서버 2개 시작 (port 8081, 8082) — 각 Node가 Central에 WebSocket 연결
+3. Alice: node-1에 접속 → `lobby` room 자동 생성
+4. Bob: node-2에 접속 → node-2에도 `lobby` room 생성 (같은 room, 다른 Node)
+5. Alice가 메시지 전송 → Bob에게 Central 통해 전달
+
+**멀티룸: 방 전환과 격리**
+
+6. Alice: `/join game-1` → lobby 자동 퇴장, game-1 입장
+7. Bob: lobby에서 메시지 전송 → Alice에게 안 감 (방 격리)
+8. Bob: `/join game-1` → node-2에 game-1이 Central 릴레이로 자동 생성
+9. Bob: game-1에서 메시지 전송 → Alice에게 전달 (같은 방, 다른 Node)
+
+```
+시간  Alice (node-1)           Bob (node-2)
+ │    lobby에서 입장            lobby에서 입장
+ │    "Hello!" ─────────────► "Hello!" 수신 (cross-node)
+ │    /join game-1
+ │    lobby 퇴장 ──────────► "Alice left" 표시
+ │    game-1 입장
+ │                              "Hi!" (lobby에서) ──✗── Alice에게 안 감
+ │                              /join game-1
+ │                              lobby 퇴장, game-1 입장
+ │    "Bob joined" 표시 ◄──── game-1 입장
+ │                              "Hey!" ────────────► Alice에게 전달
+```
+
+### 내부 동작 워크스루
+
+Alice가 node-1에서 "Hello!"를 보내면 Bob이 node-2에서 받기까지:
+
+```
+Alice (Client)                Node-1                    Central                   Node-2                    Bob (Client)
+     │                          │                          │                         │                          │
+     │── SendMessage ──────────►│                          │                         │                          │
+     │   {user:"Alice",         │                          │                         │                          │
+     │    text:"Hello!"}        │                          │                         │                          │
+     │                          │                          │                         │                          │
+     │                   ┌──────┴──────┐                   │                         │                          │
+     │                   │ 1. dispatch │                   │                         │                          │
+     │                   │ Processor:  │                   │                         │                          │
+     │                   │  SendMessage│                   │                         │                          │
+     │                   │  → Message  │                   │                         │                          │
+     │                   │    Received │                   │                         │                          │
+     │                   │ Reducer:    │                   │                         │                          │
+     │                   │  messages+= │                   │                         │                          │
+     │                   └──────┬──────┘                   │                         │                          │
+     │                          │                          │                         │                          │
+     │                          │── forwardToCentral() ───►│                         │                          │
+     │                          │   NodeAction(            │                         │                          │
+     │                          │     roomId="lobby",      │                         │                          │
+     │                          │     action=SendMessage)  │                         │                          │
+     │                          │                          │                         │                          │
+     │                          │                   ┌──────┴──────┐                  │                          │
+     │                          │                   │onUpstream   │                  │                          │
+     │                          │                   │ node-1 제외  │                  │                          │
+     │                          │                   │ async relay │                  │                          │
+     │                          │                   └──────┬──────┘                  │                          │
+     │                          │                          │                         │                          │
+     │                          │                          │── sendToNode(node-2) ──►│                          │
+     │                          │                          │   NodeAction(           │                          │
+     │                          │                          │     roomId="lobby",     │                          │
+     │                          │                          │     action=SendMessage) │                          │
+     │                          │                          │                         │                          │
+     │                          │                          │                  ┌──────┴──────┐                   │
+     │                          │                          │                  │ roomHandler │                   │
+     │                          │                          │                  │ dispatch()  │                   │
+     │                          │                          │                  │ Processor → │                   │
+     │                          │                          │                  │ Reducer     │                   │
+     │                          │                          │                  └──────┬──────┘                   │
+     │                          │                          │                         │                          │
+     │◄── SyncState ───────────│                          │                         │── SyncState ────────────►│
+     │    {messages:[...],      │                          │                         │   {messages:[...],       │
+     │     users:[Alice,Bob]}   │                          │                         │    users:[Alice,Bob]}    │
+     │                          │                          │                         │                          │
+```
+
+#### 각 컴포넌트의 역할
+
+| 컴포넌트 | 위치 | 역할 |
+|----------|------|------|
+| **Client** | 클라이언트 프로세스 | `SyncMiddleware`로 Node에 WS 연결, `SharedChatAction` 송수신 |
+| **Node (RoomServer)** | Node 서버 | `createSharedStateRoomServer()`로 로컬 room store 관리. Processor가 `SharedChatAction` → `ServerRoomAction` 변환, Reducer가 상태 반영 |
+| **Node (NodeMediator)** | Node 서버 | Central과 WS 연결, `forwardToCentral()`로 상향 전송, room handler로 하향 수신 |
+| **Central (NodeManager)** | Central 서버 | Node 연결 관리, `onUpstreamAction`에서 발신 Node 제외 후 비동기 릴레이 |
+
+#### 핵심 코드 흐름 (Node — 방 전환)
+
+```kotlin
+is SharedChatAction.JoinRoom -> {
+    val roomId = action.roomId  // 클라이언트가 지정한 방
+
+    // 기존 방이 있으면 자동 퇴장
+    val oldRoomId = sessionRooms[sessionId]
+    if (oldRoomId != null && oldRoomId != roomId) {
+        val oldRoom = roomServer.getRoom(oldRoomId)
+        oldRoom?.store?.dispatch(SharedChatAction.LeaveRoom(action.user))
+        mediator.forwardToCentral(oldRoomId, SharedChatAction.LeaveRoom(action.user))
+    }
+
+    // 새 방 생성/참여 + Central 등록
+    val room = roomServer.getOrCreateRoom(roomId)
+    if (!mediator.hasRoom(roomId)) {
+        mediator.registerRoom(roomId) { room.store.dispatch(it) }
+    }
+
+    subscribeToRoom(room)  // 클라이언트에 새 방 상태 전송
+    room.store.dispatch(action)
+    mediator.forwardToCentral(roomId, action)
+}
+```
+
+#### 핵심 코드 흐름 (Central — 릴레이)
+
+```kotlin
+onUpstreamAction = { nodeId, roomId, action ->
+    // 비동기 릴레이 (발신 Node 제외)
+    scope.launch {
+        for (targetNodeId in manager.connectedNodeIds()) {
+            if (targetNodeId != nodeId) {
+                manager.sendToNode(targetNodeId, roomId, action)
+            }
+        }
+    }
+}
+```
+
+#### 방 격리 원리
+
+Central은 `NodeAction(roomId, action)` 형태로 메시지를 중계합니다. 수신 Node의 `NodeMediator`는 roomId로 등록된 handler를 찾아 해당 room store에만 dispatch합니다. 다른 room의 store에는 영향을 주지 않으므로, 같은 Node에 여러 room이 있어도 메시지가 격리됩니다.
+
+자세한 패턴 설명은 [Node Mediator Pattern](./pattern-node-mediator.md)을 참조하세요.
+
+---
+
 ## 관련 문서
 
 - [Server Patterns Overview](./server-patterns.md) — 패턴 선택 가이드 (Single Client, Shared State, Room, Per-Client)
@@ -531,4 +725,5 @@ curl -X POST http://localhost:8080/winner
 - [Room Pattern](./pattern-room.md) — 다중 방 관리 패턴 상세
 - [Per-Client Pattern](./pattern-per-client.md) — 비공개 상태 관리 패턴
 - [Multiplexer Pattern](./pattern-multiplexer.md) — 단일 WebSocket 다중 방 패턴
+- [Node Mediator Pattern](./pattern-node-mediator.md) — Central↔Node 분산 라우팅 패턴
 - [FlowDux Remote vs Raw WebSocket](./flowdux-remote-vs-raw.md) — Use Case별 비교 및 선택 가이드
