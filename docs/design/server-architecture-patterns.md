@@ -183,15 +183,17 @@ Central Store + Room Stores + Client Stores
 
 ### 멀티 노드 (~100만)
 
-[NodeMediator](../guide/pattern-node-mediator.md)를 사용하여 Central Store와 다수의 Node를 연결합니다.
+[NodeMediator](../guide/pattern-node-mediator.md)를 사용하여 Central(릴레이)과 다수의 Node를 연결합니다.
+Central은 Store를 사용하지 않는 순수 메시지 릴레이이므로 **외부 인프라(Kafka 등) 없이** 운영 가능합니다.
 
 ```
-Central Store ←→ Node A (Room 1~100, Client Store 3만개)
-              ←→ Node B (Room 101~200, Client Store 3만개)
-              ←→ Node C (Room 201~300, Client Store 3만개)
+Central (릴레이 전용, Store 없음)
+  ←→ Node A (Room 1~100, Client Store 3만개)
+  ←→ Node B (Room 101~200, Client Store 3만개)
+  ←→ Node C (Room 201~300, Client Store 3만개)
 
 노드 간 통신: NodeMediator (WebSocket, NodeAction 프로토콜)
-Central Store 관점: 연결 3개 (CentralNodeManager)
+Central 관점: 연결 3개 (CentralNodeManager), 상태 관리 없음
 ```
 
 - 보수적: 100 nodes × 10K clients = **100만** 동시 연결
@@ -213,10 +215,12 @@ Central 수에 비례하여 throughput이 선형 증가합니다.
 
 ### 대규모 (~1억+)
 
-Central↔Node 간 WebSocket을 Event Bus로 대체하면 Central이 stateless가 됩니다:
+Central이 순수 릴레이이므로, 외부 메시지 브로커로 자연스럽게 대체 가능합니다.
+Central 서버 자체가 제거되고 Node가 직접 Event Bus에 pub/sub합니다:
 
 ```
 Node ──► Kafka / Redis Streams ◄── Node
+         (Central 서버 불필요)
 
 Room Store 분산:
   - 활성 방은 메모리에 유지

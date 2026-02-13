@@ -1,15 +1,16 @@
 # Node Mediator Pattern (수평 확장)
 
-Node Mediator 패턴은 **단일 서버의 WebSocket 연결 한계**(~10,000)를 넘기기 위한 수평 확장 레이어입니다. Central Store(1개)와 다수의 Node 사이에서 액션을 중계하는 stateless mediator 구조입니다.
+Node Mediator 패턴은 **단일 서버의 WebSocket 연결 한계**(~10,000)를 넘기기 위한 수평 확장 레이어입니다. Central(1개)이 다수의 Node 사이에서 액션을 중계하는 구조입니다. Central은 FlowDux Store를 사용하지 않는 **순수 메시지 릴레이**이므로, Kafka/Redis 같은 외부 인프라 없이 FlowDux만으로 분산 아키텍처를 구성할 수 있습니다.
 
 ## 단일 서버 vs Node Mediator
 
 | 항목 | 단일 서버 | Node Mediator |
 |------|----------|---------------|
 | WebSocket 한계 | ~10,000 | 노드 수 × 10,000 |
-| Store 위치 | 서버 1대 | Central 1대 + Node N대 |
+| Store 위치 | 서버 1대 | Node N대 (Central은 릴레이 전용) |
 | 확장 방식 | 수직 확장 (스케일 업) | 수평 확장 (스케일 아웃) |
 | 노드 간 통신 | 불필요 | Central ↔ Node (노드당 1개 WS) |
+| 외부 인프라 | 불필요 | 불필요 (FlowDux만으로 구성) |
 | 적합한 시나리오 | 소~중규모 | 대규모 (10만+ 연결) |
 
 ## 언제 사용하나요?
@@ -26,18 +27,20 @@ Node Mediator 패턴은 **단일 서버의 WebSocket 연결 한계**(~10,000)를
 ## 아키텍처
 
 ```
-Central Store (1개)
+Central (릴레이 전용 — Store 없음)
     │
-    ├── CentralNodeManager
+    ├── CentralNodeManager (메시지 중계)
     │     ├── Node A (NodeMediator) → Room Stores, Client Stores
     │     ├── Node B (NodeMediator) → Room Stores, Client Stores
     │     └── Node C (NodeMediator) → Room Stores, Client Stores
     │
     └── RoomRegistry (room → node 매핑)
 
-Central Store ↔ Node: 노드당 1개 WebSocket
-Node 내부: 로컬 dispatch
+Central ↔ Node: 노드당 1개 WebSocket (Central은 relay만 수행)
+Node 내부: 로컬 Room Store에서 상태 관리 + 클라이언트에 브로드캐스트
 ```
+
+> **Central의 역할:** Central은 FlowDux Store를 사용하지 않습니다. Reducer, Middleware, State가 없는 순수 메시지 릴레이입니다. 상태 관리는 각 Node의 Room Store에서 독립적으로 수행됩니다. 이 구조 덕분에 Kafka/Redis 같은 외부 메시지 브로커 없이도 Node 간 통신이 가능합니다.
 
 ### 데이터 흐름
 
@@ -342,6 +345,32 @@ Node                              Central
 
 ## 용량 한계와 확장 전략
 
+### Central의 본질: 외부 인프라 없는 메시지 릴레이
+
+`CentralNodeManager`는 Node 간 메시지를 중계하는 **순수 릴레이**입니다:
+
+```kotlin
+// Central의 전체 로직 — Store/Reducer/Middleware 없음
+onUpstreamAction = { nodeId, roomId, action ->
+    // 발신 Node 제외, 나머지 Node에 relay
+    for (targetNodeId in allNodes) {
+        if (targetNodeId != nodeId) sendToNode(targetNodeId, roomId, action)
+    }
+}
+```
+
+이 역할은 Kafka나 Redis 같은 외부 메시지 브로커가 하는 일과 동일합니다. 차이점은:
+
+| | CentralNodeManager | Kafka / Redis |
+|--|---------------------|---------------|
+| **외부 인프라** | 불필요 (FlowDux만으로 구성) | Kafka 클러스터 / Redis 클러스터 필요 |
+| **배포 복잡도** | JVM 프로세스 1개 | 브로커 클러스터 운영 필요 |
+| **HA (고가용성)** | 직접 구현 필요 | 브로커가 기본 제공 |
+| **확장 한계** | ~100만 (단일 프로세스) | ~1억+ (클러스터 수평 확장) |
+| **레이턴시** | ~sub-ms (직접 WebSocket) | ~수ms (브로커 경유) |
+
+**결론:** 규모가 ~100만 이내라면 `CentralNodeManager`로 외부 의존성 없이 운영하고, 그 이상이 필요할 때 Event Bus로 전환합니다.
+
 ### 계층별 연결 한계
 
 | 계층 | 연결 한계 | 병목 요인 |
@@ -364,6 +393,7 @@ Room "lobby"에 10개 Node의 유저가 참여 중
 → 초당 1,000건 메시지 = Central이 초당 9,000건 send
 
 Node가 많아질수록 Central의 relay 부하가 선형 증가
+→ 멀티룸으로 room당 Node 수를 줄이면 부하 크게 감소
 ```
 
 ### Central 한계 도달 시 확장 전략
@@ -389,16 +419,45 @@ Router (L7 Load Balancer)
   └── room=game-2 → Central-C
 ```
 
-Room 단위로 Central을 분할하면 throughput이 Central 수만큼 선형 증가합니다. Node는 자신이 가진 room에 해당하는 Central에만 연결합니다.
+Room 단위로 Central을 분할하면 throughput이 Central 수만큼 선형 증가합니다. Node는 자신이 가진 room에 해당하는 Central에만 연결합니다. 각 Central은 여전히 `CentralNodeManager`이므로 외부 인프라가 필요 없습니다.
 
 #### 2. Event Bus 도입 (대규모)
 
 ```
 현재:  Node ──WS──► Central ──WS──► Node
 변경:  Node ──► Kafka / Redis Streams ◄── Node
+
+Central 서버 자체가 사라지고, 브로커 클러스터가 대체
 ```
 
-Central↔Node 간 WebSocket을 Event Bus로 대체하면 Central이 stateless가 되어 수평 확장이 가능해집니다. 각 Node가 자신의 room topic을 subscribe하고, 메시지를 publish하는 구조입니다.
+Central↔Node 간 WebSocket을 Event Bus로 대체하면 Central이 완전히 제거됩니다. 각 Node가 room topic을 subscribe/publish하는 구조입니다:
+
+```
+Node-1                        Kafka                        Node-2
+  │                             │                             │
+  ├─ publish("room:lobby", ──►│                             │
+  │   SendMessage)              │── deliver ────────────────►│
+  │                             │   (room:lobby subscribers)  │
+  │                             │                             │
+  ├─ subscribe("room:game-1")─►│                             │
+  │                             │◄── publish("room:game-1",──│
+  │◄── deliver ────────────────│    JoinRoom)                │
+```
+
+**Event Bus의 한계:**
+
+| 병목 | Kafka | Redis Streams |
+|------|-------|---------------|
+| 메시지 throughput | 수백만/sec (파티션으로 무한 확장) | 수십만/sec (클러스터 샤딩) |
+| 장애 대응 | 브로커 클러스터 = HA 기본 제공 | Sentinel/Cluster = HA |
+| 레이턴시 | ~수ms (배치 처리) | ~sub-ms |
+
+Event Bus 기반 실질 한계:
+```
+1,000 Nodes × 100K clients/node = 1억 동시 연결
+남은 병목: Node 수 × Node당 클라이언트 수, 네트워크 대역폭
+Central throughput 병목은 완전히 제거됨
+```
 
 #### 3. Direct Mesh (특수 케이스)
 
@@ -411,17 +470,17 @@ Node 수가 적고(~10개), 대부분의 Node가 같은 room을 공유하는 경
 
 ### 확장 단계 요약
 
-| 규모 | 아키텍처 | 구현 |
-|------|----------|------|
-| ~100만 | Central 1대 + Node N대 | **현재 Node Mediator 구조** |
-| ~1,000만 | Central 샤딩 (room 기반) | Room→Central 라우터 + 복수 Central |
-| ~1억+ | Event Bus (Kafka/Redis Streams) | Central stateless화, topic 기반 pub/sub |
+| 규모 | 아키텍처 | 외부 인프라 | 구현 |
+|------|----------|-----------|------|
+| ~100만 | Central 1대 + Node N대 | **불필요** | **현재 Node Mediator 구조** |
+| ~1,000만 | Central 샤딩 (room 기반) | **불필요** | Room→Central 라우터 + 복수 Central |
+| ~1억+ | Event Bus | Kafka / Redis 클러스터 | Central 제거, topic 기반 pub/sub |
 
 ## 제약사항
 
 - **Room migration 미지원** — 실행 중 room을 다른 node로 이동하는 기능은 제공하지 않습니다
-- **Central 단일 장애점** — Central이 다운되면 모든 node가 영향받습니다 (Central 샤딩 또는 Event Bus로 해결)
-- **Event Bus 미지원** — Kafka/Redis Streams 기반 확장은 향후 별도 모듈로 제공 예정
+- **Central 단일 장애점** — Central이 다운되면 모든 node가 영향받습니다 (Central 샤딩 또는 Event Bus로 완화)
+- **Central은 순수 릴레이** — Central에는 Store/Reducer/Middleware가 없습니다. 상태 관리는 Node에서만 수행됩니다. 이 덕분에 외부 인프라 없이 운영 가능하지만, ~100만 이상 규모에서는 Event Bus로 전환이 필요합니다
 
 ## 다른 패턴으로 전환
 
