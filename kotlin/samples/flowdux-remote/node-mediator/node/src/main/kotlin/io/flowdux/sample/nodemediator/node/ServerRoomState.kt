@@ -5,6 +5,7 @@ import io.flowdux.buildReducer
 import io.flowdux.sample.nodemediator.shared.ChatAction
 import io.flowdux.sample.nodemediator.shared.ChatEvent
 import io.flowdux.sample.nodemediator.shared.ChatMessage
+import io.flowdux.sample.nodemediator.shared.SharedChatAction
 
 /**
  * Server-side room state with metadata.
@@ -18,19 +19,11 @@ data class ServerRoomState(
 ) : State
 
 /**
- * Server-only actions for internal state updates.
- */
-sealed interface ServerRoomAction : ChatAction {
-    data class MessageReceived(val user: String, val text: String) : ServerRoomAction
-    data class UserJoined(val user: String) : ServerRoomAction
-    data class UserLeft(val user: String) : ServerRoomAction
-}
-
-/**
  * Server-side reducer for room state.
+ * Handles SharedChatAction directly without intermediate server-only actions.
  */
 val serverRoomReducer = buildReducer<ServerRoomState, ChatAction> {
-    on<ServerRoomAction.MessageReceived> { state, action ->
+    on<SharedChatAction.SendMessage> { state, action ->
         state.copy(
             messages = state.messages + ChatMessage(action.user, action.text),
             lastEvent = ChatEvent.MessageReceived(user = action.user, text = action.text),
@@ -38,14 +31,14 @@ val serverRoomReducer = buildReducer<ServerRoomState, ChatAction> {
         )
     }
 
-    on<ServerRoomAction.UserJoined> { state, action ->
+    on<SharedChatAction.JoinRoom> { state, action ->
         state.copy(
             users = state.users + action.user,
             lastEvent = ChatEvent.UserJoined(user = action.user),
         )
     }
 
-    on<ServerRoomAction.UserLeft> { state, action ->
+    on<SharedChatAction.LeaveRoom> { state, action ->
         state.copy(
             users = state.users - action.user,
             lastEvent = ChatEvent.UserLeft(user = action.user),

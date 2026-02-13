@@ -1,6 +1,5 @@
 package io.flowdux.sample.nodemediator.node
 
-import io.flowdux.Middleware
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.nodemediator.NodeMediator
@@ -56,7 +55,6 @@ fun main(args: Array<String>) {
             ServerRoomState(roomId = roomId)
         },
         reducer = serverRoomReducer,
-        processors = roomProcessors(),
         stateMapper = { state ->
             SharedChatAction.SyncState(
                 RoomState(
@@ -265,16 +263,3 @@ fun main(args: Array<String>) {
 
     server.start(wait = true)
 }
-
-private fun roomProcessors() =
-    Middleware.ActionProcessorBuilder<ServerRoomState, ChatAction>().apply {
-        on<SharedChatAction.SendMessage> { _, action ->
-            emit(ServerRoomAction.MessageReceived(user = action.user, text = action.text))
-        }
-        on<SharedChatAction.JoinRoom> { _, action ->
-            emit(ServerRoomAction.UserJoined(user = action.user))
-        }
-        on<SharedChatAction.LeaveRoom> { _, action ->
-            emit(ServerRoomAction.UserLeft(user = action.user))
-        }
-    }.build()
