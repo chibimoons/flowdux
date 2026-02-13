@@ -15,4 +15,10 @@ import kotlin.time.Duration.Companion.seconds
 data class AuthConfig(
     val handshakeTimeout: Duration = 10.seconds,
     val maxAuthAttempts: Int = 1,
-)
+) {
+    init {
+        require(maxAuthAttempts >= 1) {
+            "maxAuthAttempts must be at least 1, but was $maxAuthAttempts"
+        }
+    }
+}

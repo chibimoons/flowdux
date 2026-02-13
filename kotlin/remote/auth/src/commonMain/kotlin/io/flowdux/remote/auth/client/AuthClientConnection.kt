@@ -66,6 +66,13 @@ class AuthClientConnection(
     /** Captured auth error reason from the server (if auth failed). Thread-safe via StateFlow. */
     private val _authErrorReason = MutableStateFlow<String?>(null)
 
+    /**
+     * Internal signal for auth handshake completion.
+     * The forwarder sends Unit when an auth response (success or error) is received.
+     * This avoids exposing transient DISCONNECTED state during refresh retries.
+     */
+    private val authSignal = Channel<Unit>(Channel.UNLIMITED)
+
     override suspend fun send(message: String) {
         // Gate sends until auth handshake completes
         _connectionState.first { it != ConnectionState.CONNECTING }
@@ -96,17 +103,19 @@ class AuthClientConnection(
                         if (AuthProtocol.isAuthMessage(raw)) {
                             try {
                                 when (val response = AuthProtocol.decodeAuthResponse(raw)) {
-                                    is AuthProtocolResponse.Success ->
+                                    is AuthProtocolResponse.Success -> {
                                         _connectionState.value = ConnectionState.CONNECTED
+                                        authSignal.send(Unit)
+                                    }
 
                                     is AuthProtocolResponse.Error -> {
                                         _authErrorReason.value = response.reason
-                                        _connectionState.value = ConnectionState.DISCONNECTED
+                                        authSignal.send(Unit)
                                     }
                                 }
                             } catch (_: Exception) {
                                 // Malformed auth message — treat as auth failure
-                                _connectionState.value = ConnectionState.DISCONNECTED
+                                authSignal.send(Unit)
                             }
                         } else if (_connectionState.value == ConnectionState.CONNECTED) {
                             // Only forward non-auth messages after successful auth
@@ -117,9 +126,7 @@ class AuthClientConnection(
 
                 // 5. Wait for auth to complete (with timeout)
                 val authed = withTimeoutOrNull(config.handshakeTimeout) {
-                    _connectionState.first {
-                        it == ConnectionState.CONNECTED || it == ConnectionState.DISCONNECTED
-                    }
+                    authSignal.receive()
                 }
 
                 if (authed == null) {
@@ -163,11 +170,10 @@ class AuthClientConnection(
 
         val originalErrorReason = _authErrorReason.value
         _authErrorReason.value = null
-        _connectionState.value = ConnectionState.CONNECTING
         delegate.send(AuthProtocol.encodeAuthRequest(newToken))
 
         val result = withTimeoutOrNull(config.handshakeTimeout) {
-            _connectionState.first { it != ConnectionState.CONNECTING }
+            authSignal.receive()
         }
         if (result == null || _connectionState.value != ConnectionState.CONNECTED) {
             // Restore original error reason if no new error was set (e.g., timeout)
