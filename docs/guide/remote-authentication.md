@@ -18,6 +18,29 @@ Client                                Server
   │                                     │
 ```
 
+### Token Refresh (선택적)
+
+`refreshProvider`가 설정된 경우, 초기 토큰이 거부되면 자동으로 한 번 재시도한다.
+
+```
+Client                                Server
+  │                                     │
+  │ auth: {"token":"expired-jwt"}       │
+  │ ──────────────────────────────────► │  verify → 실패
+  │      {"type":"auth_error",...}      │
+  │ ◄────────────────────────────────── │
+  │                                     │
+  │ refreshProvider() → new token       │
+  │                                     │
+  │ auth: {"token":"fresh-jwt"}         │
+  │ ──────────────────────────────────► │  verify → 성공
+  │          {"type":"auth_ok"}         │
+  │ ◄────────────────────────────────── │
+  │                                     │
+  │ ════ 인증 완료, 정상 메시지 교환 ═══ │
+  │                                     │
+```
+
 ## Ktor-Level vs In-Band Auth
 
 | | Ktor-Level Auth | In-Band Auth (이 모듈) |
@@ -207,7 +230,7 @@ val connection = KtorWebSocketClientConnection.create(
 
 ### 2. Token Provider 패턴
 
-정적 토큰 외에 동적 토큰을 위한 3가지 오버로드를 제공한다.
+정적 토큰 외에 동적 토큰을 위한 5가지 오버로드를 제공한다.
 
 ```kotlin
 // 1. Static token — 테스트, 데모용
@@ -217,10 +240,48 @@ val connection = KtorWebSocketClientConnection.create(
 .withAuth { tokenStore.getAccessToken() }
 
 // 3. CredentialProvider — 재사용 가능한 인터페이스
-.withAuth(CredentialProvider { oauthClient.refreshToken() })
+.withAuth(CredentialProvider { oauthClient.getToken() })
+
+// 4. Lambda + refresh — 토큰 갱신 지원
+.withAuth(
+    token = { tokenStore.getAccessToken() },
+    refresh = {
+        val newTokens = api.refreshTokens(tokenStore.getRefreshToken()!!)
+        tokenStore.save(newTokens)
+        newTokens.accessToken
+    },
+)
+
+// 5. CredentialProvider + refresh
+.withAuth(
+    provider = myCredentialProvider,
+    refresh = { api.refreshToken().accessToken },
+)
 ```
 
-### 3. Store 생성
+### 3. Token Refresh
+
+초기 토큰이 서버에서 거부되면, `refresh` 람다가 설정된 경우 자동으로 한 번 재시도한다.
+
+- `refresh`가 새 토큰을 반환하면 → 해당 토큰으로 재인증 시도 (1회)
+- `refresh`가 `null`을 반환하거나 예외를 던지면 → 원래의 인증 실패 사유로 `AuthenticationException` 발생
+- 재시도 토큰도 거부되면 → 두 번째 거부 사유로 `AuthenticationException` 발생
+- 재시도 응답이 `handshakeTimeout` 내에 오지 않으면 → 원래의 인증 실패 사유 유지
+
+```kotlin
+val connection = KtorWebSocketClientConnection.create(host, port, path)
+    .withAuth(
+        token = { tokenStore.getAccessToken() },
+        refresh = {
+            val newTokens = api.refreshTokens(tokenStore.getRefreshToken()!!)
+            tokenStore.save(newTokens)
+            newTokens.accessToken
+        },
+    )
+    .typedJsonAs<SharedAction, AppAction>()
+```
+
+### 4. Store 생성
 
 인증된 connection을 `SyncMiddleware`에 전달하여 Store를 생성한다.
 
@@ -376,7 +437,7 @@ kotlin/remote/auth/src/commonMain/kotlin/io/flowdux/remote/auth/
 ├── AuthenticationException.kt    # 인증 실패 예외
 ├── client/
 │   ├── AuthClientConnection.kt   # ClientConnection decorator
-│   ├── ClientAuthExt.kt          # .withAuth() extensions (3 overloads)
+│   ├── ClientAuthExt.kt          # .withAuth() extensions (5 overloads)
 │   └── CredentialProvider.kt     # token provider interface
 └── server/
     ├── AuthPrincipal.kt          # identity marker interface
