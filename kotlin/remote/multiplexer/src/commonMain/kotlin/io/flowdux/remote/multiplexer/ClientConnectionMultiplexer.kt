@@ -7,12 +7,15 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * Client-side connection multiplexer that routes actions to/from multiple rooms
@@ -38,15 +41,22 @@ import kotlinx.coroutines.sync.withLock
  * @param A The type of actions being multiplexed
  * @param physicalConnection The underlying connection that carries [RoutedAction] messages
  * @param scope The coroutine scope for the routing job
+ * @param onEvent Optional callback for routing events (message drops, errors).
+ *        When provided, transport exceptions are reported via [MultiplexerEvent.RoutingStopped].
+ *        When absent, transport exceptions propagate to [scope] via structured concurrency.
  */
+@OptIn(ExperimentalAtomicApi::class)
 class ClientConnectionMultiplexer<A : Action>(
     private val physicalConnection: TypedClientConnection<RoutedAction<A>>,
     private val scope: CoroutineScope,
+    private val onEvent: ((MultiplexerEvent) -> Unit)? = null,
 ) {
     private val mutex = Mutex()
     private val rooms = mutableMapOf<String, VirtualClientConnection>()
     private var routingJob: Job? = null
-    private var closed = false
+    private var connectJob: Job? = null
+    private val closed = AtomicBoolean(false)
+    private val connecting = AtomicBoolean(false)
 
     /**
      * Connection state of the underlying physical connection.
@@ -63,42 +73,99 @@ class ClientConnectionMultiplexer<A : Action>(
      * already connected.
      */
     fun connect() {
-        // Idempotency guard: skip if already routing
-        if (routingJob?.isActive == true) {
+        check(!closed.load()) { "Multiplexer is closed" }
+
+        // Atomic guard: prevents duplicate routing jobs from concurrent calls
+        if (!connecting.compareAndSet(expectedValue = false, newValue = true)) {
             return
         }
 
         // Start routing first so we're ready to receive messages
         startRouting()
         // Launch connection in background (connect() suspends until closed)
-        scope.launch {
-            physicalConnection.connect()
+        connectJob = scope.launch {
+            var connectFailed = false
+            try {
+                physicalConnection.connect()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                connectFailed = true
+                if (onEvent != null) {
+                    safeOnEvent(MultiplexerEvent.ConnectionFailed(e))
+                } else {
+                    throw e
+                }
+            } finally {
+                connecting.store(false)
+                if (connectFailed) {
+                    // Clean up routing job to prevent zombie collectors
+                    routingJob?.cancel()
+                    routingJob = null
+                }
+            }
         }
     }
 
     /**
-     * Disconnects the physical connection.
+     * Disconnects the physical connection and stops routing.
+     *
+     * Rooms are preserved so that [connect] can be called again to resume.
+     * Use [removeRoom] to clean up individual rooms, or [close] to shut down entirely.
      */
     suspend fun disconnect() {
-        routingJob?.cancel()
+        connecting.store(false)
+        val routingSnapshot = routingJob
+        val connectSnapshot = connectJob
+        routingJob = null
+        connectJob = null
+
+        routingSnapshot?.cancel()
+        connectSnapshot?.cancel()
+        val callerJob = currentCoroutineContext()[Job]
+        if (routingSnapshot != null && callerJob != routingSnapshot) {
+            routingSnapshot.join()
+        }
+        if (connectSnapshot != null && callerJob != connectSnapshot) {
+            connectSnapshot.join()
+        }
         physicalConnection.disconnect()
     }
 
     private fun startRouting() {
         routingJob = scope.launch {
+            var transportError: Exception? = null
             try {
                 physicalConnection.incoming.collect { routedAction ->
                     val roomId = routedAction.roomId
                     val virtualConnection = mutex.withLock { rooms[roomId] }
                     if (virtualConnection != null) {
-                        virtualConnection.channel.send(routedAction.action)
+                        val result = virtualConnection.channel.trySend(routedAction.action)
+                        if (result.isFailure) {
+                            safeOnEvent(MultiplexerEvent.MessageDropped(roomId))
+                        }
                     }
                     // Unknown rooms: silent drop (as per design decision)
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
-                // Connection closed or error
+            } catch (e: Exception) {
+                transportError = e
+                if (onEvent != null) {
+                    safeOnEvent(MultiplexerEvent.RoutingStopped(e))
+                } else {
+                    throw e
+                }
+            } finally {
+                // Transport error: clean up physical connection to avoid zombie state
+                // (routing dead but connection alive). Skipped on normal cancellation
+                // since disconnect()/close() already handle cleanup.
+                // Must disconnect before resetting connecting flag to prevent a
+                // concurrent connect() from starting a new connection that we then kill.
+                if (transportError != null) {
+                    physicalConnection.disconnect()
+                }
+                connecting.store(false)
             }
         }
     }
@@ -110,7 +177,7 @@ class ClientConnectionMultiplexer<A : Action>(
      * @return A [TypedClientConnection] scoped to the specified room
      */
     suspend fun getOrCreateRoom(roomId: String): TypedClientConnection<A> = mutex.withLock {
-        check(!closed) { "Multiplexer is closed" }
+        check(!closed.load()) { "Multiplexer is closed" }
         rooms.getOrPut(roomId) { VirtualClientConnection(roomId) }
     }
 
@@ -145,17 +212,45 @@ class ClientConnectionMultiplexer<A : Action>(
 
     /**
      * Closes the multiplexer and all virtual connections.
+     *
+     * Cancels the routing job, closes all virtual connection channels,
+     * and disconnects the physical connection. After closing, no new rooms
+     * can be created.
      */
     suspend fun close() {
+        closed.store(true)
         val virtualConnections = mutex.withLock {
-            closed = true
             val connections = rooms.values.toList()
             rooms.clear()
             connections
         }
         virtualConnections.forEach { it.channel.close() }
-        routingJob?.cancel()
+        connecting.store(false)
+        val routingSnapshot = routingJob
+        val connectSnapshot = connectJob
+        routingJob = null
+        connectJob = null
+
+        routingSnapshot?.cancel()
+        connectSnapshot?.cancel()
+        // Guard against self-join to avoid deadlock if close() is called
+        // from within the routing coroutine.
+        val callerJob = currentCoroutineContext()[Job]
+        if (routingSnapshot != null && callerJob != routingSnapshot) {
+            routingSnapshot.join()
+        }
+        if (connectSnapshot != null && callerJob != connectSnapshot) {
+            connectSnapshot.join()
+        }
         physicalConnection.disconnect()
+    }
+
+    private fun safeOnEvent(event: MultiplexerEvent) {
+        try {
+            onEvent?.invoke(event)
+        } catch (_: Exception) {
+            // Never let a faulty event handler break routing
+        }
     }
 
     private inner class VirtualClientConnection(

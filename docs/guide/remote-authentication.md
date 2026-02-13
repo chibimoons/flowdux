@@ -18,6 +18,30 @@ Client                                Server
   │                                     │
 ```
 
+### Token Refresh (선택적)
+
+`refreshProvider`가 설정된 경우, 초기 토큰이 거부되면 자동으로 한 번 재시도한다.
+서버는 `AuthConfig(maxAuthAttempts = 2)`로 재인증을 허용해야 한다.
+
+```
+Client                                Server (maxAuthAttempts = 2)
+  │                                     │
+  │ {"type":"auth","token":"expired"}   │
+  │ ──────────────────────────────────► │  verify → 실패
+  │    {"type":"auth_error",...}        │
+  │ ◄────────────────────────────────── │
+  │                                     │
+  │ refreshProvider() → new token       │
+  │                                     │
+  │ {"type":"auth","token":"fresh"}     │
+  │ ──────────────────────────────────► │  verify → 성공
+  │          {"type":"auth_ok"}         │
+  │ ◄────────────────────────────────── │
+  │                                     │
+  │ ════ 인증 완료, 정상 메시지 교환 ═══ │
+  │                                     │
+```
+
 ## Ktor-Level vs In-Band Auth
 
 | | Ktor-Level Auth | In-Band Auth (이 모듈) |
@@ -49,9 +73,9 @@ Ktor 레벨 인증 패턴은 [WebSocket Authentication Guide](./websocket-authen
 │  │  Client              │  │  Server                  │   │
 │  │  (.auth.client)      │  │  (.auth.server)          │   │
 │  │                      │  │                          │   │
-│  │  CredentialProvider  │  │  AuthPrincipal           │   │
-│  │  AuthClientConnection│  │  AuthVerifier            │   │
-│  │  .withAuth()         │  │  AuthResult              │   │
+│  │  AuthClientConnection│  │  AuthPrincipal           │   │
+│  │  .withAuth()         │  │  AuthVerifier            │   │
+│  │                      │  │  AuthResult              │   │
 │  │                      │  │  AuthServerConnection    │   │
 │  │                      │  │  .withAuth()             │   │
 │  │                      │  │  .getOrElse()            │   │
@@ -216,11 +240,55 @@ val connection = KtorWebSocketClientConnection.create(
 // 2. Lambda — 동적 토큰
 .withAuth { tokenStore.getAccessToken() }
 
-// 3. CredentialProvider — 재사용 가능한 인터페이스
-.withAuth(CredentialProvider { oauthClient.refreshToken() })
+// 3. Lambda + refresh — 토큰 갱신 지원
+.withAuth(
+    token = { tokenStore.getAccessToken() },
+    refresh = {
+        val newTokens = api.refreshTokens(tokenStore.getRefreshToken()!!)
+        tokenStore.save(newTokens)
+        newTokens.accessToken
+    },
+)
 ```
 
-### 3. Store 생성
+### 3. Token Refresh
+
+초기 토큰이 서버에서 거부되면, `refresh` 람다가 설정된 경우 클라이언트가 자동으로 한 번 재시도한다.
+
+- `refresh`가 새 토큰을 반환하면 → 해당 토큰으로 재인증 시도 (1회)
+- `refresh`가 `null`을 반환하거나 예외를 던지면 → 원래의 인증 실패 사유로 `AuthenticationException` 발생
+- 재시도 토큰도 거부되면 → 두 번째 거부 사유로 `AuthenticationException` 발생
+- 재시도 응답이 `handshakeTimeout` 내에 오지 않으면 → 원래의 인증 실패 사유 유지
+
+> **서버 설정 필수**: 서버에서 `AuthConfig(maxAuthAttempts = 2)`를 설정해야 재인증을 수락한다.
+> 기본값(`maxAuthAttempts = 1`)에서는 첫 실패 후 연결이 종료되어 클라이언트의 refresh가 동작하지 않는다.
+
+**Client:**
+
+```kotlin
+val connection = KtorWebSocketClientConnection.create(host, port, path)
+    .withAuth(
+        token = { tokenStore.getAccessToken() },
+        refresh = {
+            val newTokens = api.refreshTokens(tokenStore.getRefreshToken()!!)
+            tokenStore.save(newTokens)
+            newTokens.accessToken
+        },
+    )
+    .typedJsonAs<SharedAction, AppAction>()
+```
+
+**Server:**
+
+```kotlin
+val authed = KtorWebSocketServerConnection(this)
+    .withAuth(
+        verifier = jwtVerifier,
+        config = AuthConfig(maxAuthAttempts = 2),
+    )
+```
+
+### 4. Store 생성
 
 인증된 connection을 `SyncMiddleware`에 전달하여 Store를 생성한다.
 
@@ -376,8 +444,7 @@ kotlin/remote/auth/src/commonMain/kotlin/io/flowdux/remote/auth/
 ├── AuthenticationException.kt    # 인증 실패 예외
 ├── client/
 │   ├── AuthClientConnection.kt   # ClientConnection decorator
-│   ├── ClientAuthExt.kt          # .withAuth() extensions (3 overloads)
-│   └── CredentialProvider.kt     # token provider interface
+│   └── ClientAuthExt.kt          # .withAuth() extensions (3 overloads)
 └── server/
     ├── AuthPrincipal.kt          # identity marker interface
     ├── AuthResult.kt             # Success/Failure + getOrElse()

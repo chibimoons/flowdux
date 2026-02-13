@@ -2,6 +2,8 @@ package io.flowdux.remote.multiplexer
 
 import io.flowdux.Action
 import io.flowdux.remote.server.connection.TypedServerConnection
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.take
@@ -212,6 +214,139 @@ class ServerConnectionMultiplexerTest {
         val mux = ServerConnectionMultiplexer(physical, this)
 
         assertFalse(mux.hasRoom("nonexistent"))
+
+        mux.close()
+    }
+
+    // --- Concurrency tests ---
+
+    @Test
+    fun concurrentGetOrCreateRoomReturnsSameInstance() = runTest {
+        val physical = FakeTypedServerConnection<TestAction>()
+        val mux = ServerConnectionMultiplexer(physical, this)
+
+        val results = (1..10).map {
+            async { mux.getOrCreateRoom("shared-room") }
+        }.awaitAll()
+
+        // All should be the same instance
+        val first = results.first()
+        results.forEach { assertTrue(it === first) }
+        assertEquals(setOf("shared-room"), mux.roomIds())
+
+        mux.close()
+    }
+
+    @Test
+    fun concurrentRemoveRoomIsSafe() = runTest {
+        val physical = FakeTypedServerConnection<TestAction>()
+        val mux = ServerConnectionMultiplexer(physical, this)
+
+        mux.getOrCreateRoom("room-1")
+
+        // Multiple concurrent removes should not throw
+        val jobs = (1..5).map {
+            async { mux.removeRoom("room-1") }
+        }
+        jobs.awaitAll()
+
+        assertFalse(mux.hasRoom("room-1"))
+        mux.close()
+    }
+
+    @Test
+    fun rapidCreateRemoveCreateLifecycle() = runTest {
+        val physical = FakeTypedServerConnection<TestAction>()
+        val mux = ServerConnectionMultiplexer(physical, this)
+
+        val room1 = mux.getOrCreateRoom("room-1")
+        mux.removeRoom("room-1")
+        val room2 = mux.getOrCreateRoom("room-1")
+
+        // After remove and recreate, should be a new instance
+        assertFalse(room1 === room2)
+        assertTrue(mux.hasRoom("room-1"))
+
+        mux.close()
+    }
+
+    // --- onUnknownRoom callback tests ---
+
+    @Test
+    fun onUnknownRoomCallbackReceivesCorrectRoomIdAndAction() = runTest {
+        val physical = FakeTypedServerConnection<TestAction>()
+        val receivedCalls = mutableListOf<Pair<String, TestAction>>()
+
+        val mux = ServerConnectionMultiplexer(
+            physicalConnection = physical,
+            scope = this,
+            onUnknownRoom = { roomId, action -> receivedCalls.add(roomId to action) },
+        )
+
+        yield()
+
+        physical.simulateIncoming(routed("new-room", TestAction.Message("hello")))
+        physical.simulateIncoming(routed("another-room", TestAction.Ping(42)))
+        yield()
+
+        assertEquals(2, receivedCalls.size)
+        assertEquals("new-room" to TestAction.Message("hello"), receivedCalls[0])
+        assertEquals("another-room" to TestAction.Ping(42), receivedCalls[1])
+
+        mux.close()
+    }
+
+    @Test
+    fun onUnknownRoomCallbackExceptionDoesNotStopRouting() = runTest {
+        val physical = FakeTypedServerConnection<TestAction>()
+        var callCount = 0
+
+        val mux = ServerConnectionMultiplexer(
+            physicalConnection = physical,
+            scope = this,
+            onUnknownRoom = { _, _ ->
+                callCount++
+                if (callCount == 1) throw RuntimeException("callback error")
+            },
+        )
+
+        // Also create a known room to verify routing continues
+        val room1 = mux.getOrCreateRoom("room-1")
+        val room1Actions = mutableListOf<TestAction>()
+
+        val job = launch {
+            room1.incoming.take(1).toList(room1Actions)
+        }
+        yield()
+
+        // First unknown room triggers exception in callback
+        physical.simulateIncoming(routed("unknown-1", TestAction.Message("boom")))
+        yield()
+
+        // Second unknown room should still be processed
+        physical.simulateIncoming(routed("unknown-2", TestAction.Message("ok")))
+        yield()
+
+        // Known room should still receive messages
+        physical.simulateIncoming(routed("room-1", TestAction.Message("hello")))
+
+        withTimeout(1000) { job.join() }
+
+        assertEquals(2, callCount)
+        val expectedRoom1: List<TestAction> = listOf(TestAction.Message("hello"))
+        assertEquals(expectedRoom1, room1Actions)
+
+        mux.close()
+    }
+
+    @Test
+    fun removeRoomForNonexistentRoomIsSafe() = runTest {
+        val physical = FakeTypedServerConnection<TestAction>()
+        val mux = ServerConnectionMultiplexer(physical, this)
+
+        // Should not throw
+        mux.removeRoom("nonexistent")
+        assertEquals(emptySet(), mux.roomIds())
 
         mux.close()
     }

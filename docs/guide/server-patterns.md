@@ -243,6 +243,7 @@ webSocket("/game/{playerId}") {
 2. **[Shared State Pattern](./pattern-shared-state.md)** — 1:1:N 패턴, 다중 클라이언트 상태 공유
 3. **[Room Pattern](./pattern-room.md)** — 1:N:M 패턴, 그룹별 독립 상태
 4. **[Per-Client Pattern](./pattern-per-client.md)** — 1:N:N 패턴, 클라이언트별 비공개 상태
+5. **[Node Mediator Pattern](./pattern-node-mediator.md)** — 수평 확장, Central Store + 다수 Node 구조
 
 ## Related
 

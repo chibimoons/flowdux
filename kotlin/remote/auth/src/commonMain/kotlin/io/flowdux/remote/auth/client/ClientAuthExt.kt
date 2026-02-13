@@ -4,18 +4,18 @@ import io.flowdux.remote.ClientConnection
 import io.flowdux.remote.auth.AuthConfig
 
 /**
- * Add authentication to a client connection with a credential provider.
+ * Add authentication to a client connection with a static token.
  *
  * ```kotlin
  * val connection = KtorWebSocketClientConnection(url)
- *     .withAuth(CredentialProvider { tokenStore.getAccessToken() })
+ *     .withAuth(token = "my-api-key")
  *     .typedJson<SharedAction>()
  * ```
  */
 fun ClientConnection.withAuth(
-    provider: CredentialProvider,
+    token: String,
     config: AuthConfig = AuthConfig(),
-): ClientConnection = AuthClientConnection(this, provider, config)
+): ClientConnection = AuthClientConnection(this, { token }, config)
 
 /**
  * Add authentication to a client connection with a token provider lambda.
@@ -28,19 +28,30 @@ fun ClientConnection.withAuth(
  */
 fun ClientConnection.withAuth(
     config: AuthConfig = AuthConfig(),
-    provider: suspend () -> String,
-): ClientConnection = AuthClientConnection(this, CredentialProvider { provider() }, config)
+    token: suspend () -> String,
+): ClientConnection = AuthClientConnection(this, token, config)
 
 /**
- * Add authentication to a client connection with a static token.
+ * Add authentication with token refresh support.
+ *
+ * When the server rejects the initial token, [refresh] is called once to obtain a new token.
+ * If the refreshed token is also rejected (or [refresh] returns null / throws), authentication fails.
  *
  * ```kotlin
  * val connection = KtorWebSocketClientConnection(url)
- *     .withAuth(token = "my-api-key")
+ *     .withAuth(
+ *         token = { tokenStore.getAccessToken() },
+ *         refresh = {
+ *             val newTokens = api.refreshTokens(tokenStore.getRefreshToken()!!)
+ *             tokenStore.save(newTokens)
+ *             newTokens.accessToken
+ *         },
+ *     )
  *     .typedJson<SharedAction>()
  * ```
  */
 fun ClientConnection.withAuth(
-    token: String,
     config: AuthConfig = AuthConfig(),
-): ClientConnection = AuthClientConnection(this, CredentialProvider { token }, config)
+    token: suspend () -> String,
+    refresh: suspend () -> String?,
+): ClientConnection = AuthClientConnection(this, token, config, refresh)
