@@ -70,8 +70,11 @@ class AuthClientConnection(
      * Internal signal for auth handshake completion.
      * The forwarder sends Unit when an auth response (success or error) is received.
      * This avoids exposing transient DISCONNECTED state during refresh retries.
+     *
+     * All interactions use non-throwing APIs (trySend / receiveCatching) so that
+     * shutdown cannot race into ClosedSendChannelException / ClosedReceiveChannelException.
      */
-    private val authSignal = Channel<Unit>(Channel.UNLIMITED)
+    private val authSignal = Channel<Unit>(capacity = 1)
 
     override suspend fun send(message: String) {
         // Gate sends until auth handshake completes
@@ -105,17 +108,17 @@ class AuthClientConnection(
                                 when (val response = AuthProtocol.decodeAuthResponse(raw)) {
                                     is AuthProtocolResponse.Success -> {
                                         _connectionState.value = ConnectionState.CONNECTED
-                                        authSignal.send(Unit)
+                                        authSignal.trySend(Unit)
                                     }
 
                                     is AuthProtocolResponse.Error -> {
                                         _authErrorReason.value = response.reason
-                                        authSignal.send(Unit)
+                                        authSignal.trySend(Unit)
                                     }
                                 }
                             } catch (_: Exception) {
                                 // Malformed auth message — treat as auth failure
-                                authSignal.send(Unit)
+                                authSignal.trySend(Unit)
                             }
                         } else if (_connectionState.value == ConnectionState.CONNECTED) {
                             // Only forward non-auth messages after successful auth
@@ -126,7 +129,7 @@ class AuthClientConnection(
 
                 // 5. Wait for auth to complete (with timeout)
                 val authed = withTimeoutOrNull(config.handshakeTimeout) {
-                    authSignal.receive()
+                    authSignal.receiveCatching().getOrNull()
                 }
 
                 if (authed == null) {
@@ -174,7 +177,7 @@ class AuthClientConnection(
         delegate.send(AuthProtocol.encodeAuthRequest(newToken))
 
         val result = withTimeoutOrNull(config.handshakeTimeout) {
-            authSignal.receive()
+            authSignal.receiveCatching().getOrNull()
         }
         if (result == null || _connectionState.value != ConnectionState.CONNECTED) {
             // Restore original error reason if no new error was set (e.g., timeout)
