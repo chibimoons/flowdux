@@ -5,6 +5,7 @@ import io.flowdux.remote.ClientConnection
 import io.flowdux.remote.TypedClientConnection
 import io.flowdux.remote.serialization.JsonMessageCodec
 import io.flowdux.remote.serialization.SerializableActionCodec
+import io.flowdux.remote.serialization.actionCodecOf
 import io.flowdux.remote.server.connection.ServerConnection
 import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.typed
@@ -28,7 +29,7 @@ import kotlinx.serialization.json.Json
 inline fun <reified A : Action> ClientConnection.typedRoutedJson(
     json: Json = SerializableActionCodec.DefaultJson,
 ): TypedClientConnection<RoutedAction<A>> {
-    val routedCodec = routedActionCodecOf<A>(json)
+    val routedCodec = actionCodecOf<RoutedAction<A>>(json)
     return typed(routedCodec, JsonMessageCodec())
 }
 
@@ -51,6 +52,6 @@ inline fun <reified A : Action> ClientConnection.typedRoutedJson(
 inline fun <reified A : Action> ServerConnection.typedRoutedJson(
     json: Json = SerializableActionCodec.DefaultJson,
 ): TypedServerConnection<RoutedAction<A>> {
-    val routedCodec = routedActionCodecOf<A>(json)
+    val routedCodec = actionCodecOf<RoutedAction<A>>(json)
     return typed(routedCodec, JsonMessageCodec())
 }
