@@ -21,18 +21,19 @@ Client                                Server
 ### Token Refresh (선택적)
 
 `refreshProvider`가 설정된 경우, 초기 토큰이 거부되면 자동으로 한 번 재시도한다.
+서버는 `AuthConfig(maxAuthAttempts = 2)`로 재인증을 허용해야 한다.
 
 ```
-Client                                Server
+Client                                Server (maxAuthAttempts = 2)
   │                                     │
-  │ auth: {"token":"expired-jwt"}       │
+  │ {"type":"auth","token":"expired"}   │
   │ ──────────────────────────────────► │  verify → 실패
-  │      {"type":"auth_error",...}      │
+  │    {"type":"auth_error",...}        │
   │ ◄────────────────────────────────── │
   │                                     │
   │ refreshProvider() → new token       │
   │                                     │
-  │ auth: {"token":"fresh-jwt"}         │
+  │ {"type":"auth","token":"fresh"}     │
   │ ──────────────────────────────────► │  verify → 성공
   │          {"type":"auth_ok"}         │
   │ ◄────────────────────────────────── │
@@ -252,12 +253,17 @@ val connection = KtorWebSocketClientConnection.create(
 
 ### 3. Token Refresh
 
-초기 토큰이 서버에서 거부되면, `refresh` 람다가 설정된 경우 자동으로 한 번 재시도한다.
+초기 토큰이 서버에서 거부되면, `refresh` 람다가 설정된 경우 클라이언트가 자동으로 한 번 재시도한다.
 
 - `refresh`가 새 토큰을 반환하면 → 해당 토큰으로 재인증 시도 (1회)
 - `refresh`가 `null`을 반환하거나 예외를 던지면 → 원래의 인증 실패 사유로 `AuthenticationException` 발생
 - 재시도 토큰도 거부되면 → 두 번째 거부 사유로 `AuthenticationException` 발생
 - 재시도 응답이 `handshakeTimeout` 내에 오지 않으면 → 원래의 인증 실패 사유 유지
+
+> **서버 설정 필수**: 서버에서 `AuthConfig(maxAuthAttempts = 2)`를 설정해야 재인증을 수락한다.
+> 기본값(`maxAuthAttempts = 1`)에서는 첫 실패 후 연결이 종료되어 클라이언트의 refresh가 동작하지 않는다.
+
+**Client:**
 
 ```kotlin
 val connection = KtorWebSocketClientConnection.create(host, port, path)
@@ -270,6 +276,16 @@ val connection = KtorWebSocketClientConnection.create(host, port, path)
         },
     )
     .typedJsonAs<SharedAction, AppAction>()
+```
+
+**Server:**
+
+```kotlin
+val authed = KtorWebSocketServerConnection(this)
+    .withAuth(
+        verifier = jwtVerifier,
+        config = AuthConfig(maxAuthAttempts = 2),
+    )
 ```
 
 ### 4. Store 생성

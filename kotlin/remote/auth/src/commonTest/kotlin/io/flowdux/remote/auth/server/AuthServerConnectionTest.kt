@@ -239,4 +239,97 @@ class AuthServerConnectionTest {
         // isAuthMessage returns true for auth_ok, but decodeAuthRequest fails (no token)
         assertTrue(result.reason.contains("Malformed auth message"))
     }
+
+    // --- maxAuthAttempts retry tests ---
+
+    @Test
+    fun retryAuth_secondAttemptSucceeds() = runTest {
+        val mock = MockServerConnection()
+        val verifier = tokenVerifier("valid-token")
+        val authConn = AuthServerConnection(
+            delegate = mock,
+            verifier = verifier,
+            config = AuthConfig(maxAuthAttempts = 2),
+        )
+
+        // First: bad token, Second: valid token
+        mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-token"))
+        mock.simulateIncoming(AuthProtocol.encodeAuthRequest("valid-token"))
+
+        val result = authConn.awaitAuth(backgroundScope)
+
+        assertIs<AuthResult.Success<TestPrincipal>>(result)
+        assertEquals("user-1", result.principal.userId)
+
+        // Verify: auth_error for first, auth_ok for second
+        assertEquals(2, mock.sentMessages.size)
+        assertTrue(mock.sentMessages[0].contains("auth_error"))
+        assertTrue(mock.sentMessages[1].contains("auth_ok"))
+    }
+
+    @Test
+    fun retryAuth_bothAttemptsFail() = runTest {
+        val mock = MockServerConnection()
+        val authConn = AuthServerConnection(
+            delegate = mock,
+            verifier = rejectAllVerifier,
+            config = AuthConfig(maxAuthAttempts = 2),
+        )
+
+        mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-1"))
+        mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-2"))
+
+        val result = authConn.awaitAuth(backgroundScope)
+
+        assertIs<AuthResult.Failure>(result)
+        assertEquals("Access denied", result.reason)
+
+        // Two auth_error messages sent
+        assertEquals(2, mock.sentMessages.size)
+        assertTrue(mock.sentMessages.all { it.contains("auth_error") })
+    }
+
+    @Test
+    fun retryAuth_messagesForwardedAfterRetrySuccess() = runTest {
+        val mock = MockServerConnection()
+        val verifier = tokenVerifier("valid-token")
+        val authConn = AuthServerConnection(
+            delegate = mock,
+            verifier = verifier,
+            config = AuthConfig(maxAuthAttempts = 2),
+        )
+
+        mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-token"))
+        mock.simulateIncoming(AuthProtocol.encodeAuthRequest("valid-token"))
+
+        val result = authConn.awaitAuth(backgroundScope)
+        assertIs<AuthResult.Success<TestPrincipal>>(result)
+
+        turbineScope {
+            val messages = authConn.incoming.testIn(backgroundScope)
+            mock.simulateIncoming("""{"data":"after-retry"}""")
+            assertEquals("""{"data":"after-retry"}""", messages.awaitItem())
+            messages.cancel()
+        }
+    }
+
+    @Test
+    fun defaultMaxAttempts_singleAttemptOnly() = runTest {
+        val mock = MockServerConnection()
+        val verifier = tokenVerifier("valid-token")
+        val authConn = AuthServerConnection(
+            delegate = mock,
+            verifier = verifier,
+            // default: maxAuthAttempts = 1
+        )
+
+        mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-token"))
+
+        val result = authConn.awaitAuth(backgroundScope)
+
+        // Should fail immediately — no retry
+        assertIs<AuthResult.Failure>(result)
+        assertEquals("Invalid token", result.reason)
+        assertEquals(1, mock.sentMessages.size)
+    }
 }

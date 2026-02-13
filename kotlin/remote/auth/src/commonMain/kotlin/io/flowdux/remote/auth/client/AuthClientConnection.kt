@@ -6,6 +6,7 @@ import io.flowdux.remote.auth.AuthConfig
 import io.flowdux.remote.auth.AuthProtocol
 import io.flowdux.remote.auth.AuthProtocolResponse
 import io.flowdux.remote.auth.AuthenticationException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -154,6 +155,8 @@ class AuthClientConnection(
         val refresh = refreshProvider ?: return false
         val newToken = try {
             refresh()
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             return false
         } ?: return false
