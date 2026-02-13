@@ -21,7 +21,7 @@ sealed interface SharedChatAction : ChatAction {
     data class SendMessage(val user: String, val text: String) : SharedChatAction, ServerSharedAction
 
     @Serializable
-    data class JoinRoom(val user: String) : SharedChatAction, ServerSharedAction
+    data class JoinRoom(val user: String, val roomId: String = "lobby") : SharedChatAction, ServerSharedAction
 
     @Serializable
     data class LeaveRoom(val user: String) : SharedChatAction, ServerSharedAction

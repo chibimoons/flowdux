@@ -38,7 +38,7 @@ fun main(args: Array<String>) = runBlocking {
     println("=== FlowDux Node Mediator Chat ===")
     println("User: $username")
     println("Node: $nodeHost:$nodePort")
-    println("Commands: type a message, /quit to exit")
+    println("Commands: /join <room>, /users, /room, /quit")
     println()
 
     val store = createChatStore(nodeHost, nodePort)
@@ -47,21 +47,21 @@ fun main(args: Array<String>) = runBlocking {
         store.state.collect { state ->
             when (val event = state.lastEvent) {
                 is ChatEvent.UserJoined ->
-                    println("  * ${event.user} joined (online: ${state.users})")
+                    println("  [${state.currentRoom}] * ${event.user} joined (online: ${state.users})")
                 is ChatEvent.UserLeft ->
-                    println("  * ${event.user} left (online: ${state.users})")
+                    println("  [${state.currentRoom}] * ${event.user} left (online: ${state.users})")
                 is ChatEvent.MessageReceived ->
-                    println("  [${event.user}] ${event.text}")
+                    println("  [${state.currentRoom}] [${event.user}] ${event.text}")
                 null -> {}
             }
         }
     }
 
-    // Connect and join
+    // Connect and join default room
     store.dispatch(ClientChatAction.SetCurrentUser(username))
     store.dispatch(ClientChatAction.Connect)
     delay(500)
-    store.dispatch(SharedChatAction.JoinRoom(username))
+    store.dispatch(SharedChatAction.JoinRoom(username, roomId = "lobby"))
     delay(200)
 
     // Interactive input loop
@@ -74,8 +74,24 @@ fun main(args: Array<String>) = runBlocking {
             if (trimmed.equals("/quit", ignoreCase = true)) break
 
             if (trimmed.equals("/users", ignoreCase = true)) {
-                val users = store.currentState.users
-                println("  Online: $users")
+                val s = store.currentState
+                println("  [${s.currentRoom}] Online: ${s.users}")
+                continue
+            }
+
+            if (trimmed.equals("/room", ignoreCase = true)) {
+                println("  Current room: ${store.currentState.currentRoom}")
+                continue
+            }
+
+            if (trimmed.startsWith("/join ", ignoreCase = true)) {
+                val roomId = trimmed.substringAfter("/join ").trim()
+                if (roomId.isEmpty()) {
+                    println("  Usage: /join <room>")
+                    continue
+                }
+                println("  Switching to room: $roomId")
+                store.dispatch(SharedChatAction.JoinRoom(username, roomId = roomId))
                 continue
             }
 

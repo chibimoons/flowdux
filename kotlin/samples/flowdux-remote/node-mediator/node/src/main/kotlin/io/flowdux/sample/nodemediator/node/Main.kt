@@ -156,11 +156,46 @@ fun main(args: Array<String>) {
                 // which would compete for connection.incoming).
                 var stateJob: Job? = null
 
+                fun subscribeToRoom(room: io.flowdux.remote.server.pattern.SharedStateServer<ServerRoomState, ChatAction>) {
+                    stateJob?.cancel()
+                    stateJob = applicationScope.launch {
+                        room.store.state.collect { state ->
+                            val syncAction = SharedChatAction.SyncState(
+                                RoomState(
+                                    roomId = state.roomId,
+                                    messages = state.messages,
+                                    users = state.users,
+                                    lastEvent = state.lastEvent,
+                                )
+                            )
+                            try {
+                                connection.send(syncAction)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                // Client disconnected
+                            }
+                        }
+                    }
+                }
+
                 try {
                     connection.incoming.collect { action ->
                         when (action) {
                             is SharedChatAction.JoinRoom -> {
-                                val roomId = "lobby"
+                                val roomId = action.roomId
+
+                                // Leave current room if switching
+                                val oldRoomId = sessionRooms[sessionId]
+                                if (oldRoomId != null && oldRoomId != roomId) {
+                                    val oldRoom = roomServer.getRoom(oldRoomId)
+                                    if (oldRoom != null) {
+                                        val leaveAction = SharedChatAction.LeaveRoom(action.user)
+                                        oldRoom.store.dispatch(leaveAction)
+                                        mediator.forwardToCentral(oldRoomId, leaveAction)
+                                    }
+                                }
+
                                 val room = roomServer.getOrCreateRoom(roomId)
                                 sessionRooms[sessionId] = roomId
 
@@ -172,26 +207,8 @@ fun main(args: Array<String>) {
                                     localRegistry.assignRoom(roomId, nodeId)
                                 }
 
-                                // Subscribe client to room state changes
-                                stateJob = applicationScope.launch {
-                                    room.store.state.collect { state ->
-                                        val syncAction = SharedChatAction.SyncState(
-                                            RoomState(
-                                                roomId = state.roomId,
-                                                messages = state.messages,
-                                                users = state.users,
-                                                lastEvent = state.lastEvent,
-                                            )
-                                        )
-                                        try {
-                                            connection.send(syncAction)
-                                        } catch (e: CancellationException) {
-                                            throw e
-                                        } catch (_: Exception) {
-                                            // Client disconnected
-                                        }
-                                    }
-                                }
+                                // Subscribe client to new room state
+                                subscribeToRoom(room)
 
                                 delay(50)
                                 room.store.dispatch(action)
@@ -208,6 +225,8 @@ fun main(args: Array<String>) {
                             is SharedChatAction.LeaveRoom -> {
                                 val roomId = sessionRooms.remove(sessionId) ?: return@collect
                                 val room = roomServer.getRoom(roomId) ?: return@collect
+                                stateJob?.cancel()
+                                stateJob = null
                                 room.store.dispatch(action)
                                 mediator.forwardToCentral(roomId, action)
                             }
@@ -217,7 +236,16 @@ fun main(args: Array<String>) {
                     }
                 } finally {
                     stateJob?.cancel()
-                    sessionRooms.remove(sessionId)
+                    // Leave room on disconnect
+                    val roomId = sessionRooms.remove(sessionId)
+                    if (roomId != null) {
+                        val room = roomServer.getRoom(roomId)
+                        if (room != null) {
+                            val leaveAction = SharedChatAction.LeaveRoom("session:$sessionId")
+                            room.store.dispatch(leaveAction)
+                            mediator.forwardToCentral(roomId, leaveAction)
+                        }
+                    }
                     println("[$nodeId] Client disconnected: $sessionId")
                 }
             }

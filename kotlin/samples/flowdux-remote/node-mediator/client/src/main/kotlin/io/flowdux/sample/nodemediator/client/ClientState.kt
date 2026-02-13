@@ -15,6 +15,7 @@ data class ClientChatState(
     val users: Set<String> = emptySet(),
     val lastEvent: ChatEvent? = null,
     val currentUser: String = "",
+    val currentRoom: String = "",
 ) : State
 
 /**
@@ -35,6 +36,7 @@ val clientChatReducer = buildReducer<ClientChatState, ChatAction> {
             messages = action.state.messages,
             users = action.state.users,
             lastEvent = action.state.lastEvent,
+            currentRoom = action.state.roomId,
         )
     }
 
