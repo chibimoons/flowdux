@@ -773,7 +773,9 @@ io.on("connection", (socket) => {
   socket.on("sendMessage", ({ roomId, user, text }) => {
     const state = roomStates.get(roomId)
     state.messages.push({ user, text })       // 직접 구현 (reducer 없음)
-    io.to(roomId).emit("syncState", state)    // 직접 구현
+    io.to(roomId).emit("syncState", {         // 직접 구현 (Set → Array 변환 필요)
+      ...state, users: [...state.users],
+    })
   })
 
   socket.on("disconnect", () => {
@@ -873,20 +875,30 @@ FlowDux의 `handleClient`는 이 모든 것을 한 번의 호출로 통합합니
 
 위에서 "직접 구현"으로 표시된 부분을 모두 채운 Socket.IO + Redis Adapter 전체 코드입니다. FlowDux NodeRoomServer와 동일한 스펙(Room 상태 관리, 세션 추적, 자동 브로드캐스트, 빈 Room 정리, disconnect 처리)을 구현합니다.
 
+> **참고:** 이 예시는 sticky session을 전제합니다. Redis Adapter는 이벤트(브로드캐스트)만 cross-node로 전달하며 상태 자체를 동기화하지 않으므로, 같은 room의 클라이언트가 여러 노드에 분산되면 노드별 in-memory 상태가 분기됩니다. sticky session 없이 노드 간 상태 일관성이 필요하면 room action을 Redis Pub/Sub로 모든 노드에 fan-out하여 각 노드에서 동일하게 reducer를 적용하거나, 상태를 Redis/DB에 저장하고 단일 소스에서 읽어와야 합니다. FlowDux NodeMediator는 Central이 액션을 모든 Node에 릴레이하고 각 Node가 동일한 Reducer를 적용하는 방식으로 이 문제를 해결합니다.
+
 ```js
 // ── server.js (Socket.IO + Redis Adapter) ────────────────────────
+const http = require("http")
 const { Server } = require("socket.io")
 const { createAdapter } = require("@socket.io/redis-adapter")
 const { createClient } = require("redis")
 
+const server = http.createServer()
 const io = new Server(server, { cors: { origin: "*" } })
 
 // Redis Adapter — cross-node 릴레이
-const pubClient = createClient({ url: "redis://localhost:6379" })
-const subClient = pubClient.duplicate()
-await pubClient.connect()
-await subClient.connect()
-io.adapter(createAdapter(pubClient, subClient))
+;(async () => {
+  const pubClient = createClient({ url: "redis://localhost:6379" })
+  const subClient = pubClient.duplicate()
+  await pubClient.connect()
+  await subClient.connect()
+  io.adapter(createAdapter(pubClient, subClient))
+})()
+
+server.listen(3000, () => {
+  console.log("Socket.IO server listening on port 3000")
+})
 
 // ── 직접 구현 시작: Store/Reducer 패턴 ──────────────────────────
 
@@ -1007,13 +1019,18 @@ io.on("connection", (socket) => {
     room.dispatch({ type: "MESSAGE_RECEIVED", user, text })
   })
 
-  socket.on("leaveRoom", ({ roomId, user }) => {
+  socket.on("leaveRoom", ({ roomId }) => {
     socket.leave(roomId)
-    untrackSession(socket.id, roomId)
     const room = rooms.get(roomId)
-    if (!room) return
-    room.dispatch({ type: "USER_LEFT", user })
+    if (!room) {
+      untrackSession(socket.id, roomId)
+      return
+    }
+    const userNames = sessionUsers.get(socket.id)
+    const username = userNames?.get(roomId) ?? "unknown"
+    room.dispatch({ type: "USER_LEFT", user: username })
     destroyRoomIfEmpty(roomId)
+    untrackSession(socket.id, roomId)
   })
 
   // ── 직접 구현: disconnect 시 모든 room에서 유저 정리 ──────────
@@ -1066,11 +1083,11 @@ nodeRoomServer.connect()
 
 // 3. 클라이언트 처리 — handleClient가 나머지를 자동 처리
 webSocket("/ws/{roomId}") {
-    val roomId = call.parameters["roomId"]!!
+    val roomId = call.parameters["roomId"] ?: return@webSocket
     val username = call.request.queryParameters["user"] ?: "anonymous"
     val sessionId = UUID.randomUUID().toString()
-    val connection = KtorWebSocketServerConnection(this)
-        .typedJson<SharedChatAction>() as TypedServerConnection<SharedChatAction>
+    val connection: TypedServerConnection<SharedChatAction> =
+        KtorWebSocketServerConnection(this).typedJson()
 
     nodeRoomServer.dispatchAndForward(
         roomId, SharedChatAction.JoinRoom(username),
