@@ -65,7 +65,7 @@ PR이 머지되면:
 
 ```bash
 git fetch origin main --tags
-git tag <version> origin/main
+git tag -a <version> -m "Release <version>" origin/main
 git push origin <version>
 ```
 

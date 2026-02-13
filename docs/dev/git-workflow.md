@@ -33,7 +33,7 @@ gh auth switch -u chibimoons  # 아니면 전환
 3. `docs/guide/remote.md`, `docs/guide/timetravel.md` 버전 업데이트
 4. `main`으로 PR 생성 → 머지
 5. 최신 main 동기화: `git checkout main && git pull --ff-only`
-6. 태그: `git tag x.x.x && git push origin x.x.x`
+6. 태그: `git tag -a x.x.x -m "Release x.x.x" && git push origin x.x.x`
 7. GitHub Actions 자동 배포 (~25분)
 
 ## 브랜치 네이밍

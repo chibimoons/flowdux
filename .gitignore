@@ -25,6 +25,8 @@ kotlin-js-store/
 
 # Local configuration
 local.properties
+CLAUDE.local.md
+.claude/settings.local.json
 
 # Xcode
 xcuserdata/
