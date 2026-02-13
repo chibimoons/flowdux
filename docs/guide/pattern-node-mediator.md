@@ -342,10 +342,11 @@ val physical = serverConnection.typedNodeActionJson<SharedAction>()
 ### 직접 Codec 생성
 
 ```kotlin
-import io.flowdux.remote.nodemediator.nodeRoutedActionCodecOf
+import io.flowdux.remote.nodemediator.NodeAction
 import io.flowdux.remote.serialization.JsonMessageCodec
+import io.flowdux.remote.serialization.actionCodecOf
 
-val nodeCodec = nodeRoutedActionCodecOf<SharedAction>()
+val nodeCodec = actionCodecOf<NodeAction<SharedAction>>()
 val physical = rawConnection.typed(nodeCodec, JsonMessageCodec())
 ```
 

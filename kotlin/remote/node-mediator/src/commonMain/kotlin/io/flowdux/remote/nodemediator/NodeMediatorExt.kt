@@ -2,11 +2,12 @@ package io.flowdux.remote.nodemediator
 
 import io.flowdux.Action
 import io.flowdux.remote.ClientConnection
+import io.flowdux.remote.TypedClientConnection
 import io.flowdux.remote.nodemediator.transport.NodeTransport
 import io.flowdux.remote.nodemediator.transport.WebSocketNodeTransport
-import io.flowdux.remote.TypedClientConnection
 import io.flowdux.remote.serialization.JsonMessageCodec
 import io.flowdux.remote.serialization.SerializableActionCodec
+import io.flowdux.remote.serialization.actionCodecOf
 import io.flowdux.remote.server.connection.ServerConnection
 import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.typed
@@ -30,8 +31,7 @@ import kotlinx.serialization.json.Json
 inline fun <reified A : Action> ClientConnection.typedNodeActionJson(
     json: Json = SerializableActionCodec.DefaultJson,
 ): TypedClientConnection<NodeAction<A>> {
-    val nodeCodec = nodeRoutedActionCodecOf<A>(json)
-    return typed(nodeCodec, JsonMessageCodec())
+    return typed(actionCodecOf<NodeAction<A>>(json), JsonMessageCodec())
 }
 
 /**
@@ -53,8 +53,7 @@ inline fun <reified A : Action> ClientConnection.typedNodeActionJson(
 inline fun <reified A : Action> ServerConnection.typedNodeActionJson(
     json: Json = SerializableActionCodec.DefaultJson,
 ): TypedServerConnection<NodeAction<A>> {
-    val nodeCodec = nodeRoutedActionCodecOf<A>(json)
-    return typed(nodeCodec, JsonMessageCodec())
+    return typed(actionCodecOf<NodeAction<A>>(json), JsonMessageCodec())
 }
 
 /**
