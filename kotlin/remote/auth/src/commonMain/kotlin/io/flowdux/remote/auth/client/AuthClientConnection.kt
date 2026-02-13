@@ -150,6 +150,7 @@ class AuthClientConnection(
         } finally {
             _connectionState.value = ConnectionState.DISCONNECTED
             messageChannel.close()
+            authSignal.close()
         }
     }
 
@@ -188,6 +189,7 @@ class AuthClientConnection(
     override suspend fun disconnect() {
         delegate.disconnect()
         messageChannel.close()
+        authSignal.close()
         _connectionState.value = ConnectionState.DISCONNECTED
     }
 }
