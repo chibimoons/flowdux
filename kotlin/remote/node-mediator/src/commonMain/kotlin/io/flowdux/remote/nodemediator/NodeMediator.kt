@@ -154,8 +154,9 @@ class NodeMediator<A : Action>(
                         } catch (e: Exception) {
                             safeOnEvent(NodeMediatorEvent.CallbackFailed(roomId, e))
                         }
+                    } else {
+                        safeOnEvent(NodeMediatorEvent.MessageDropped(roomId))
                     }
-                    // else: silent drop
                 }
             } catch (e: CancellationException) {
                 throw e

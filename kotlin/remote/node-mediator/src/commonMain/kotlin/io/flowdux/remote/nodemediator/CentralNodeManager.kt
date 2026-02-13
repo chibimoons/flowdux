@@ -78,12 +78,14 @@ class CentralNodeManager<A : Action>(
         check(!closed) { "CentralNodeManager is closed" }
 
         val callerJob = currentCoroutineContext()[Job]!!
+        val entry = NodeEntry(connection, callerJob)
+        var cause: Exception? = null
 
         try {
             safeOnEvent(NodeMediatorEvent.NodeConnected(nodeId))
 
             mutex.withLock {
-                nodes[nodeId] = NodeEntry(connection, callerJob)
+                nodes[nodeId] = entry
             }
 
             connection.incoming.collect { nodeAction ->
@@ -98,11 +100,14 @@ class CentralNodeManager<A : Action>(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            safeOnEvent(NodeMediatorEvent.NodeDisconnected(nodeId, e))
+            cause = e
         } finally {
             withContext(NonCancellable) {
                 mutex.withLock {
-                    nodes.remove(nodeId)
+                    // Only remove if this entry is still the current one (not replaced by a newer connection)
+                    if (nodes[nodeId] === entry) {
+                        nodes.remove(nodeId)
+                    }
                 }
                 // Remove room assignments for disconnected node
                 val rooms = roomRegistry.getRoomsForNode(nodeId)
@@ -110,7 +115,7 @@ class CentralNodeManager<A : Action>(
                     roomRegistry.unassignRoom(roomId)
                 }
             }
-            safeOnEvent(NodeMediatorEvent.NodeDisconnected(nodeId, null))
+            safeOnEvent(NodeMediatorEvent.NodeDisconnected(nodeId, cause))
         }
     }
 

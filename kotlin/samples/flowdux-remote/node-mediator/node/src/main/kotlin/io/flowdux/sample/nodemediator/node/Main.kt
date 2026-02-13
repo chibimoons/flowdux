@@ -5,7 +5,6 @@ import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.nodemediator.NodeMediator
 import io.flowdux.remote.nodemediator.NodeMediatorEvent
-import io.flowdux.remote.nodemediator.registry.InMemoryRoomRegistry
 import io.flowdux.remote.nodemediator.webSocketNodeTransport
 import io.flowdux.remote.serialization.typedJsonAs
 import io.flowdux.remote.server.pattern.createSharedStateRoomServer
@@ -49,7 +48,6 @@ fun main(args: Array<String>) {
     val centralPort = args.getOrElse(3) { "8080" }.toInt()
 
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    val localRegistry = InMemoryRoomRegistry()
 
     // Create room server for local room management
     val roomServer = createSharedStateRoomServer(
@@ -131,8 +129,9 @@ fun main(args: Array<String>) {
     )
     println()
 
-    // Tracks which room each client session belongs to
+    // Tracks which room and username each client session belongs to
     val sessionRooms = java.util.concurrent.ConcurrentHashMap<String, String>()
+    val sessionUsers = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     val server = embeddedServer(CIO, port = localPort) {
         install(WebSockets) {
@@ -198,13 +197,13 @@ fun main(args: Array<String>) {
 
                                 val room = roomServer.getOrCreateRoom(roomId)
                                 sessionRooms[sessionId] = roomId
+                                sessionUsers[sessionId] = action.user
 
-                                // Register room with Central if not already
+                                // Register room with mediator if not already
                                 if (!mediator.hasRoom(roomId)) {
                                     mediator.registerRoom(roomId) { centralAction ->
                                         room.store.dispatch(centralAction)
                                     }
-                                    localRegistry.assignRoom(roomId, nodeId)
                                 }
 
                                 // Subscribe client to new room state
@@ -241,10 +240,11 @@ fun main(args: Array<String>) {
                     stateJob?.cancel()
                     // Leave room on disconnect
                     val roomId = sessionRooms.remove(sessionId)
-                    if (roomId != null) {
+                    val user = sessionUsers.remove(sessionId)
+                    if (roomId != null && user != null) {
                         val room = roomServer.getRoom(roomId)
                         if (room != null) {
-                            val leaveAction = SharedChatAction.LeaveRoom("session:$sessionId")
+                            val leaveAction = SharedChatAction.LeaveRoom(user)
                             room.store.dispatch(leaveAction)
                             mediator.forwardToCentral(roomId, leaveAction)
                         }
