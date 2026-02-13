@@ -118,7 +118,7 @@ data class NodeAction<A : Action>(
 
 ```kotlin
 import io.flowdux.remote.nodemediator.CentralNodeManager
-import io.flowdux.remote.nodemediator.InMemoryRoomRegistry
+import io.flowdux.remote.nodemediator.registry.InMemoryRoomRegistry
 
 val roomRegistry = InMemoryRoomRegistry()
 

@@ -1,6 +1,7 @@
 package io.flowdux.remote.nodemediator
 
 import io.flowdux.Action
+import io.flowdux.remote.nodemediator.transport.NodeTransport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

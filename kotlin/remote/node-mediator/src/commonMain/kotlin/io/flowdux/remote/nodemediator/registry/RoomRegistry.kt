@@ -1,4 +1,4 @@
-package io.flowdux.remote.nodemediator
+package io.flowdux.remote.nodemediator.registry
 
 /**
  * Abstraction for tracking which rooms are assigned to which nodes.

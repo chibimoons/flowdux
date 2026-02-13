@@ -1,6 +1,7 @@
 package io.flowdux.remote.nodemediator
 
 import io.flowdux.Action
+import io.flowdux.remote.nodemediator.registry.InMemoryRoomRegistry
 import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow

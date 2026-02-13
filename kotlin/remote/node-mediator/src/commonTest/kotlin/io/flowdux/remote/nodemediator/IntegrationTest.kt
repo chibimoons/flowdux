@@ -2,6 +2,8 @@ package io.flowdux.remote.nodemediator
 
 import io.flowdux.Action
 import io.flowdux.remote.ConnectionState
+import io.flowdux.remote.nodemediator.registry.InMemoryRoomRegistry
+import io.flowdux.remote.nodemediator.transport.WebSocketNodeTransport
 import io.flowdux.remote.TypedClientConnection
 import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlinx.coroutines.async

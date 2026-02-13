@@ -1,5 +1,6 @@
 package io.flowdux.remote.nodemediator
 
+import io.flowdux.remote.nodemediator.registry.InMemoryRoomRegistry
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest

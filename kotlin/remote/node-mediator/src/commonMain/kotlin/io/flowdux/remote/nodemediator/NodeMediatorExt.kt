@@ -2,6 +2,8 @@ package io.flowdux.remote.nodemediator
 
 import io.flowdux.Action
 import io.flowdux.remote.ClientConnection
+import io.flowdux.remote.nodemediator.transport.NodeTransport
+import io.flowdux.remote.nodemediator.transport.WebSocketNodeTransport
 import io.flowdux.remote.TypedClientConnection
 import io.flowdux.remote.serialization.JsonMessageCodec
 import io.flowdux.remote.serialization.SerializableActionCodec

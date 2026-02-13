@@ -2,8 +2,8 @@ package io.flowdux.sample.nodemediator.central
 
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.nodemediator.CentralNodeManager
-import io.flowdux.remote.nodemediator.InMemoryRoomRegistry
 import io.flowdux.remote.nodemediator.NodeMediatorEvent
+import io.flowdux.remote.nodemediator.registry.InMemoryRoomRegistry
 import io.flowdux.remote.nodemediator.typedNodeActionJson
 import io.flowdux.sample.nodemediator.shared.SharedChatAction
 import io.ktor.server.application.*

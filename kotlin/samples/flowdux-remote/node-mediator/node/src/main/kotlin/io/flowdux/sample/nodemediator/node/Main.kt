@@ -3,9 +3,9 @@ package io.flowdux.sample.nodemediator.node
 import io.flowdux.Middleware
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
-import io.flowdux.remote.nodemediator.InMemoryRoomRegistry
 import io.flowdux.remote.nodemediator.NodeMediator
 import io.flowdux.remote.nodemediator.NodeMediatorEvent
+import io.flowdux.remote.nodemediator.registry.InMemoryRoomRegistry
 import io.flowdux.remote.nodemediator.webSocketNodeTransport
 import io.flowdux.remote.serialization.typedJsonAs
 import io.flowdux.remote.server.pattern.createSharedStateRoomServer

@@ -1,6 +1,7 @@
 package io.flowdux.remote.nodemediator
 
 import io.flowdux.Action
+import io.flowdux.remote.nodemediator.transport.NodeTransport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job

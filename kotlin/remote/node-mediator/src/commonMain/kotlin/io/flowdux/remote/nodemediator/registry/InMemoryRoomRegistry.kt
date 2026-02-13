@@ -1,4 +1,4 @@
-package io.flowdux.remote.nodemediator
+package io.flowdux.remote.nodemediator.registry
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

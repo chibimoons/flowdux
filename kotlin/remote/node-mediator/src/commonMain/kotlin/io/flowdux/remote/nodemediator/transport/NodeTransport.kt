@@ -1,6 +1,7 @@
-package io.flowdux.remote.nodemediator
+package io.flowdux.remote.nodemediator.transport
 
 import io.flowdux.Action
+import io.flowdux.remote.nodemediator.NodeAction
 import kotlinx.coroutines.flow.Flow
 
 /**
