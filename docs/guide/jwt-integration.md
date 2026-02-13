@@ -330,6 +330,29 @@ val connection = KtorWebSocketClientConnection.create(
     .typedJsonAs<SharedGameAction, GameAction>()
 ```
 
+### 클라이언트 (Token Refresh 활용)
+
+`withAuth(token, refresh)`를 사용하면 초기 토큰이 만료되었을 때 자동으로 갱신을 시도한다.
+
+```kotlin
+val connection = KtorWebSocketClientConnection.create(
+    host = "your-server.com",
+    port = 443,
+    path = "/game",
+)
+    .withAuth(
+        token = {
+            Firebase.auth.currentUser?.getIdToken(false)?.await()?.token
+                ?: throw AuthenticationException("Not signed in")
+        },
+        refresh = {
+            // forceRefresh = true로 최신 토큰 획득
+            Firebase.auth.currentUser?.getIdToken(true)?.await()?.token
+        },
+    )
+    .typedJsonAs<SharedGameAction, GameAction>()
+```
+
 > **주의**: Firebase ID 토큰은 기본 1시간 유효.
 > 장시간 WebSocket 연결에서는 토큰 만료 전 재연결을 고려해야 한다.
 
@@ -462,6 +485,29 @@ val connection = KtorWebSocketClientConnection.create(
     path = "/chat",
 )
     .withAuth(token = session.accessToken)
+    .typedJsonAs<SharedAction, AppAction>()
+```
+
+### 클라이언트 (Token Refresh 활용)
+
+Supabase의 access token이 만료되었을 때 자동으로 refresh token을 사용하여 갱신한다.
+
+```kotlin
+val connection = KtorWebSocketClientConnection.create(
+    host = "your-server.com",
+    port = 443,
+    path = "/chat",
+)
+    .withAuth(
+        token = {
+            supabase.auth.currentSessionOrNull()?.accessToken
+                ?: throw AuthenticationException("Not signed in")
+        },
+        refresh = {
+            supabase.auth.refreshCurrentSession()
+            supabase.auth.currentSessionOrNull()?.accessToken
+        },
+    )
     .typedJsonAs<SharedAction, AppAction>()
 ```
 

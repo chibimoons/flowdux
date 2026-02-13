@@ -6,6 +6,7 @@ import io.flowdux.remote.auth.AuthConfig
 import io.flowdux.remote.auth.AuthProtocol
 import io.flowdux.remote.auth.AuthProtocolResponse
 import io.flowdux.remote.auth.AuthenticationException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -22,9 +23,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * During [connect], this connection:
  * 1. Opens the underlying transport connection
- * 2. Sends an auth token (from [credentialProvider])
+ * 2. Sends an auth token (from [tokenProvider])
  * 3. Waits for the server's auth response
- * 4. Forwards non-auth messages to [incoming] (only after auth succeeds)
+ * 4. If auth fails and [refreshProvider] is set, refreshes the token and retries once
+ * 5. Forwards non-auth messages to [incoming] (only after auth succeeds)
  *
  * [send] is gated on authentication: calls before auth completes will suspend
  * until the handshake succeeds, or throw [AuthenticationException] if it fails.
@@ -32,13 +34,27 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Usage:
  * ```kotlin
  * val authedConnection = KtorWebSocketClientConnection(url)
- *     .withAuth { tokenStore.getAccessToken() }
+ *     .withAuth(
+ *         token = { tokenStore.getAccessToken() },
+ *         refresh = {
+ *             val newTokens = api.refreshTokens(tokenStore.getRefreshToken()!!)
+ *             tokenStore.save(newTokens)
+ *             newTokens.accessToken
+ *         },
+ *     )
  * ```
+ *
+ * @param delegate The underlying transport connection
+ * @param tokenProvider Suspend lambda that provides the initial auth token
+ * @param config Auth handshake configuration (timeout, etc.)
+ * @param refreshProvider Optional lambda to obtain a new token when auth is rejected.
+ *   Called at most once per [connect] attempt. Returns the new token, or null to skip retry.
  */
 class AuthClientConnection(
     private val delegate: ClientConnection,
-    private val credentialProvider: CredentialProvider,
+    private val tokenProvider: suspend () -> String,
     private val config: AuthConfig = AuthConfig(),
+    private val refreshProvider: (suspend () -> String?)? = null,
 ) : ClientConnection {
 
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
@@ -47,8 +63,18 @@ class AuthClientConnection(
     private val messageChannel = Channel<String>(Channel.UNLIMITED)
     override val incoming: Flow<String> = messageChannel.receiveAsFlow()
 
-    /** Captured auth error reason from the server (if auth failed). */
-    private var authErrorReason: String? = null
+    /** Captured auth error reason from the server (if auth failed). Thread-safe via StateFlow. */
+    private val _authErrorReason = MutableStateFlow<String?>(null)
+
+    /**
+     * Internal signal for auth handshake completion.
+     * The forwarder sends Unit when an auth response (success or error) is received.
+     * This avoids exposing transient DISCONNECTED state during refresh retries.
+     *
+     * All interactions use non-throwing APIs (trySend / receiveCatching) so that
+     * shutdown cannot race into ClosedSendChannelException / ClosedReceiveChannelException.
+     */
+    private val authSignal = Channel<Unit>(capacity = 1)
 
     override suspend fun send(message: String) {
         // Gate sends until auth handshake completes
@@ -71,7 +97,7 @@ class AuthClientConnection(
                 delegate.connectionState.first { it == ConnectionState.CONNECTED }
 
                 // 3. Send auth token
-                val token = credentialProvider.provide()
+                val token = tokenProvider()
                 delegate.send(AuthProtocol.encodeAuthRequest(token))
 
                 // 4. Start message forwarding (filters auth messages)
@@ -80,19 +106,20 @@ class AuthClientConnection(
                         if (AuthProtocol.isAuthMessage(raw)) {
                             try {
                                 when (val response = AuthProtocol.decodeAuthResponse(raw)) {
-                                    is AuthProtocolResponse.Success ->
+                                    is AuthProtocolResponse.Success -> {
                                         _connectionState.value = ConnectionState.CONNECTED
+                                        authSignal.trySend(Unit)
+                                    }
 
                                     is AuthProtocolResponse.Error -> {
-                                        authErrorReason = response.reason
-                                        _connectionState.value = ConnectionState.DISCONNECTED
-                                        delegate.disconnect()
+                                        _authErrorReason.value = response.reason
+                                        authSignal.trySend(Unit)
                                     }
                                 }
-                            } catch (_: Exception) {
-                                // Malformed auth message — treat as auth failure
-                                _connectionState.value = ConnectionState.DISCONNECTED
-                                delegate.disconnect()
+                            } catch (e: Exception) {
+                                // Malformed auth message — treat as terminal auth failure
+                                _authErrorReason.value = "Malformed auth response: ${e.message}"
+                                authSignal.trySend(Unit)
                             }
                         } else if (_connectionState.value == ConnectionState.CONNECTED) {
                             // Only forward non-auth messages after successful auth
@@ -103,9 +130,7 @@ class AuthClientConnection(
 
                 // 5. Wait for auth to complete (with timeout)
                 val authed = withTimeoutOrNull(config.handshakeTimeout) {
-                    _connectionState.first {
-                        it == ConnectionState.CONNECTED || it == ConnectionState.DISCONNECTED
-                    }
+                    authSignal.receiveCatching().getOrNull()
                 }
 
                 if (authed == null) {
@@ -113,23 +138,72 @@ class AuthClientConnection(
                     throw AuthenticationException("Auth handshake timed out")
                 }
 
+                // 6. Auth failed — attempt refresh and retry once
                 if (_connectionState.value != ConnectionState.CONNECTED) {
-                    val reason = authErrorReason ?: "unknown reason"
-                    throw AuthenticationException("Authentication rejected by server: $reason")
+                    val refreshed = tryRefresh()
+                    if (!refreshed) {
+                        val reason = _authErrorReason.value ?: "unknown reason"
+                        delegate.disconnect()
+                        throw AuthenticationException("Authentication rejected by server: $reason")
+                    }
                 }
 
-                // 6. Stay alive until connection closes
+                // 7. Stay alive until connection closes
                 connectJob.join()
             }
         } finally {
             _connectionState.value = ConnectionState.DISCONNECTED
             messageChannel.close()
+            authSignal.close()
         }
+    }
+
+    /**
+     * Attempt to refresh the auth token and retry authentication once.
+     *
+     * @return true if refresh + re-auth succeeded, false otherwise
+     */
+    private suspend fun tryRefresh(): Boolean {
+        val refresh = refreshProvider ?: return false
+        val newToken = try {
+            withTimeoutOrNull(config.handshakeTimeout) { refresh() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return false
+        } ?: return false
+
+        val originalErrorReason = _authErrorReason.value
+        _authErrorReason.value = null
+        try {
+            delegate.send(AuthProtocol.encodeAuthRequest(newToken))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // Transport closed (e.g., server maxAuthAttempts=1) — treat as refresh failure
+            if (_authErrorReason.value == null) {
+                _authErrorReason.value = originalErrorReason
+            }
+            return false
+        }
+
+        val result = withTimeoutOrNull(config.handshakeTimeout) {
+            authSignal.receiveCatching().getOrNull()
+        }
+        if (result == null || _connectionState.value != ConnectionState.CONNECTED) {
+            // Restore original error reason if no new error was set (e.g., timeout)
+            if (_authErrorReason.value == null) {
+                _authErrorReason.value = originalErrorReason
+            }
+            return false
+        }
+        return true
     }
 
     override suspend fun disconnect() {
         delegate.disconnect()
         messageChannel.close()
+        authSignal.close()
         _connectionState.value = ConnectionState.DISCONNECTED
     }
 }
