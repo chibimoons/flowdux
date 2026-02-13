@@ -18,8 +18,7 @@ class RoutedActionCodecTest {
         @Serializable data class SetName(val name: String) : TestAction
     }
 
-    private val innerCodec = actionCodecOf<TestAction>()
-    private val routedCodec = innerCodec.routed()
+    private val routedCodec = actionCodecOf<RoutedAction<TestAction>>()
 
     private fun routed(roomId: String, action: TestAction): RoutedAction<TestAction> =
         RoutedAction(roomId, action)
@@ -111,14 +110,5 @@ class RoutedActionCodecTest {
         assertFailsWith<SerializationException> {
             routedCodec.decode("""{"roomId":"room-1","action":{"type":"Unknown"}}""")
         }
-    }
-
-    @Test
-    fun routedActionCodecOfFactoryWorks() {
-        val codec = routedActionCodecOf<TestAction>()
-        val original = routed("factory-room", TestAction.Add(100))
-        val json = codec.encode(original)
-        val decoded = codec.decode(json)
-        assertEquals(original, decoded)
     }
 }

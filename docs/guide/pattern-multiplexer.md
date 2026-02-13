@@ -234,10 +234,11 @@ val physical = serverConnection.typedRoutedJson<SharedChatAction>()
 ### 직접 Codec 생성
 
 ```kotlin
-import io.flowdux.remote.multiplexer.routedActionCodecOf
+import io.flowdux.remote.multiplexer.RoutedAction
 import io.flowdux.remote.serialization.JsonMessageCodec
+import io.flowdux.remote.serialization.actionCodecOf
 
-val routedCodec = routedActionCodecOf<SharedChatAction>()
+val routedCodec = actionCodecOf<RoutedAction<SharedChatAction>>()
 val physical = rawConnection.typed(routedCodec, JsonMessageCodec())
 ```
 
