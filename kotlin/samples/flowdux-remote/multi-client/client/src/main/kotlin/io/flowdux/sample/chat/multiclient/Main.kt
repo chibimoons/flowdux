@@ -94,12 +94,11 @@ fun main(args: Array<String>) = runBlocking {
     // Cleanup
     println()
     println("Leaving room...")
-    store.dispatch(SharedChatAction.LeaveRoom(username))
-    delay(300)
-
     collectorJob.cancel()
-    store.dispatch(ClientChatAction.Disconnect)
-    store.close()
+    store.closeGracefully { dispatch ->
+        dispatch(SharedChatAction.LeaveRoom(username))
+        dispatch(ClientChatAction.Disconnect)
+    }
 
     println("Bye!")
 }
