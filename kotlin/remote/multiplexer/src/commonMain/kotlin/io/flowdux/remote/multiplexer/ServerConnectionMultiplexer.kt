@@ -60,6 +60,7 @@ class ServerConnectionMultiplexer<A : Action>(
     private val mutex = Mutex()
     private val rooms = mutableMapOf<String, VirtualServerConnection>()
     private var routingJob: Job? = null
+    @Volatile
     private var closed = false
 
     init {
@@ -178,6 +179,7 @@ class ServerConnectionMultiplexer<A : Action>(
     ) : TypedServerConnection<A> {
         val channel = Channel<A>(Channel.BUFFERED)
 
+        override val isActive: Boolean get() = physicalConnection.isActive && !closed
         override val incoming: Flow<A> = channel.receiveAsFlow()
 
         override suspend fun send(action: A) {

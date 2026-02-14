@@ -60,6 +60,7 @@ class NodeRoomServerTest {
     }
 
     private class FakeClientConnection : TypedServerConnection<TestAction> {
+        override val isActive: Boolean = true
         val incomingFlow = MutableSharedFlow<TestAction>(extraBufferCapacity = 64)
         override val incoming: Flow<TestAction> = incomingFlow
 

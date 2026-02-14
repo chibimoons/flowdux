@@ -686,33 +686,44 @@ fs.file-max = 1000000
 - **코드 변경**: Node가 room에 따라 해당 Central에 연결하도록 설정 변경
 - **전환 신호**: Central 샤드 수십 개 이상, 운영 복잡도 급증
 
-#### Stage 5: Kafka 도입 (100대+)
+#### Stage 5: Redis + Kafka 도입 (100대+)
 
 ```
-           ┌─────────────────┐
-           │  Kafka Cluster  │  ← 여기서 처음으로 외부 인프라 등장
-           │  (매니지드 서비스) │
-           └──┬────┬────┬───┘
-              │    │    │
-           Node  Node  Node × 100+
+                    ┌─────────────────────────────┐
+                    │           Redis              │  ← 여기서 처음으로 외부 인프라 등장
+                    │  Pub/Sub: room:{id}:actions  │
+                    │  Set:     room:{id}:nodes    │
+                    └──────┬──────────┬────────────┘
+                           │          │
+              subscribe/publish    subscribe/publish
+                           │          │
+                        Node 1 ... Node 100+
+                           │
+                    ┌──────┴──────┐
+                    │    Kafka    │  (optional, 상태복구용)
+                    └─────────────┘
 ```
 
 - **동접**: ~1억
-- **외부 인프라**: Kafka 클러스터 (AWS MSK, Confluent Cloud 등)
+- **외부 인프라**: Redis (필수, Sentinel/Cluster로 HA), Kafka (선택, 상태복구/감사용)
 - **코드 변경**: transport 1줄만 교체
-- Central 서버 제거 — Kafka가 대체
-- 공지: Admin이 `__broadcast` topic에 publish
+- Central 서버 제거 — Redis Pub/Sub가 릴레이 대체
+- 상태 복구: Kafka replay로 장애 복구 가능
 
 ```kotlin
 // Before (Stage 2~4):
 val transport = clientConnection.webSocketNodeTransport<SharedAction>()
 
 // After (Stage 5):
-val transport = KafkaNodeTransport<SharedAction>(bootstrapServers = "kafka:9092")
+val transport = RedisPubSubTransport<SharedAction>(
+    nodeId, redisClient, actionCodecOf(), scope
+)
 
-// NodeMediator 코드 동일
-val mediator = NodeMediator(nodeId, transport, scope)
+// NodeRoomServer 코드 동일
+val nodeRoomServer = NodeRoomServer(nodeId, transport, roomServer, scope)
 ```
+
+> 상세 설계는 [Redis + Kafka Scaling Design](../design/REDIS_KAFKA_SCALING.md)을 참고하세요.
 
 #### 시나리오 요약
 

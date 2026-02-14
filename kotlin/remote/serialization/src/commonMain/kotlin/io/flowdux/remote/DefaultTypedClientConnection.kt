@@ -14,6 +14,7 @@ internal class DefaultTypedClientConnection<A : Action>(
     private val connection: ClientConnection,
     private val actionCodec: ActionCodec<A>,
     private val messageCodec: MessageCodec,
+    private val onDecodeError: ((Exception) -> Unit)? = null,
 ) : TypedClientConnection<A> {
 
     override val connectionState: StateFlow<ConnectionState>
@@ -25,16 +26,18 @@ internal class DefaultTypedClientConnection<A : Action>(
             messageCodec.decodeServerMessage(raw)
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            return@transform // Skip malformed server messages
+        } catch (e: Exception) {
+            onDecodeError?.invoke(e)
+            return@transform
         }
         for (actionJson in response.actions) {
             val action = try {
                 actionCodec.decode(actionJson)
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
-                continue // Skip malformed actions
+            } catch (e: Exception) {
+                onDecodeError?.invoke(e)
+                continue
             }
             emit(action)
         }

@@ -41,6 +41,8 @@ class AuthServerConnection<P : AuthPrincipal>(
     private val rawChannel = Channel<String>(Channel.UNLIMITED)
     private val messageChannel = Channel<String>(Channel.UNLIMITED)
 
+    override val isActive: Boolean get() = delegate.isActive
+
     override val incoming: Flow<String> = messageChannel.receiveAsFlow()
 
     override suspend fun send(message: String) = delegate.send(message)

@@ -52,6 +52,7 @@ data class BroadcastConfig(
 class SessionBroadcaster<A : Action>(
     val registry: SessionRegistry<A>,
     private val config: BroadcastConfig = BroadcastConfig.Sequential,
+    private val onSendError: ((sessionId: String, Exception) -> Unit)? = null,
 ) {
 
     /**
@@ -67,8 +68,8 @@ class SessionBroadcaster<A : Action>(
             connection.send(action)
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            // Isolate send failures
+        } catch (e: Exception) {
+            onSendError?.invoke(sessionId, e)
         }
     }
 
@@ -81,9 +82,9 @@ class SessionBroadcaster<A : Action>(
      * @param action The action to broadcast.
      */
     suspend fun broadcast(action: A) {
-        val connections = registry.getSessions().values.toList()
-        forEachConcurrent(connections) { connection ->
-            sendSafe(connection, action)
+        val sessions = registry.getSessions().entries.toList()
+        forEachConcurrent(sessions) { (sessionId, connection) ->
+            sendSafe(sessionId, connection, action)
         }
     }
 
@@ -102,7 +103,7 @@ class SessionBroadcaster<A : Action>(
         val sessions = registry.getSessions().entries.toList()
         forEachConcurrent(sessions) { (sessionId, connection) ->
             val action = mapper(sessionId) ?: return@forEachConcurrent
-            sendSafe(connection, action)
+            sendSafe(sessionId, connection, action)
         }
     }
 
@@ -127,13 +128,13 @@ class SessionBroadcaster<A : Action>(
         }
     }
 
-    private suspend fun sendSafe(connection: TypedServerConnection<A>, action: A) {
+    private suspend fun sendSafe(sessionId: String, connection: TypedServerConnection<A>, action: A) {
         try {
             connection.send(action)
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            // Isolate per-client send failures
+        } catch (e: Exception) {
+            onSendError?.invoke(sessionId, e)
         }
     }
 }
