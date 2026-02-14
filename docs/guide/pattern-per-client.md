@@ -273,8 +273,6 @@ class PokerRemoteMiddleware(
 ) : SyncMiddleware<ClientPokerState, PokerAction>(
     connection = connection,
 ) {
-    override val name: String = "PokerRemoteMiddleware"
-
     override val processors: ActionProcessorMap<ClientPokerState, PokerAction> = buildProcessors {
         on<LocalPokerAction.Connect> { _, _ ->
             startConnection()

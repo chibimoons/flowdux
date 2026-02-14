@@ -83,7 +83,6 @@ open class SyncMiddleware<S : State, A : Action>(
         actualScope.coroutineContext[Job]?.invokeOnCompletion { errorChannel.close() }
     }
 
-    override val name: String = "SyncMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     /**

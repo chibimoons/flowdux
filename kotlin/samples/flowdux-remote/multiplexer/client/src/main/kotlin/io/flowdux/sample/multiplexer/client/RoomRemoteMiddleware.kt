@@ -15,8 +15,6 @@ class RoomRemoteMiddleware(
 ) : SyncMiddleware<ClientRoomState, ChatAction>(
     connection = connection,
 ) {
-    override val name: String = "RoomRemoteMiddleware"
-
     override val processors = buildProcessors {
         on<ClientRoomAction.Connect> { _, _ ->
             startConnection()
