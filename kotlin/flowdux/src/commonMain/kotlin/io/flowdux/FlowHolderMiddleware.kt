@@ -29,7 +29,6 @@ internal class FlowHolderMiddleware<S : State, A : Action>(
     private val dispatch: (A) -> Unit,
 ) : Middleware<S, A> {
 
-    override val name: String = "FlowHolderMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
     private val isLoggingEnabled = logger::class != NoOpStoreLogger::class
 

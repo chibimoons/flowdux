@@ -29,7 +29,6 @@ internal class ClientSharedActionForwarder<S : State, A : Action>(
     private val dispatch: (A) -> Unit,
 ) : Middleware<S, A> {
 
-    override val name: String = "ClientSharedActionForwarder"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     override fun process(getState: () -> S, action: A): Flow<A> {

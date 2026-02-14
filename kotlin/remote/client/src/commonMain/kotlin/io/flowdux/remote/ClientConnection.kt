@@ -28,9 +28,19 @@ interface ClientConnection {
     suspend fun disconnect()
 }
 
+/** Represents the connection lifecycle states. */
 enum class ConnectionState {
+    /** Not connected to the server. */
     DISCONNECTED,
+    /** Connection attempt in progress. */
     CONNECTING,
+    /** Actively connected and ready to send/receive. */
     CONNECTED,
+    /**
+     * Attempting to re-establish a lost connection.
+     *
+     * Reserved for future auto-reconnect implementations.
+     * Not currently emitted by any built-in connection class.
+     */
     RECONNECTING,
 }

@@ -80,25 +80,10 @@ class SessionBroadcaster<A : Action>(
      *
      * @param action The action to broadcast.
      */
-    @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun broadcast(action: A) {
         val connections = registry.getSessions().values.toList()
-
-        if (config.concurrency == 1) {
-            // Sequential mode
-            for (connection in connections) {
-                sendSafe(connection, action)
-            }
-        } else {
-            // Parallel mode using flatMapMerge
-            connections.asFlow()
-                .flatMapMerge(config.concurrency) { connection ->
-                    flow {
-                        sendSafe(connection, action)
-                        emit(Unit)
-                    }
-                }
-                .collect()
+        forEachConcurrent(connections) { connection ->
+            sendSafe(connection, action)
         }
     }
 
@@ -113,25 +98,28 @@ class SessionBroadcaster<A : Action>(
      *
      * @param mapper Function that produces an action for each session ID, or null to skip.
      */
-    @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun sendPerSession(mapper: (sessionId: String) -> A?) {
-        val sessions = registry.getSessions()
+        val sessions = registry.getSessions().entries.toList()
+        forEachConcurrent(sessions) { (sessionId, connection) ->
+            val action = mapper(sessionId) ?: return@forEachConcurrent
+            sendSafe(connection, action)
+        }
+    }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun <T> forEachConcurrent(
+        items: Collection<T>,
+        action: suspend (T) -> Unit,
+    ) {
         if (config.concurrency == 1) {
-            // Sequential mode
-            for ((sessionId, connection) in sessions) {
-                val action = mapper(sessionId) ?: continue
-                sendSafe(connection, action)
+            for (item in items) {
+                action(item)
             }
         } else {
-            // Parallel mode using flatMapMerge
-            sessions.entries.asFlow()
-                .flatMapMerge(config.concurrency) { (sessionId, connection) ->
+            items.asFlow()
+                .flatMapMerge(config.concurrency) { item ->
                     flow {
-                        val action = mapper(sessionId)
-                        if (action != null) {
-                            sendSafe(connection, action)
-                        }
+                        action(item)
                         emit(Unit)
                     }
                 }

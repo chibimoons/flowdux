@@ -119,8 +119,6 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
     internal val broadcaster: SessionBroadcaster<A>,
 ) : Middleware<S, A> {
 
-    override val name: String = "MultiClientSyncMiddleware"
-
     @Suppress("UNCHECKED_CAST")
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
         // 1. InternalSendToClient: send action to specific client

@@ -311,8 +311,6 @@ class ChatRemoteMiddleware(
 ) : SyncMiddleware<ClientChatState, ChatAction>(
     connection = connection,
 ) {
-    override val name: String = "ChatRemoteMiddleware"
-
     override val processors: ActionProcessorMap<ClientChatState, ChatAction> = buildProcessors {
         on<LocalChatAction.Connect> { _, _ ->
             startConnection()  // Built-in: connects and listens for messages
