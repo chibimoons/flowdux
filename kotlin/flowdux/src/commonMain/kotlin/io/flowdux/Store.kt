@@ -131,13 +131,18 @@ class Store<S : State, A : Action> internal constructor(
      * @param timeout Maximum time to wait for pending actions to drain. Defaults to 5 seconds.
      * @param beforeClose Optional suspend block invoked before draining.
      *        Use the provided `dispatch` function to enqueue cleanup actions.
+     *        Actions are sent directly to the channel (not via [dispatch]) to guarantee
+     *        ordering: all cleanup actions will be enqueued before the drain sentinel.
      */
     suspend fun closeGracefully(
         timeout: Duration = 5.seconds,
-        beforeClose: (suspend (dispatch: (A) -> Unit) -> Unit)? = null,
+        beforeClose: (suspend (dispatch: suspend (A) -> Unit) -> Unit)? = null,
     ) {
         if (_isClosed) return
-        beforeClose?.invoke { dispatch(it) }
+        beforeClose?.invoke {
+            if (isLoggingEnabled) logger.onActionDispatched(it)
+            actionFlow.send(it)
+        }
         val signal = CompletableDeferred<Unit>()
         @Suppress("UNCHECKED_CAST")
         try {
