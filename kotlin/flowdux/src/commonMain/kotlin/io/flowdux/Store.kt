@@ -116,6 +116,18 @@ class Store<S : State, A : Action> internal constructor(
      * Optionally dispatches cleanup actions (e.g., disconnect, leave room) via [beforeClose],
      * then waits for all queued actions to drain before calling [close].
      *
+     * **How it works:** A sentinel action is enqueued after all [beforeClose] dispatches.
+     * The sentinel passes through the full middleware pipeline (middlewares pass it through
+     * as an unknown action type). When it reaches the reducer, it signals completion without
+     * modifying state. This guarantees all previously dispatched actions have been fully
+     * processed before [close] is called.
+     *
+     * **Limitations:**
+     * - In-flight [FlowHolderAction]s may still emit actions after the sentinel is processed,
+     *   since their flows are collected independently by [FlowHolderMiddleware].
+     * - If a middleware filters unknown action types instead of passing them through,
+     *   the sentinel will not reach the reducer and the call will fall back to [timeout].
+     *
      * @param timeout Maximum time to wait for pending actions to drain. Defaults to 5 seconds.
      * @param beforeClose Optional suspend block invoked before draining.
      *        Use the provided `dispatch` function to enqueue cleanup actions.

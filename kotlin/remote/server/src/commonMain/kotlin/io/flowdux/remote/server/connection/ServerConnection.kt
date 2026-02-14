@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 interface ServerConnection {
     /** Whether the underlying transport is still active/open. */
     val isActive: Boolean
+        get() = true
 
     /** Incoming raw messages from the client. */
     val incoming: Flow<String>
