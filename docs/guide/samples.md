@@ -564,8 +564,8 @@ Central 서버가 여러 Node 서버를 관리하는 분산 채팅 예제입니�
 ### 클라이언트 실행
 
 ```bash
-./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Alice localhost 8081"
-./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Bob localhost 8082"
+./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Alice lobby localhost 8081"
+./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Bob lobby localhost 8082"
 ```
 
 ### 클라이언트 명령어
