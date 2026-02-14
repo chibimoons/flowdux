@@ -207,6 +207,7 @@ class SessionAwareSharedStateServerTest {
     fun `error in one session does not affect others during per-session send`() = runTest {
         val connAlice = MockTypedServerConnection<PokerAction>()
         val failingConn = object : TypedServerConnection<PokerAction> {
+            override val isActive: Boolean = true
             override val incoming = emptyFlow<PokerAction>()
             override suspend fun send(action: PokerAction) {
                 throw RuntimeException("Connection failed")

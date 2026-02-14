@@ -131,6 +131,7 @@ class MultiClientSyncMiddlewareTest {
     fun `broadcast error isolation - one failure does not affect others`() = runTest {
         val goodConn = MockTypedServerConnection<ServerAction>()
         val failingConn = object : TypedServerConnection<ServerAction> {
+            override val isActive: Boolean = true
             override val incoming = goodConn.incoming // unused
             override suspend fun send(action: ServerAction) {
                 throw RuntimeException("Connection failed")

@@ -66,6 +66,8 @@ import kotlinx.coroutines.sync.withLock
  *              across multiple connect/disconnect cycles.
  * @param onConnectionError Optional callback to convert connection errors to actions.
  *        When provided, connection failures will be dispatched through the store.
+ *        When `null` (default), connection errors are silently ignored.
+ *        Consider providing a callback for production use to enable error visibility.
  */
 open class SyncMiddleware<S : State, A : Action>(
     private val connection: TypedClientConnection<A>,

@@ -145,6 +145,7 @@ val pokerErrorProcessor = object : ErrorProcessor<PokerAction> {
 // -- Mock TypedServerConnection --
 
 class MockTypedServerConnection<A : Action> : TypedServerConnection<A> {
+    override val isActive: Boolean = true
     private val incomingChannel = Channel<A>(Channel.BUFFERED)
     override val incoming: Flow<A> = incomingChannel.receiveAsFlow()
 

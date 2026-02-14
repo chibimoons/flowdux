@@ -65,6 +65,7 @@ class IntegrationTest {
         }
 
         val serverSide = object : TypedServerConnection<NodeAction<TestAction>> {
+            override val isActive: Boolean = true
             override val incoming: Flow<NodeAction<TestAction>> = clientToServer
 
             override suspend fun send(action: NodeAction<TestAction>) {

@@ -71,6 +71,7 @@ class MockClientConnection(
 
 class MockServerConnection : ServerConnection {
 
+    override val isActive: Boolean = true
     private val incomingChannel = Channel<String>(Channel.UNLIMITED)
     override val incoming: Flow<String> = incomingChannel.receiveAsFlow()
 

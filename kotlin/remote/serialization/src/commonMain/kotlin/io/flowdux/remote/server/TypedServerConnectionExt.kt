@@ -15,4 +15,5 @@ import io.flowdux.remote.server.connection.TypedServerConnection
 fun <A : Action> ServerConnection.typed(
     actionCodec: ActionCodec<A>,
     messageCodec: MessageCodec,
-): TypedServerConnection<A> = DefaultTypedServerConnection(this, actionCodec, messageCodec)
+    onDecodeError: ((Exception) -> Unit)? = null,
+): TypedServerConnection<A> = DefaultTypedServerConnection(this, actionCodec, messageCodec, onDecodeError)

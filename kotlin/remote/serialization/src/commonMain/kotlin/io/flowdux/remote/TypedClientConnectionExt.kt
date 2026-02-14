@@ -11,4 +11,5 @@ import io.flowdux.Action
 fun <A : Action> ClientConnection.typed(
     actionCodec: ActionCodec<A>,
     messageCodec: MessageCodec,
-): TypedClientConnection<A> = DefaultTypedClientConnection(this, actionCodec, messageCodec)
+    onDecodeError: ((Exception) -> Unit)? = null,
+): TypedClientConnection<A> = DefaultTypedClientConnection(this, actionCodec, messageCodec, onDecodeError)
