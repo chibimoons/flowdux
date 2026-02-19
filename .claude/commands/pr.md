@@ -97,7 +97,16 @@ gh run view <run-id> --log-failed
 
 실패 원인 분석 → 수정 → 커밋 & 푸시
 
-### 2-4. 상태 재확인
+### 2-4. Copilot 코드리뷰 재요청
+
+푸시 후 Copilot에게 코드리뷰를 재요청합니다:
+
+```bash
+gh api repos/chibimoons/flowdux/pulls/<pr-number>/requested_reviewers \
+  --method POST -f 'reviewers[]=Copilot'
+```
+
+### 2-5. 상태 재확인
 
 ```bash
 gh pr checks <pr-number>

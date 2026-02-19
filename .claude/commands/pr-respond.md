@@ -55,7 +55,16 @@ gh run view <run-id> --log-failed
 
 실패 원인 분석 → 수정 → 테스트 확인 → 커밋 & 푸시
 
-## 5. 상태 재확인
+## 5. Copilot 코드리뷰 재요청
+
+푸시 후 Copilot에게 코드리뷰를 재요청합니다:
+
+```bash
+gh api repos/chibimoons/flowdux/pulls/<pr-number>/requested_reviewers \
+  --method POST -f 'reviewers[]=Copilot'
+```
+
+## 6. 상태 재확인
 
 ```bash
 gh pr checks <pr-number>
@@ -71,7 +80,7 @@ gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments | jq '
 
 → 두 조건 모두 충족될 때까지 2번부터 반복
 
-## 6. 완료
+## 7. 완료
 
 ```
 PR #<number> 리뷰 대응 완료:
