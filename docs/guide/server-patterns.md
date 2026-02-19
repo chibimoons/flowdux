@@ -132,6 +132,17 @@ FlowDux Remote는 다양한 실시간 앱 요구사항에 맞는 서버 아키�
 | 퀴즈 쇼 | Room + Per-Client | 공개 점수 + 개인 답안 |
 | 라이브 투표 | Shared State | 실시간 집계 공유 |
 
+### 멀티디바이스 (Multi-Device Sync)
+
+| Use Case | 패턴 | 이유 |
+|----------|------|------|
+| 메모/노트 동기화 | Room (roomId=userId) | 같은 유저의 디바이스들이 상태 공유 |
+| 설정 동기화 | Room (roomId=userId) | 디바이스 간 앱 설정 일관성 |
+| 장바구니 | Room (roomId=userId) | 어느 디바이스에서든 동일한 장바구니 |
+| 읽기 진행률 | Room (roomId=userId) | 마지막 읽은 위치 공유 |
+
+자세한 내용은 [Multi-Device Session Sync Pattern](./pattern-multi-device.md) 참조.
+
 ### 금융/거래 (Finance & Trading)
 
 | Use Case | 패턴 | 이유 |
@@ -244,6 +255,7 @@ webSocket("/game/{playerId}") {
 3. **[Room Pattern](./pattern-room.md)** — 1:N:M 패턴, 그룹별 독립 상태
 4. **[Per-Client Pattern](./pattern-per-client.md)** — 1:N:N 패턴, 클라이언트별 비공개 상태
 5. **[Node Mediator Pattern](./pattern-node-mediator.md)** — 수평 확장, Central Store + 다수 Node 구조
+6. **[Multi-Device Sync Pattern](./pattern-multi-device.md)** — Room 패턴 응용, roomId = userId로 디바이스 간 동기화
 
 ## Related
 
