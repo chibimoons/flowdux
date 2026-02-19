@@ -53,3 +53,52 @@ jobs:
 
       - name: Run flowdux-remote-server tests
         run: ./gradlew :kotlin:flowdux-remote-server:jvmTest
+
+      - name: Run flowdux-remote-serialization tests
+        run: ./gradlew :kotlin:flowdux-remote-serialization:jvmTest
+
+      - name: Run flowdux-remote-ktor tests
+        run: ./gradlew :kotlin:flowdux-remote-ktor:jvmTest
+
+      - name: Run flowdux-remote-multiplexer tests
+        run: ./gradlew :kotlin:flowdux-remote-multiplexer:jvmTest
+
+      - name: Run flowdux-remote-auth tests
+        run: ./gradlew :kotlin:flowdux-remote-auth:jvmTest
+
+      - name: Run flowdux-remote-node-mediator tests
+        run: ./gradlew :kotlin:flowdux-remote-node-mediator:jvmTest
+
+  # iOS/Native compilation check — catches issues like missing imports
+  # that only surface on non-JVM targets (e.g. kotlin.concurrent.Volatile)
+  compile-native:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Compile iOS targets
+        run: |
+          ./gradlew \
+            :kotlin:flowdux:compileKotlinIosSimulatorArm64 \
+            :kotlin:flowdux-timetravel:compileKotlinIosSimulatorArm64 \
+            :kotlin:flowdux-remote-core:compileKotlinIosSimulatorArm64 \
+            :kotlin:flowdux-remote-client:compileKotlinIosSimulatorArm64 \
+            :kotlin:flowdux-remote-server:compileKotlinIosSimulatorArm64 \
+            :kotlin:flowdux-remote-serialization:compileKotlinIosSimulatorArm64 \
+            :kotlin:flowdux-remote-ktor:compileKotlinIosSimulatorArm64 \
+            :kotlin:flowdux-remote-multiplexer:compileKotlinIosSimulatorArm64 \
+            :kotlin:flowdux-remote-auth:compileKotlinIosSimulatorArm64 \
+            :kotlin:flowdux-remote-node-mediator:compileKotlinIosSimulatorArm64
