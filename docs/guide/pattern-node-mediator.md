@@ -686,33 +686,44 @@ fs.file-max = 1000000
 - **코드 변경**: Node가 room에 따라 해당 Central에 연결하도록 설정 변경
 - **전환 신호**: Central 샤드 수십 개 이상, 운영 복잡도 급증
 
-#### Stage 5: Kafka 도입 (100대+)
+#### Stage 5: Redis + Kafka 도입 (100대+)
 
 ```
-           ┌─────────────────┐
-           │  Kafka Cluster  │  ← 여기서 처음으로 외부 인프라 등장
-           │  (매니지드 서비스) │
-           └──┬────┬────┬───┘
-              │    │    │
-           Node  Node  Node × 100+
+                    ┌─────────────────────────────┐
+                    │           Redis              │  ← 여기서 처음으로 외부 인프라 등장
+                    │  Pub/Sub: room:{id}:actions  │
+                    │  Set:     room:{id}:nodes    │
+                    └──────┬──────────┬────────────┘
+                           │          │
+              subscribe/publish    subscribe/publish
+                           │          │
+                        Node 1 ... Node 100+
+                           │
+                    ┌──────┴──────┐
+                    │    Kafka    │  (optional, 상태복구용)
+                    └─────────────┘
 ```
 
 - **동접**: ~1억
-- **외부 인프라**: Kafka 클러스터 (AWS MSK, Confluent Cloud 등)
+- **외부 인프라**: Redis (필수, Sentinel/Cluster로 HA), Kafka (선택, 상태복구/감사용)
 - **코드 변경**: transport 1줄만 교체
-- Central 서버 제거 — Kafka가 대체
-- 공지: Admin이 `__broadcast` topic에 publish
+- Central 서버 제거 — Redis Pub/Sub가 릴레이 대체
+- 상태 복구: Kafka replay로 장애 복구 가능
 
 ```kotlin
 // Before (Stage 2~4):
 val transport = clientConnection.webSocketNodeTransport<SharedAction>()
 
 // After (Stage 5):
-val transport = KafkaNodeTransport<SharedAction>(bootstrapServers = "kafka:9092")
+val transport = RedisPubSubTransport<SharedAction>(
+    nodeId, redisClient, actionCodecOf(), scope
+)
 
-// NodeMediator 코드 동일
-val mediator = NodeMediator(nodeId, transport, scope)
+// NodeRoomServer 코드 동일
+val nodeRoomServer = NodeRoomServer(nodeId, transport, roomServer, scope)
 ```
+
+> 상세 설계는 [Redis + Kafka Scaling Design](../design/REDIS_KAFKA_SCALING.md)을 참고하세요.
 
 #### 시나리오 요약
 
@@ -745,6 +756,382 @@ val mediator = NodeMediator(nodeId, transport, scope)
 > ```
 >
 > 초기 복잡도가 약간 높지만 마이그레이션 비용이 0이므로, 확장을 예상하는 경우 권장합니다.
+
+## 다른 솔루션과의 비교
+
+동일한 스펙(수평 확장 WebSocket, Central 릴레이, Room 관리, 클라이언트 세션, 상태 동기화)을 다른 프레임워크로 구현할 때의 비교입니다.
+
+### 프레임워크별 구현 예시
+
+**Socket.IO + Redis Adapter (Node.js):**
+
+```js
+const io = require("socket.io")(server)
+io.adapter(createAdapter(pubClient, subClient))
+
+// Room join/leave는 빌트인이지만, 상태 관리/브로드캐스트는 직접 구현
+const roomStates = new Map()  // 직접 구현
+
+io.on("connection", (socket) => {
+  socket.on("joinRoom", ({ roomId, user }) => {
+    socket.join(roomId)
+    if (!roomStates.has(roomId)) roomStates.set(roomId, createState(roomId))  // 직접 구현
+    const state = roomStates.get(roomId)
+    state.users.add(user)                     // 직접 구현
+    io.to(roomId).emit("syncState", state)    // 직접 구현
+  })
+
+  socket.on("sendMessage", ({ roomId, user, text }) => {
+    const state = roomStates.get(roomId)
+    state.messages.push({ user, text })       // 직접 구현 (reducer 없음)
+    io.to(roomId).emit("syncState", {         // 직접 구현 (Set → Array 변환 필요)
+      ...state, users: [...state.users],
+    })
+  })
+
+  socket.on("disconnect", () => {
+    // 세션→room 매핑 추적 — 직접 구현
+    // 유저 제거, 상태 업데이트 — 직접 구현
+    // 빈 room 정리 — 직접 구현
+  })
+})
+```
+
+**Phoenix Channels (Elixir):**
+
+```elixir
+defmodule MyApp.RoomChannel do
+  use Phoenix.Channel
+
+  def join("room:" <> room_id, _params, socket) do
+    send(self(), :after_join)
+    {:ok, assign(socket, :room_id, room_id)}
+  end
+
+  def handle_info(:after_join, socket) do
+    Presence.track(socket, socket.assigns.user_id, %{})
+    # 상태 관리는 GenServer로 직접 구현
+    push(socket, "sync_state", RoomStore.get_state(socket.assigns.room_id))
+    {:noreply, socket}
+  end
+
+  def handle_in("send_message", %{"text" => text}, socket) do
+    RoomStore.dispatch(socket.assigns.room_id, {:send_message, text})  # 직접 구현
+    broadcast!(socket, "sync_state", RoomStore.get_state(socket.assigns.room_id))
+    {:noreply, socket}
+  end
+end
+```
+
+**SignalR + Redis Backplane (C#):**
+
+```csharp
+public class ChatHub : Hub {
+    // Room별 상태 저장소 — 직접 구현
+    private static ConcurrentDictionary<string, RoomState> _rooms = new();
+
+    public async Task JoinRoom(string roomId, string user) {
+        await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
+        var state = _rooms.GetOrAdd(roomId, _ => new RoomState());  // 직접 구현
+        state.Users.Add(user);                                       // 직접 구현
+        await Clients.Group(roomId).SendAsync("SyncState", state);   // 직접 구현
+    }
+
+    public async Task SendMessage(string roomId, string user, string text) {
+        var state = _rooms[roomId];
+        state.Messages.Add(new(user, text));                          // 직접 구현
+        await Clients.Group(roomId).SendAsync("SyncState", state);    // 직접 구현
+    }
+
+    public override async Task OnDisconnectedAsync(Exception? ex) {
+        // 세션→room 매핑, 유저 제거, 빈 room 정리 — 전부 직접 구현
+    }
+}
+```
+
+### 기능 비교
+
+| | FlowDux NodeRoomServer | Socket.IO + Redis | Phoenix Channels | SignalR + Redis |
+|---|---|---|---|---|
+| **Cross-node 릴레이** | NodeMediator | Redis Adapter | 빌트인 PubSub | Redis Backplane |
+| **Room join/leave** | handleClient 자동 | 빌트인 | 빌트인 | Groups 빌트인 |
+| **State 관리 (Reducer)** | Store + Reducer | 직접 구현 | 직접 구현 | 직접 구현 |
+| **상태 브로드캐스트** | handleClient 자동 | 직접 구현 | 직접 구현 | 직접 구현 |
+| **세션 추적** | handleClient 자동 | 직접 구현 | Presence 빌트인 | 직접 구현 |
+| **빈 Room 정리** | destroyRoomIfEmpty | 직접 구현 | 프로세스 GC | 직접 구현 |
+| **타입 안전성** | sealed interface | 없음 | 패턴 매칭 | 부분적 |
+| **KMP 클라이언트** | Android/iOS/JS/JVM | JS 중심 | JS 중심 | .NET/JS |
+
+### 코드량 비교
+
+다른 솔루션들은 **transport + room routing**은 잘 제공하지만, State/Reducer + 자동 브로드캐스트는 직접 구현해야 합니다:
+
+| 직접 구현 항목 | 예상 코드량 |
+|---|---|
+| Store/Reducer 패턴 | ~40줄 |
+| Room별 상태 저장소 + lifecycle | ~30줄 |
+| 세션→room 매핑 추적 | ~20줄 |
+| 상태 변경 시 자동 브로드캐스트 | ~15줄 |
+| 빈 room 정리 | ~15줄 |
+| **합계 (인프라 코드)** | **~120줄** |
+
+```
+Socket.IO / SignalR: ~80줄 (프레임워크 코드) + ~120줄 (직접 구현) = ~200줄
+FlowDux NodeRoomServer: ~90줄 (handleClient가 나머지를 자동 처리)
+```
+
+FlowDux의 `handleClient`는 이 모든 것을 한 번의 호출로 통합합니다. 세션 관리, 상태 브로드캐스트, Central 포워딩이 `ForwardingConnection` + `SharedStateServer` 조합으로 자동 처리됩니다.
+
+### Socket.IO 전체 구현 예시
+
+위에서 "직접 구현"으로 표시된 부분을 모두 채운 Socket.IO + Redis Adapter 전체 코드입니다. FlowDux NodeRoomServer와 동일한 스펙(Room 상태 관리, 세션 추적, 자동 브로드캐스트, 빈 Room 정리, disconnect 처리)을 구현합니다.
+
+> **참고:** 이 예시는 sticky session을 전제합니다. Redis Adapter는 이벤트(브로드캐스트)만 cross-node로 전달하며 상태 자체를 동기화하지 않으므로, 같은 room의 클라이언트가 여러 노드에 분산되면 노드별 in-memory 상태가 분기됩니다. sticky session 없이 노드 간 상태 일관성이 필요하면 room action을 Redis Pub/Sub로 모든 노드에 fan-out하여 각 노드에서 동일하게 reducer를 적용하거나, 상태를 Redis/DB에 저장하고 단일 소스에서 읽어와야 합니다. FlowDux NodeMediator는 Central이 액션을 모든 Node에 릴레이하고 각 Node가 동일한 Reducer를 적용하는 방식으로 이 문제를 해결합니다.
+
+```js
+// ── server.js (Socket.IO + Redis Adapter) ────────────────────────
+const http = require("http")
+const { Server } = require("socket.io")
+const { createAdapter } = require("@socket.io/redis-adapter")
+const { createClient } = require("redis")
+
+const server = http.createServer()
+const io = new Server(server, { cors: { origin: "*" } })
+
+// Redis Adapter — cross-node 릴레이
+;(async () => {
+  const pubClient = createClient({ url: "redis://localhost:6379" })
+  const subClient = pubClient.duplicate()
+  await pubClient.connect()
+  await subClient.connect()
+  io.adapter(createAdapter(pubClient, subClient))
+})()
+
+server.listen(3000, () => {
+  console.log("Socket.IO server listening on port 3000")
+})
+
+// ── 직접 구현 시작: Store/Reducer 패턴 ──────────────────────────
+
+function createRoomState(roomId) {
+  return {
+    roomId,
+    messages: [],
+    users: new Set(),
+    lastEvent: null,
+  }
+}
+
+function roomReducer(state, action) {
+  switch (action.type) {
+    case "USER_JOINED":
+      return {
+        ...state,
+        users: new Set([...state.users, action.user]),
+        lastEvent: { type: "UserJoined", user: action.user },
+      }
+    case "USER_LEFT": {
+      const users = new Set(state.users)
+      users.delete(action.user)
+      return {
+        ...state,
+        users,
+        lastEvent: { type: "UserLeft", user: action.user },
+      }
+    }
+    case "MESSAGE_RECEIVED":
+      return {
+        ...state,
+        messages: [...state.messages, { user: action.user, text: action.text }],
+        lastEvent: { type: "MessageReceived", user: action.user, text: action.text },
+      }
+    default:
+      return state
+  }
+}
+
+// ── 직접 구현: Room별 상태 저장소 + lifecycle ────────────────────
+
+const rooms = new Map()  // roomId → { state, dispatch }
+
+function getOrCreateRoom(roomId) {
+  if (!rooms.has(roomId)) {
+    let state = createRoomState(roomId)
+    rooms.set(roomId, {
+      get state() { return state },
+      dispatch(action) {
+        state = roomReducer(state, action)
+        // 자동 브로드캐스트
+        broadcastState(roomId, state)
+      },
+    })
+  }
+  return rooms.get(roomId)
+}
+
+// ── 직접 구현: 상태 변경 시 자동 브로드캐스트 ────────────────────
+
+function broadcastState(roomId, state) {
+  io.to(roomId).emit("syncState", {
+    roomId: state.roomId,
+    messages: state.messages,
+    users: [...state.users],
+    lastEvent: state.lastEvent,
+  })
+}
+
+// ── 직접 구현: 세션 → room 매핑 추적 ────────────────────────────
+
+const sessionRooms = new Map()   // socketId → Set<roomId>
+const sessionUsers = new Map()   // socketId → Map<roomId, username>
+
+function trackSession(socketId, roomId, username) {
+  if (!sessionRooms.has(socketId)) sessionRooms.set(socketId, new Set())
+  if (!sessionUsers.has(socketId)) sessionUsers.set(socketId, new Map())
+  sessionRooms.get(socketId).add(roomId)
+  sessionUsers.get(socketId).set(roomId, username)
+}
+
+function untrackSession(socketId, roomId) {
+  sessionRooms.get(socketId)?.delete(roomId)
+  sessionUsers.get(socketId)?.delete(roomId)
+  if (sessionRooms.get(socketId)?.size === 0) {
+    sessionRooms.delete(socketId)
+    sessionUsers.delete(socketId)
+  }
+}
+
+// ── 직접 구현: 빈 Room 정리 ─────────────────────────────────────
+
+function destroyRoomIfEmpty(roomId) {
+  const room = rooms.get(roomId)
+  if (room && room.state.users.size === 0) {
+    rooms.delete(roomId)
+    return true
+  }
+  return false
+}
+
+// ── 연결 처리 ───────────────────────────────────────────────────
+
+io.on("connection", (socket) => {
+  console.log(`Client connected: ${socket.id}`)
+
+  socket.on("joinRoom", ({ roomId, user }) => {
+    socket.join(roomId)
+    trackSession(socket.id, roomId, user)
+    const room = getOrCreateRoom(roomId)
+    room.dispatch({ type: "USER_JOINED", user })
+  })
+
+  socket.on("sendMessage", ({ roomId, user, text }) => {
+    const room = rooms.get(roomId)
+    if (!room) return
+    room.dispatch({ type: "MESSAGE_RECEIVED", user, text })
+  })
+
+  socket.on("leaveRoom", ({ roomId }) => {
+    socket.leave(roomId)
+    const room = rooms.get(roomId)
+    if (!room) {
+      untrackSession(socket.id, roomId)
+      return
+    }
+    const userNames = sessionUsers.get(socket.id)
+    const username = userNames?.get(roomId) ?? "unknown"
+    room.dispatch({ type: "USER_LEFT", user: username })
+    destroyRoomIfEmpty(roomId)
+    untrackSession(socket.id, roomId)
+  })
+
+  // ── 직접 구현: disconnect 시 모든 room에서 유저 정리 ──────────
+  socket.on("disconnect", () => {
+    const userRooms = sessionRooms.get(socket.id)
+    const userNames = sessionUsers.get(socket.id)
+    if (userRooms) {
+      for (const roomId of userRooms) {
+        const username = userNames?.get(roomId) ?? "unknown"
+        const room = rooms.get(roomId)
+        if (room) {
+          room.dispatch({ type: "USER_LEFT", user: username })
+          destroyRoomIfEmpty(roomId)
+        }
+      }
+    }
+    sessionRooms.delete(socket.id)
+    sessionUsers.delete(socket.id)
+    console.log(`Client disconnected: ${socket.id}`)
+  })
+})
+
+// 총 ~130줄 (프레임워크 설정 포함)
+```
+
+**FlowDux NodeRoomServer 동일 스펙:**
+
+```kotlin
+// ── Node Main.kt (FlowDux NodeRoomServer) ────────────────────────
+
+// 1. Room Server 생성 — Reducer로 상태 관리
+val roomServer = createSharedStateRoomServer(
+    initialStateFactory = { roomId -> ServerRoomState(roomId = roomId) },
+    reducer = serverRoomReducer,       // Reducer 별도 파일
+    processors = roomProcessors(),     // Processor 별도 파일
+    stateMapper = { state -> SharedChatAction.SyncState(state.toRoomState()) },
+    scope = applicationScope,
+)
+
+// 2. Central 연결 + NodeRoomServer 생성
+val transport = KtorWebSocketClientConnection.create(
+    host = centralHost, port = centralPort, path = "/node/$nodeId",
+).webSocketNodeTransport<SharedChatAction>()
+
+val nodeRoomServer = NodeRoomServer(
+    nodeId = nodeId, transport = transport,
+    roomServer = roomServer, scope = applicationScope,
+)
+nodeRoomServer.connect()
+
+// 3. 클라이언트 처리 — handleClient가 나머지를 자동 처리
+webSocket("/ws/{roomId}") {
+    val roomId = call.parameters["roomId"] ?: return@webSocket
+    val username = call.request.queryParameters["user"] ?: "anonymous"
+    val sessionId = UUID.randomUUID().toString()
+    val connection: TypedServerConnection<SharedChatAction> =
+        KtorWebSocketServerConnection(this).typedJson()
+
+    nodeRoomServer.dispatchAndForward(
+        roomId, SharedChatAction.JoinRoom(username),
+    )
+    try {
+        // 세션 추적, 상태 브로드캐스트, Central 포워딩 전부 자동
+        nodeRoomServer.handleClient(roomId, sessionId, connection)
+    } finally {
+        withContext(NonCancellable) {
+            nodeRoomServer.dispatchAndForward(
+                roomId, SharedChatAction.LeaveRoom(username),
+            )
+            nodeRoomServer.destroyRoomIfEmpty(roomId)
+        }
+    }
+}
+// 총 ~40줄 (Reducer/Processor 별도)
+```
+
+**차이점 요약:**
+
+| | Socket.IO + Redis | FlowDux NodeRoomServer |
+|---|---|---|
+| **상태 관리** | `roomReducer` 함수 + `Map` 직접 관리 | `createSharedStateRoomServer` + `buildReducer` |
+| **자동 브로드캐스트** | `broadcastState()` 직접 호출 | `handleClient` 내부에서 자동 |
+| **세션 추적** | `sessionRooms`, `sessionUsers` 직접 관리 | `handleClient`가 자동 관리 |
+| **disconnect 정리** | `socket.on("disconnect")` 직접 구현 | `finally` + `destroyRoomIfEmpty` |
+| **Cross-node 릴레이** | Redis Adapter (외부 인프라) | NodeMediator (FlowDux 내장) |
+| **외부 인프라** | Redis 필수 | 불필요 |
+| **타입 안전성** | 없음 (문자열 이벤트) | sealed interface + 컴파일 타임 검증 |
+| **코드량** | ~130줄 (모든 "직접 구현" 포함) | ~40줄 (Main) + Reducer/Processor |
+
+Socket.IO는 transport와 room join/leave를 잘 추상화하지만, **상태 관리 계층**이 없어서 Store 패턴, 브로드캐스트, 세션 추적을 전부 수동으로 구현해야 합니다. FlowDux는 이 계층을 `handleClient` 한 번의 호출로 제공합니다.
 
 ## 제약사항
 

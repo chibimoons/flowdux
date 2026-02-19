@@ -68,12 +68,11 @@ fun main(args: Array<String>) = runBlocking {
         // 3. Cancel observer
         // 4. Close store
         store?.let { oldStore ->
-            oldStore.dispatch(SharedChatAction.LeaveRoom(username))
-            delay(100)
-            oldStore.dispatch(ClientChatAction.Disconnect)
-            delay(50) // Wait for disconnect to be processed
             collectorJob?.cancel()
-            oldStore.close()
+            oldStore.closeGracefully { dispatch ->
+                dispatch(SharedChatAction.LeaveRoom(username))
+                dispatch(ClientChatAction.Disconnect)
+            }
         } ?: collectorJob?.cancel()
 
         println("\n  Connecting to room: $roomId...")
@@ -171,12 +170,11 @@ fun main(args: Array<String>) = runBlocking {
     // 3. Cancel collector
     // 4. Close store
     println("\n  Leaving room...")
-    store?.dispatch(SharedChatAction.LeaveRoom(username))
-    delay(100)
-    store?.dispatch(ClientChatAction.Disconnect)
-    delay(50)
     collectorJob?.cancel()
-    store?.close()
+    store?.closeGracefully { dispatch ->
+        dispatch(SharedChatAction.LeaveRoom(username))
+        dispatch(ClientChatAction.Disconnect)
+    }
 
     println("  Bye!")
 }

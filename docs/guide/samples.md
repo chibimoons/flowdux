@@ -18,6 +18,7 @@ FlowDux 샘플 앱 가이드입니다. 각 샘플은 특정 기능이나 패턴�
 | [remote-poker](#remote-poker-sample) | Per-Client Store | JVM | 비공개 상태 관리 (포커) |
 | [remote-auth](#remote-auth-sample) | In-Band WebSocket 인증 | JVM | 토큰 기반 인증 채팅 |
 | [remote-multiplexer](#remote-multiplexer-sample) | Connection Multiplexer | JVM | 단일 WS, 다중 방 동시 참여 |
+| [remote-multidevice](#remote-multi-device-sample) | Room Store (roomId=userId) | JVM | 멀티디바이스 메모 동기화 |
 | [remote-node-mediator](#remote-node-mediator-sample) | Node Mediator | JVM | Central↔Node 분산 채팅 |
 
 ---
@@ -467,6 +468,67 @@ curl -X POST http://localhost:8080/winner
 
 ---
 
+## Remote Multi-Device Sample
+
+**학습 포인트:** Room Store 패턴 응용, roomId = userId, 디바이스 간 상태 동기화
+
+같은 유저의 여러 디바이스(폰, 태블릿, PC)에서 메모를 공유하는 예제이다.
+핵심은 **roomId = userId**: 같은 유저의 모든 디바이스가 동일 Room에 접속하여 상태가 자동 동기화된다.
+
+```
+User "alice"
+├── Phone    → ws://server/sync/alice  ─┐
+├── Tablet   → ws://server/sync/alice  ─┼─► Room "alice" ──► 상태 공유
+└── Desktop  → ws://server/sync/alice  ─┘
+
+User "bob"
+└── Phone    → ws://server/sync/bob    ─── Room "bob"  (별도 상태)
+```
+
+### 서버 시작
+
+```bash
+./gradlew :kotlin:sample-remote-multidevice:server:run
+```
+
+### 클라이언트 실행 (여러 터미널에서)
+
+```bash
+# alice의 phone
+./gradlew :kotlin:sample-remote-multidevice:client:run --args="alice phone"
+
+# alice의 desktop (같은 userId → 상태 공유!)
+./gradlew :kotlin:sample-remote-multidevice:client:run --args="alice desktop"
+
+# bob의 phone (다른 userId → 별도 상태)
+./gradlew :kotlin:sample-remote-multidevice:client:run --args="bob phone"
+```
+
+### 클라이언트 명령어
+
+| 명령어 | 설명 |
+|--------|------|
+| `/add <title> \| <content>` | 메모 추가 |
+| `/edit <id> <title> \| <content>` | 메모 수정 |
+| `/delete <id>` | 메모 삭제 |
+| `/list` | 메모 목록 |
+| `/devices` | 연결된 디바이스 목록 |
+| `/quit` | 종료 |
+
+### 데모 시나리오
+
+1. 터미널 4개 열기
+2. 서버 시작
+3. alice/phone: `/add 장보기 | 우유, 빵, 계란` → 메모 추가
+4. alice/desktop 접속 → 기존 메모("장보기")가 즉시 동기화됨
+5. alice/desktop: `/add 회의 | 3시 팀미팅` → alice/phone에도 즉시 반영
+6. bob/phone 접속 → bob의 메모는 비어있음 (별도 상태)
+7. alice/phone: `/devices` → `{phone, desktop}` 출력
+
+자세한 패턴 설명은 [Multi-Device Sync Pattern](./pattern-multi-device.md)을 참조하세요.
+
+---
+
 ## Remote Multiplexer Sample
 
 **학습 포인트:** ConnectionMultiplexer, RoutedAction, 단일 WebSocket 다중 방
@@ -564,8 +626,8 @@ Central 서버가 여러 Node 서버를 관리하는 분산 채팅 예제입니�
 ### 클라이언트 실행
 
 ```bash
-./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Alice localhost 8081"
-./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Bob localhost 8082"
+./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Alice lobby localhost 8081"
+./gradlew :kotlin:sample-remote-node-mediator:client:run --args="Bob lobby localhost 8082"
 ```
 
 ### 클라이언트 명령어

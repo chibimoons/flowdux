@@ -10,6 +10,7 @@ import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,7 +66,11 @@ class KtorWebSocketClientConnection(
         if (_connectionState.value != ConnectionState.CONNECTED) {
             throw IllegalStateException("Cannot send message: WebSocket is not connected")
         }
-        outgoingChannel.send(message)
+        try {
+            outgoingChannel.send(message)
+        } catch (_: ClosedSendChannelException) {
+            throw IllegalStateException("Cannot send message: WebSocket connection was closed")
+        }
     }
 
     override suspend fun connect() {

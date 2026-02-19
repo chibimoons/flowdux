@@ -48,6 +48,7 @@ class UpcastConnectionTest {
 
     // -- Mock TypedServerConnection --
     class MockTypedServerConnection : TypedServerConnection<SharedAction> {
+        override val isActive: Boolean = true
         override val incoming: Flow<SharedAction> = flowOf(SharedAction.Message("from client"))
 
         val sentActions = mutableListOf<SharedAction>()

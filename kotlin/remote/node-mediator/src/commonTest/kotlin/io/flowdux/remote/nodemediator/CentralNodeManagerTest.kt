@@ -24,6 +24,7 @@ class CentralNodeManagerTest {
     }
 
     private class FakeTypedServerConnection : TypedServerConnection<NodeAction<TestAction>> {
+        override val isActive: Boolean = true
         val incomingFlow = MutableSharedFlow<NodeAction<TestAction>>(extraBufferCapacity = 64)
         val sentActions = mutableListOf<NodeAction<TestAction>>()
 
@@ -329,6 +330,7 @@ class CentralNodeManagerTest {
         )
 
         val failingConn = object : TypedServerConnection<NodeAction<TestAction>> {
+            override val isActive: Boolean = true
             val incomingFlow = MutableSharedFlow<NodeAction<TestAction>>(extraBufferCapacity = 64)
             override val incoming: Flow<NodeAction<TestAction>> = incomingFlow
             override suspend fun send(action: NodeAction<TestAction>) {

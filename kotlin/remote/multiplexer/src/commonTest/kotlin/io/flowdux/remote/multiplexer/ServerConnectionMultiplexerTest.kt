@@ -31,6 +31,7 @@ class ServerConnectionMultiplexerTest {
         RoutedAction(roomId, action)
 
     private class FakeTypedServerConnection<A : Action> : TypedServerConnection<RoutedAction<A>> {
+        override val isActive: Boolean = true
         val incomingFlow = MutableSharedFlow<RoutedAction<A>>(extraBufferCapacity = 64)
         val sentActions = mutableListOf<RoutedAction<A>>()
 

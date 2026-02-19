@@ -30,7 +30,8 @@ import kotlinx.serialization.json.Json
  */
 inline fun <reified A : Action> ClientConnection.typedJson(
     json: Json = SerializableActionCodec.DefaultJson,
-): TypedClientConnection<A> = typed(actionCodecOf<A>(json), JsonMessageCodec())
+    noinline onDecodeError: ((Exception) -> Unit)? = null,
+): TypedClientConnection<A> = typed(actionCodecOf<A>(json), JsonMessageCodec(), onDecodeError)
 
 /**
  * Creates a [TypedServerConnection] using JSON serialization.
@@ -49,7 +50,8 @@ inline fun <reified A : Action> ClientConnection.typedJson(
  */
 inline fun <reified A : Action> ServerConnection.typedJson(
     json: Json = SerializableActionCodec.DefaultJson,
-): TypedServerConnection<A> = typed(actionCodecOf<A>(json), JsonMessageCodec())
+    noinline onDecodeError: ((Exception) -> Unit)? = null,
+): TypedServerConnection<A> = typed(actionCodecOf<A>(json), JsonMessageCodec(), onDecodeError)
 
 /**
  * Creates a [TypedClientConnection] using JSON serialization and upcasts to a supertype.
@@ -72,7 +74,8 @@ inline fun <reified A : Action> ServerConnection.typedJson(
  */
 inline fun <reified Wire : A, reified A : Action> ClientConnection.typedJsonAs(
     json: Json = SerializableActionCodec.DefaultJson,
-): TypedClientConnection<A> = typedJson<Wire>(json).upcast<Wire, A>()
+    noinline onDecodeError: ((Exception) -> Unit)? = null,
+): TypedClientConnection<A> = typedJson<Wire>(json, onDecodeError).upcast<Wire, A>()
 
 /**
  * Creates a [TypedServerConnection] using JSON serialization and upcasts to a supertype.
@@ -95,7 +98,8 @@ inline fun <reified Wire : A, reified A : Action> ClientConnection.typedJsonAs(
  */
 inline fun <reified Wire : A, reified A : Action> ServerConnection.typedJsonAs(
     json: Json = SerializableActionCodec.DefaultJson,
-): TypedServerConnection<A> = typedJson<Wire>(json).upcast<Wire, A>()
+    noinline onDecodeError: ((Exception) -> Unit)? = null,
+): TypedServerConnection<A> = typedJson<Wire>(json, onDecodeError).upcast<Wire, A>()
 
 /**
  * Upcasts this [TypedClientConnection] to work with a supertype action.
@@ -149,6 +153,21 @@ inline fun <reified Sub : Super, reified Super : Action> TypedClientConnection<S
 inline fun <reified Sub : Super, reified Super : Action> TypedServerConnection<Sub>.upcast(): TypedServerConnection<Super> =
     UpcastTypedServerConnection(this, Sub::class)
 
+/**
+ * Validates that [action] is an instance of [subClass] before sending through an upcast connection.
+ * @throws IllegalArgumentException if the action type doesn't match
+ */
+@Suppress("UNCHECKED_CAST")
+internal fun <Sub : Super, Super : Action> validateAndCast(
+    action: Super,
+    subClass: kotlin.reflect.KClass<Sub>,
+): Sub {
+    require(subClass.isInstance(action)) {
+        "Cannot send ${action::class.simpleName} through connection typed for ${subClass.simpleName}"
+    }
+    return action as Sub
+}
+
 @PublishedApi
 internal class UpcastTypedClientConnection<Sub : Super, Super : Action>(
     private val delegate: TypedClientConnection<Sub>,
@@ -158,11 +177,7 @@ internal class UpcastTypedClientConnection<Sub : Super, Super : Action>(
     override val incoming: Flow<Super> = delegate.incoming.map { it }
 
     override suspend fun send(action: Super) {
-        require(subClass.isInstance(action)) {
-            "Cannot send ${action::class.simpleName} through connection typed for ${subClass.simpleName}"
-        }
-        @Suppress("UNCHECKED_CAST")
-        delegate.send(action as Sub)
+        delegate.send(validateAndCast(action, subClass))
     }
 
     override suspend fun connect() = delegate.connect()
@@ -174,13 +189,10 @@ internal class UpcastTypedServerConnection<Sub : Super, Super : Action>(
     private val delegate: TypedServerConnection<Sub>,
     private val subClass: kotlin.reflect.KClass<Sub>,
 ) : TypedServerConnection<Super> {
+    override val isActive: Boolean get() = delegate.isActive
     override val incoming: Flow<Super> = delegate.incoming.map { it }
 
     override suspend fun send(action: Super) {
-        require(subClass.isInstance(action)) {
-            "Cannot send ${action::class.simpleName} through connection typed for ${subClass.simpleName}"
-        }
-        @Suppress("UNCHECKED_CAST")
-        delegate.send(action as Sub)
+        delegate.send(validateAndCast(action, subClass))
     }
 }

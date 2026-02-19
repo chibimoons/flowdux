@@ -53,7 +53,6 @@ open class SingleClientSyncMiddleware<S : State, A : Action>(
     private val connection: TypedServerConnection<A>,
 ) : Middleware<S, A> {
 
-    override val name: String = "SingleClientSyncMiddleware"
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     @Suppress("UNCHECKED_CAST")

@@ -17,7 +17,10 @@ internal class DefaultTypedServerConnection<A : Action>(
     private val connection: ServerConnection,
     private val actionCodec: ActionCodec<A>,
     private val messageCodec: MessageCodec,
+    private val onDecodeError: ((Exception) -> Unit)? = null,
 ) : TypedServerConnection<A> {
+
+    override val isActive: Boolean get() = connection.isActive
 
     override val incoming: Flow<A> = connection.incoming.mapNotNull { raw ->
         try {
@@ -25,8 +28,9 @@ internal class DefaultTypedServerConnection<A : Action>(
             actionCodec.decode(actionJson)
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            null // Skip malformed messages
+        } catch (e: Exception) {
+            onDecodeError?.invoke(e)
+            null
         }
     }
 

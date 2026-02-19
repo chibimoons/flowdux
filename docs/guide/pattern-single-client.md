@@ -224,8 +224,6 @@ class UserRemoteMiddleware(
 ) : SyncMiddleware<UserState, UserAction>(
     connection = connection,
 ) {
-    override val name: String = "UserRemoteMiddleware"
-
     override val processors: ActionProcessorMap<UserState, UserAction> = buildProcessors {
         on<LocalUserAction.Connect> { _, _ ->
             startConnection()  // 내장: 연결 및 메시지 리스닝 시작

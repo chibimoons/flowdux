@@ -9,6 +9,10 @@ import kotlinx.coroutines.flow.Flow
  * Implementations handle the actual network communication (e.g., WebSocket session).
  */
 interface ServerConnection {
+    /** Whether the underlying transport is still active/open. */
+    val isActive: Boolean
+        get() = true
+
     /** Incoming raw messages from the client. */
     val incoming: Flow<String>
 

@@ -10,6 +10,10 @@ import kotlinx.coroutines.flow.Flow
  * This decouples the middleware from codec details.
  */
 interface TypedServerConnection<A : Action> {
+    /** Whether the underlying transport is still active/open. */
+    val isActive: Boolean
+        get() = true
+
     /** Incoming actions from the client, already decoded. */
     val incoming: Flow<A>
 

@@ -220,6 +220,8 @@ private class ForwardingConnection<A : Action>(
     private val roomId: String,
 ) : TypedServerConnection<A> {
 
+    override val isActive: Boolean get() = delegate.isActive
+
     override val incoming: Flow<A> = delegate.incoming.onEach { action ->
         try {
             mediator.forwardToCentral(roomId, action)

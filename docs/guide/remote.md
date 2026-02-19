@@ -39,17 +39,17 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // Shared action markers (ServerSharedAction, ClientSharedAction)
-            implementation("io.github.chibimoons:flowdux-remote-core:1.16.0")
+            implementation("io.github.chibimoons:flowdux-remote-core:1.17.0")
             // Client middleware (SyncMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-client:1.16.0")
+            implementation("io.github.chibimoons:flowdux-remote-client:1.17.0")
             // Server middleware (SingleClientSyncMiddleware, MultiClientSyncMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-server:1.16.0")
+            implementation("io.github.chibimoons:flowdux-remote-server:1.17.0")
             // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-            implementation("io.github.chibimoons:flowdux-remote-serialization:1.16.0")
+            implementation("io.github.chibimoons:flowdux-remote-serialization:1.17.0")
             // Ktor WebSocket transport (JVM, iOS, JS — WASM not supported)
-            implementation("io.github.chibimoons:flowdux-remote-ktor:1.16.0")
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.17.0")
             // Optional: In-band WebSocket authentication
-            implementation("io.github.chibimoons:flowdux-remote-auth:1.16.0")
+            implementation("io.github.chibimoons:flowdux-remote-auth:1.17.0")
         }
     }
 }
@@ -311,8 +311,6 @@ class ChatRemoteMiddleware(
 ) : SyncMiddleware<ClientChatState, ChatAction>(
     connection = connection,
 ) {
-    override val name: String = "ChatRemoteMiddleware"
-
     override val processors: ActionProcessorMap<ClientChatState, ChatAction> = buildProcessors {
         on<LocalChatAction.Connect> { _, _ ->
             startConnection()  // Built-in: connects and listens for messages

@@ -5,6 +5,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +21,9 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 private const val DEFAULT_CONCURRENCY = 16
 
@@ -96,10 +101,65 @@ class Store<S : State, A : Action> internal constructor(
     }
 
     private fun reduceAction(currentState: S, action: A): S {
+        if (action is DrainSentinel) {
+            action.signal.complete(Unit)
+            return currentState
+        }
         val newState = reducer.reduce(currentState, action)
         if (isLoggingEnabled) logger.onStateReduced(action, currentState, newState)
         return newState
     }
+
+    /**
+     * Gracefully closes the store after all pending actions have been processed.
+     *
+     * Optionally dispatches cleanup actions (e.g., disconnect, leave room) via [beforeClose],
+     * then waits for all queued actions to drain before calling [close].
+     *
+     * **How it works:** A sentinel action is enqueued after all [beforeClose] dispatches.
+     * The sentinel passes through the full middleware pipeline (middlewares pass it through
+     * as an unknown action type). When it reaches the reducer, it signals completion without
+     * modifying state. This guarantees all previously dispatched actions have been fully
+     * processed before [close] is called.
+     *
+     * **Limitations:**
+     * - In-flight [FlowHolderAction]s may still emit actions after the sentinel is processed,
+     *   since their flows are collected independently by [FlowHolderMiddleware].
+     * - If a middleware filters unknown action types instead of passing them through,
+     *   the sentinel will not reach the reducer and the call will fall back to [timeout].
+     *
+     * @param timeout Maximum time to wait for pending actions to drain. Defaults to 5 seconds.
+     * @param beforeClose Optional suspend block invoked before draining.
+     *        Use the provided `dispatch` function to enqueue cleanup actions.
+     *        Actions are sent directly to the channel (not via [dispatch]) to guarantee
+     *        ordering: all cleanup actions will be enqueued before the drain sentinel.
+     */
+    suspend fun closeGracefully(
+        timeout: Duration = 5.seconds,
+        beforeClose: (suspend (dispatch: suspend (A) -> Unit) -> Unit)? = null,
+    ) {
+        if (_isClosed) return
+        beforeClose?.invoke {
+            if (isLoggingEnabled) logger.onActionDispatched(it)
+            actionFlow.send(it)
+        }
+        val signal = CompletableDeferred<Unit>()
+        @Suppress("UNCHECKED_CAST")
+        try {
+            actionFlow.send(DrainSentinel(signal) as A)
+        } catch (_: ClosedSendChannelException) {
+            close()
+            return
+        }
+        try {
+            withTimeout(timeout) { signal.await() }
+        } catch (_: TimeoutCancellationException) {
+            // Timeout expired; close anyway
+        }
+        close()
+    }
+
+    private class DrainSentinel(val signal: CompletableDeferred<Unit>) : Action
 }
 
 fun <S : State, A : Action> createStore(

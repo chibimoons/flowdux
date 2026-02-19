@@ -82,8 +82,6 @@ private class PlayerRemoteMiddleware(
 ) : SingleClientSyncMiddleware<PlayerState, PokerAction>(
     connection = connection,
 ) {
-    override val name: String = "PlayerRemoteMiddleware"
-
     // No processors needed - this store only sends state, doesn't receive actions
     override val processors = buildProcessors { }
 }

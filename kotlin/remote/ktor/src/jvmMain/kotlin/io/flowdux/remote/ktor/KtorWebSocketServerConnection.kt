@@ -6,6 +6,7 @@ import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.readText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ClosedSendChannelException
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
@@ -22,6 +23,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 class KtorWebSocketServerConnection(
     private val session: WebSocketSession,
 ) : ServerConnection {
+
+    override val isActive: Boolean get() = session.isActive
 
     override val incoming: Flow<String> = session.incoming.receiveAsFlow()
         .filterIsInstance<Frame.Text>()
