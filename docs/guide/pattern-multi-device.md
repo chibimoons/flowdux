@@ -229,9 +229,95 @@ data class ServerNoteState(
 
 ---
 
+## 스케일 아웃
+
+싱글 서버에서는 모든 디바이스가 같은 프로세스의 Room에 접속하므로 자연스럽게 동기화된다.
+서버를 여러 대로 스케일 아웃하면, 같은 유저의 디바이스가 서로 다른 서버에 접속할 수 있다:
+
+```
+❌ 스케일 아웃 시 문제
+alice/phone   → Server-1 (Room "alice" — 메모 3개)
+alice/desktop → Server-2 (Room "alice" — 비어있음!)  ← 동기화 안 됨
+```
+
+### 방법 1: Sticky Session (Affinity Routing)
+
+로드밸런서에서 userId 기반 consistent hashing으로 같은 유저의 모든 디바이스를 항상 같은 서버로 라우팅한다.
+
+```
+                  LB (hash(userId) → Server)
+                         │
+            ┌────────────┴────────────┐
+            │                         │
+         Server-1                  Server-2
+         Room "alice"              Room "bob"
+         ├── phone                 └── phone
+         ├── tablet
+         └── desktop
+```
+
+```nginx
+# nginx 예시: WebSocket sticky session (consistent hashing)
+upstream backend {
+    hash $arg_userId consistent;
+    server server-1:8080;
+    server server-2:8080;
+}
+```
+
+- **장점**: 코드 변경 없음, 현재 샘플 그대로 동작
+- **단점**: 서버 추가/제거 시 세션 재분배, 특정 서버에 핫유저 집중 가능, 서버 장애 시 해당 유저 세션 유실
+
+### 방법 2: Node Mediator 패턴
+
+FlowDux의 [Node Mediator 패턴](./pattern-node-mediator.md)을 사용하면, 각 서버 인스턴스가 Node가 되고
+Central 서버가 cross-node 릴레이를 담당한다. 디바이스가 어느 Node에 붙든 상관없이 동기화된다.
+
+```
+alice/phone → Node-1 ─┐                   ┌─ Node-2 ← alice/desktop
+                       ├─► Central ◄──────┘
+bob/phone   → Node-1 ─┘    (relay)    ┌─ Node-3 ← bob/tablet
+                                       └─ Node-3 ← charlie/phone
+```
+
+동작 흐름:
+
+```
+alice/phone (Node-1)        Central             alice/desktop (Node-2)
+     │                         │                        │
+     │── AddNote ────────────►│                        │
+     │                         │ relay (Node-1 제외)    │
+     │                         │── AddNote ───────────►│
+     │                         │                        │
+     │◄── SyncState ──────── │                        │
+     │                         │ ──── SyncState ──────►│
+     │                         │                (즉시 동기화)
+```
+
+- **장점**: 디바이스가 어느 서버에 붙든 동기화, 서버 장애 시 다른 Node에서 계속 동작
+- **단점**: Central 서버 추가 구성 필요, 네트워크 홉 증가
+
+### 비교
+
+| | Sticky Session | Node Mediator |
+|---|---|---|
+| 코드 변경 | 없음 (LB 설정만) | Node + Central 구성 |
+| 디바이스 라우팅 | 같은 서버 강제 | 아무 서버나 가능 |
+| 서버 장애 시 | 해당 유저 세션 유실 | 다른 Node에서 계속 동작 |
+| 확장성 | 중간 (~10K users) | 높음 (~100K+ users) |
+| 복잡도 | 낮음 | 중간 |
+| 지연시간 | 최소 (직접 통신) | Central 경유 (1홉 추가) |
+
+**권장**: 초기에는 Sticky Session으로 시작하고, 규모가 커지면 Node Mediator로 전환.
+Node Mediator 구현 예시는 [Node Mediator 샘플](./samples.md#remote-node-mediator-sample)을 참조.
+
+---
+
 ## Related
 
 - [Room Pattern](./pattern-room.md) — Multi-Device의 기반 패턴
+- [Node Mediator Pattern](./pattern-node-mediator.md) — 스케일 아웃 시 cross-node 릴레이
+- [Scaling Architecture](./scaling.md) — 대규모 연결 처리
 - [Server Patterns](./server-patterns.md) — 전체 서버 패턴 비교
 - [Remote Authentication](./remote-authentication.md) — 인증 연동
 - [Samples](./samples.md) — 샘플 앱 실행 가이드
