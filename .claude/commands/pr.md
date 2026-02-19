@@ -38,7 +38,35 @@ git diff
 git log --oneline <base-branch>..HEAD
 ```
 
-### 1-5. PR 생성
+### 1-5. 로컬 코드 리뷰
+
+PR 생성 전에 전체 변경사항을 리뷰합니다. Task(general-purpose) 서브에이전트에 아래 프롬프트를 전달하세요:
+
+```
+코드 리뷰를 수행하세요. 수정은 하지 마세요.
+
+대상: `git diff <base-branch>...HEAD`의 전체 변경 파일을 Read로 읽어서 리뷰
+
+리뷰 관점:
+1. 버그/논리 오류 — 의도와 다르게 동작할 수 있는 코드
+2. 보안 취약점 — injection, 인증 우회, 민감 정보 노출
+3. 프로젝트 컨벤션 위반 — CLAUDE.md의 규칙과 기존 코드 패턴 참조
+4. 불필요한 코드 — 미사용 import, 데드코드, 불필요한 주석
+5. 누락된 에러 처리 — 예외 미처리, 경계값 미검증
+
+결과를 severity별로 정리하세요:
+- [CRITICAL] 반드시 수정 필요
+- [WARNING] 수정 권장
+- [INFO] 참고 사항
+
+문제가 없으면 "No issues found"로 보고하세요.
+```
+
+**리뷰 결과 처리:**
+- CRITICAL/WARNING 발견 시 → 수정 → 커밋 후 다시 리뷰
+- 문제 없으면 → 1-6으로 진행
+
+### 1-6. PR 생성
 
 ```bash
 gh pr create --base <target> --title "<title>" --body "$(cat <<'EOF'
