@@ -76,14 +76,16 @@ Check `gh auth status` output to identify available accounts and ensure the corr
 
 - **기본 타겟 브랜치**: `develop`
 - release, hotfix 브랜치 외 모든 작업(feature, fix, docs 등)은 `develop`으로 PR 생성
-- release, hotfix, docs 브랜치만 `main`으로 머지
+- release, docs 브랜치만 `main`으로 머지
+- hotfix 브랜치는 `main` + `develop` **양쪽 모두** 머지
 
 ```
 feature/xxx  ─┐
 fix/xxx      ─┼─► develop ─► release/x.x.x ─► main ─► tag
 docs/xxx     ─┼─► develop (일반) / main (직접 반영 필요 시)
               ┘
-hotfix/xxx   ─────────────────────────────► main ─► tag
+hotfix/xxx   ─┬─► main ─► tag
+              └─► develop (동기화)
 ```
 
 ### Main 브랜치 머지 규칙 (CI 강제)

@@ -24,7 +24,22 @@ gh auth switch -u chibimoons  # 아니면 전환
 | 작업 유형 | 타겟 브랜치 |
 |----------|------------|
 | feature, fix, docs (일반) | `develop` |
-| release, hotfix, docs (main 직접 반영) | `main` |
+| release, docs (main 직접 반영) | `main` |
+| hotfix | `main` + `develop` (양쪽 모두) |
+
+## 핫픽스 프로세스
+
+1. `origin/main`에서 `hotfix/{short-description}` 브랜치 생성
+2. 수정 → 커밋
+3. `main`으로 PR 생성 → CI 통과 → 머지
+4. **같은 브랜치**에서 `develop`으로도 PR 생성 → 머지
+5. 필요 시 패치 태그 생성 (e.g. `1.17.1`)
+
+```
+hotfix/xxx
+  ├── PR → main   (긴급 수정 반영)
+  └── PR → develop (develop에도 동기화)
+```
 
 ## 릴리즈 프로세스
 
