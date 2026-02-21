@@ -7,22 +7,22 @@
 ## 1. PR 상태 확인
 
 ```bash
-gh pr view <pr-number> --json title,state,headRefName,baseRefName
-gh pr checks <pr-number>
+gh pr view <pr-number> --repo chibimoons/flowdux --json title,state,headRefName,baseRefName
+gh pr checks <pr-number> --repo chibimoons/flowdux
 ```
 
 ## 2. 리뷰 코멘트 확인
 
 ```bash
-gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments | jq '.[] | {id, path, body, line, in_reply_to_id}'
+gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments --jq '.[] | {id, path, body, line, in_reply_to_id}'
 ```
 
 미답변 코멘트만 필터:
 
 ```bash
-gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments | jq '
+gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments --jq '
   ( [.[].in_reply_to_id] | unique ) as $replied_ids
-  | [ .[] | select(.in_reply_to_id == null and (.id | IN($replied_ids[]) | not)) ]
+  | [ .[] | select(.in_reply_to_id == null and (.id as $id | $replied_ids | index($id) | not)) ]
 '
 ```
 
@@ -33,14 +33,14 @@ gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments | jq '
    - 코드 수정
    - 테스트 실행하여 통과 확인
    - 커밋 & 푸시
-   - 해당 코멘트에 답글: 어떻게 수정했는지 명시 (커밋 해시 포함)
+   - 해당 코멘트에 답글: 어떻게 수정했는지 명시
 3. **수정이 불필요한 경우:**
    - 해당 코멘트에 답글: 수정하지 않는 이유 설명
 
 ```bash
 # 리뷰 코멘트에 답글
 gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments/<comment-id>/replies \
-  -f body="Fixed in <commit-hash>. <설명>"
+  -X POST -f body="Fixed. <설명>"
 ```
 
 **중요: 모든 리뷰 코멘트에 반드시 답글을 남기세요. 수정 여부와 관계없이.**
@@ -50,27 +50,56 @@ gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments/<comment-id>/replies 
 CI가 실패했으면:
 
 ```bash
-gh run view <run-id> --log-failed
+gh pr checks <pr-number> --repo chibimoons/flowdux
+# 실패한 job의 로그 확인
+gh api repos/chibimoons/flowdux/actions/jobs/<job-id>/logs
 ```
 
 실패 원인 분석 → 수정 → 테스트 확인 → 커밋 & 푸시
 
-## 5. Copilot 코드리뷰 재요청
+## 5. Copilot 코드리뷰 재요청 & 대기
 
-푸시 후 Copilot에게 코드리뷰를 재요청합니다:
+3~4단계에서 코드를 푸시했으면 Copilot에게 코드리뷰를 재요청하고 **리뷰가 도착할 때까지 대기**합니다.
+코드 수정/푸시가 없었으면 이 단계를 건너뜁니다.
+
+### 5-1. 재요청
 
 ```bash
-gh api repos/chibimoons/flowdux/pulls/<pr-number>/requested_reviewers \
-  --method POST -f 'reviewers[]=Copilot'
+gh pr edit <pr-number> --repo chibimoons/flowdux --add-reviewer copilot
 ```
+
+### 5-2. 최신 커밋 SHA 확인
+
+```bash
+LATEST_COMMIT=$(gh pr view <pr-number> --repo chibimoons/flowdux --json headRefOid --jq '.headRefOid')
+```
+
+### 5-3. Copilot 리뷰 도착 대기
+
+최신 커밋(`$LATEST_COMMIT`)에 대한 Copilot 리뷰가 제출될 때까지 10초 간격으로 폴링합니다 (최대 10분).
+
+```bash
+for i in $(seq 1 60); do
+  count=$(gh api repos/chibimoons/flowdux/pulls/<pr-number>/reviews \
+    --jq "[.[] | select(.user.login == \"copilot-pull-request-reviewer[bot]\" and .commit_id == \"$LATEST_COMMIT\")] | length")
+  if [ "$count" -gt 0 ]; then
+    echo "Copilot review received"
+    break
+  fi
+  echo "Waiting for Copilot review... (${i}0s)"
+  sleep 10
+done
+```
+
+> Copilot은 GitHub App 봇(`copilot-pull-request-reviewer[bot]`)이라 `requested_reviewers`에 나타나지 않습니다. reviews API로 확인해야 합니다.
 
 ## 6. 상태 재확인
 
 ```bash
-gh pr checks <pr-number>
-gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments | jq '
+gh pr checks <pr-number> --repo chibimoons/flowdux
+gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments --jq '
   ( [.[].in_reply_to_id] | unique ) as $replied_ids
-  | [ .[] | select(.in_reply_to_id == null and (.id | IN($replied_ids[]) | not)) ]
+  | [ .[] | select(.in_reply_to_id == null and (.id as $id | $replied_ids | index($id) | not)) ]
   | length
 '
 ```

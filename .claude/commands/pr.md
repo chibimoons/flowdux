@@ -27,7 +27,7 @@ gh auth switch -u chibimoons
 - 현재 브랜치명 확인
 - 타겟 브랜치 결정:
   - `main` 타겟: 브랜치명이 `release/*`, `hotfix/*`, `docs/*` 인지 확인 (아니면 CI fail)
-  - `develop` 타겟: 제한 없음
+  - `develop` 타겟: feature, fix, chore, refactor, test 등
 - 사용자에게 타겟 브랜치를 확인받으세요
 
 ### 1-4. 변경 사항 파악
@@ -45,7 +45,7 @@ PR 생성 전에 전체 변경사항을 리뷰합니다. Task(general-purpose) �
 ```
 코드 리뷰를 수행하세요. 수정은 하지 마세요.
 
-대상: `git diff <base-branch>...HEAD`로 변경 파일 목록을 확인하고, 각 파일을 Read로 읽어서 변경 부분 중심으로 리뷰
+대상: `git diff --name-only <base-branch>...HEAD`로 변경 파일 목록을 확인하고, 각 파일을 Read로 읽어서 변경 부분 중심으로 리뷰
 
 리뷰 관점:
 1. 버그/논리 오류 — 의도와 다르게 동작할 수 있는 코드
@@ -70,7 +70,7 @@ PR 생성 전에 전체 변경사항을 리뷰합니다. Task(general-purpose) �
 ### 1-6. PR 생성
 
 ```bash
-gh pr create --base <target> --title "<title>" --body "$(cat <<'EOF'
+gh pr create --repo chibimoons/flowdux --base <target> --title "<title>" --body "$(cat <<'EOF'
 ## Summary
 <변경 내용 요약>
 
@@ -82,6 +82,30 @@ EOF
 )"
 ```
 
+### 1-7. Copilot 리뷰 요청 & 대기
+
+```bash
+gh pr edit <pr-number> --repo chibimoons/flowdux --add-reviewer copilot
+```
+
+최신 커밋에 대한 Copilot 리뷰가 도착할 때까지 10초 간격으로 폴링합니다 (최대 10분):
+
+```bash
+LATEST_COMMIT=$(gh pr view <pr-number> --repo chibimoons/flowdux --json headRefOid --jq '.headRefOid')
+for i in $(seq 1 60); do
+  count=$(gh api repos/chibimoons/flowdux/pulls/<pr-number>/reviews \
+    --jq "[.[] | select(.user.login == \"copilot-pull-request-reviewer[bot]\" and .commit_id == \"$LATEST_COMMIT\")] | length")
+  if [ "$count" -gt 0 ]; then
+    echo "Copilot review received"
+    break
+  fi
+  echo "Waiting for Copilot review... (${i}0s)"
+  sleep 10
+done
+```
+
+> Copilot은 GitHub App 봇(`copilot-pull-request-reviewer[bot]`)이라 `requested_reviewers`에 나타나지 않습니다. reviews API로 확인해야 합니다.
+
 ---
 
 ## Phase 2: 코드리뷰 & CI 대응 (반복)
@@ -91,8 +115,8 @@ PR 생성 후 아래 루프를 코드리뷰와 CI가 모두 완료될 때까지 
 ### 2-1. CI & 리뷰 상태 확인
 
 ```bash
-gh pr checks <pr-number>
-gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments | jq '.[] | {id, path, body, line}'
+gh pr checks <pr-number> --repo chibimoons/flowdux
+gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments --jq '.[] | {id, path, body, line}'
 ```
 
 ### 2-2. 코드리뷰 대응
@@ -104,14 +128,14 @@ gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments | jq '.[] | {id, path
    - 코드 수정
    - 테스트 실행하여 통과 확인
    - 커밋 & 푸시
-   - 해당 코멘트에 답글: 어떻게 수정했는지 명시 (커밋 해시 포함)
+   - 해당 코멘트에 답글: 어떻게 수정했는지 명시
 3. **수정이 불필요한 경우:**
    - 해당 코멘트에 답글: 수정하지 않는 이유 설명
 
 ```bash
 # 리뷰 코멘트에 답글
 gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments/<comment-id>/replies \
-  -f body="Fixed in <commit-hash>. <설명>"
+  -X POST -f body="Fixed. <설명>"
 ```
 
 **중요: 모든 리뷰 코멘트에 반드시 답글을 남기세요. 수정 여부와 관계없이.**
@@ -121,27 +145,45 @@ gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments/<comment-id>/replies 
 CI가 실패했으면:
 
 ```bash
-gh run view <run-id> --log-failed
+gh pr checks <pr-number> --repo chibimoons/flowdux
+# 실패한 job의 로그 확인
+gh api repos/chibimoons/flowdux/actions/jobs/<job-id>/logs
 ```
 
 실패 원인 분석 → 수정 → 커밋 & 푸시
 
-### 2-4. Copilot 코드리뷰 재요청
+### 2-4. Copilot 코드리뷰 재요청 & 대기
 
-푸시 후 Copilot에게 코드리뷰를 재요청합니다:
+2-2~2-3에서 코드를 푸시했으면 Copilot에게 코드리뷰를 재요청하고 **리뷰가 도착할 때까지 대기**합니다.
+코드 수정/푸시가 없었으면 이 단계를 건너뜁니다.
 
 ```bash
-gh api repos/chibimoons/flowdux/pulls/<pr-number>/requested_reviewers \
-  --method POST -f 'reviewers[]=Copilot'
+gh pr edit <pr-number> --repo chibimoons/flowdux --add-reviewer copilot
+```
+
+최신 커밋에 대한 Copilot 리뷰가 도착할 때까지 10초 간격으로 폴링합니다 (최대 10분):
+
+```bash
+LATEST_COMMIT=$(gh pr view <pr-number> --repo chibimoons/flowdux --json headRefOid --jq '.headRefOid')
+for i in $(seq 1 60); do
+  count=$(gh api repos/chibimoons/flowdux/pulls/<pr-number>/reviews \
+    --jq "[.[] | select(.user.login == \"copilot-pull-request-reviewer[bot]\" and .commit_id == \"$LATEST_COMMIT\")] | length")
+  if [ "$count" -gt 0 ]; then
+    echo "Copilot review received"
+    break
+  fi
+  echo "Waiting for Copilot review... (${i}0s)"
+  sleep 10
+done
 ```
 
 ### 2-5. 상태 재확인
 
 ```bash
-gh pr checks <pr-number>
-gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments | jq '
+gh pr checks <pr-number> --repo chibimoons/flowdux
+gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments --jq '
   ( [.[].in_reply_to_id] | unique ) as $replied_ids
-  | [ .[] | select(.in_reply_to_id == null and (.id | IN($replied_ids[]) | not)) ]
+  | [ .[] | select(.in_reply_to_id == null and (.id as $id | $replied_ids | index($id) | not)) ]
   | length
 '
 ```
