@@ -92,9 +92,12 @@ gh pr edit <pr-number> --repo chibimoons/flowdux --add-reviewer copilot
 
 ```bash
 LATEST_COMMIT=$(gh pr view <pr-number> --repo chibimoons/flowdux --json headRefOid --jq '.headRefOid')
+count=0
 for i in $(seq 1 60); do
   count=$(gh api repos/chibimoons/flowdux/pulls/<pr-number>/reviews \
-    --jq "[.[] | select(.user.login == \"copilot-pull-request-reviewer[bot]\" and .commit_id == \"$LATEST_COMMIT\")] | length")
+    --paginate --slurp \
+    --jq "flatten | map(select(.user.login == \"copilot-pull-request-reviewer[bot]\" and .commit_id == \"$LATEST_COMMIT\")) | length")
+  count=${count:-0}
   if [ "$count" -gt 0 ]; then
     echo "Copilot review received"
     break
@@ -148,9 +151,14 @@ gh api repos/chibimoons/flowdux/pulls/<pr-number>/comments/<comment-id>/replies 
 CI가 실패했으면:
 
 ```bash
+# PR의 CI 상태 요약 확인
 gh pr checks <pr-number> --repo chibimoons/flowdux
-# 실패한 job의 로그 확인
-gh api repos/chibimoons/flowdux/actions/jobs/<job-id>/logs
+
+# 관련 GitHub Actions run 목록 확인 (run-id 확인용)
+gh run list --repo chibimoons/flowdux --limit 10
+
+# 실패한 run의 로그 터미널에서 바로 확인
+gh run view <run-id> --repo chibimoons/flowdux --log-failed
 ```
 
 실패 원인 분석 → 수정 → 커밋 & 푸시
@@ -168,9 +176,12 @@ gh pr edit <pr-number> --repo chibimoons/flowdux --add-reviewer copilot
 
 ```bash
 LATEST_COMMIT=$(gh pr view <pr-number> --repo chibimoons/flowdux --json headRefOid --jq '.headRefOid')
+count=0
 for i in $(seq 1 60); do
   count=$(gh api repos/chibimoons/flowdux/pulls/<pr-number>/reviews \
-    --jq "[.[] | select(.user.login == \"copilot-pull-request-reviewer[bot]\" and .commit_id == \"$LATEST_COMMIT\")] | length")
+    --paginate --slurp \
+    --jq "flatten | map(select(.user.login == \"copilot-pull-request-reviewer[bot]\" and .commit_id == \"$LATEST_COMMIT\")) | length")
+  count=${count:-0}
   if [ "$count" -gt 0 ]; then
     echo "Copilot review received"
     break
