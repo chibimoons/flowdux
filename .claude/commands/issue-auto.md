@@ -72,7 +72,7 @@ gh issue view $ARGUMENTS --repo chibimoons/flowdux --json state,title,body,label
   - `flowdux`, `remote-core`, `remote-client`, `remote-server`, `remote-ktor`, `remote-serialization`, `remote-auth`, `remote-multiplexer`, `remote-node-mediator`, `timetravel`
   - 여러 모듈에 걸치면 `remote` 등 상위 스코프 사용
   - 샘플/문서만 수정 시 `sample`, `docs` 사용
-- **타겟 브랜치**: git-workflow.md 규칙에 따라 `develop`을 타겟으로 함
+- **타겟 브랜치**: `develop` (이슈 기반 작업은 모두 develop 타겟, main 직접 반영이 필요한 문서는 별도 `/pr` 워크플로우 사용)
 
 ### 2-2. 관련 코드 탐색
 
@@ -137,8 +137,16 @@ Phase 2에서 출력한 계획에 따라 코드를 수정합니다.
 ./gradlew jvmTest
 ```
 
-- 실패 시 → 수정 → 재실행 (최대 3회)
-- 계속 실패하면 실패 내역을 정리하여 보고하고 **이 워크플로우를 중단하세요. PR을 생성하거나 푸시하지 않습니다.**
+- 실패 시 → 원인 분석 → 수정 → 재실행 (최초 실행 포함 최대 3회)
+- 3회 실패 시 아래 형식으로 보고하고 **워크플로우를 중단하세요. PR을 생성하거나 푸시하지 않습니다.**
+
+```
+이슈 #$ARGUMENTS 처리 실패 (자율 모드):
+- 브랜치: {branch-name}
+- 실패 원인: {테스트 실패 내역 요약}
+- 시도 횟수: 3회
+- 수동 확인이 필요합니다.
+```
 
 ### 3-4. 커밋 & 푸시
 

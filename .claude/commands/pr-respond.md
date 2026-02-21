@@ -89,6 +89,9 @@ for i in $(seq 1 60); do
   echo "Waiting for Copilot review... (${i}0s)"
   sleep 10
 done
+if [ "$count" -eq 0 ]; then
+  echo "Timed out waiting for Copilot review (10min). Proceeding without it."
+fi
 ```
 
 > Copilot은 GitHub App 봇(`copilot-pull-request-reviewer[bot]`)이라 `requested_reviewers`에 나타나지 않습니다. reviews API로 확인해야 합니다.
