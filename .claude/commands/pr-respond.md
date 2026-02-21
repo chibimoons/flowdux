@@ -87,8 +87,7 @@ LATEST_COMMIT=$(gh pr view <pr-number> --repo chibimoons/flowdux --json headRefO
 count=0
 for i in $(seq 1 60); do
   count=$(gh api repos/chibimoons/flowdux/pulls/<pr-number>/reviews \
-    --paginate --slurp \
-    --jq "flatten | map(select(.user.login == \"copilot-pull-request-reviewer[bot]\" and .commit_id == \"$LATEST_COMMIT\")) | length")
+    --jq "[.[] | select(.user.login == \"copilot-pull-request-reviewer[bot]\" and .commit_id == \"$LATEST_COMMIT\")] | length")
   count=${count:-0}
   if [ "$count" -gt 0 ]; then
     echo "Copilot review received"
