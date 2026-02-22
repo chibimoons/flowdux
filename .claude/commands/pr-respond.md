@@ -69,8 +69,11 @@ gh run view <run-id> --repo chibimoons/flowdux --log-failed
 
 ### 5-1. 재요청
 
+> **주의**: `gh pr edit --add-reviewer copilot`은 이미 등록된 리뷰어에게 재트리거되지 않습니다. `requested_reviewers` API를 사용하세요.
+
 ```bash
-gh pr edit <pr-number> --repo chibimoons/flowdux --add-reviewer copilot
+gh api repos/chibimoons/flowdux/pulls/<pr-number>/requested_reviewers \
+  --method POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
 ```
 
 ### 5-2. 최신 커밋 SHA 확인

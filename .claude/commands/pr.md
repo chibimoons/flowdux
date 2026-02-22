@@ -167,8 +167,11 @@ gh run view <run-id> --repo chibimoons/flowdux --log-failed
 2-2~2-3에서 코드를 푸시했으면 Copilot에게 코드리뷰를 재요청하고 **리뷰가 도착할 때까지 대기**합니다.
 코드 수정/푸시가 없었으면 이 단계를 건너뜁니다.
 
+> **주의**: 재요청 시 `gh pr edit --add-reviewer copilot`은 이미 등록된 리뷰어에게 재트리거되지 않습니다. `requested_reviewers` API를 사용하세요.
+
 ```bash
-gh pr edit <pr-number> --repo chibimoons/flowdux --add-reviewer copilot
+gh api repos/chibimoons/flowdux/pulls/<pr-number>/requested_reviewers \
+  --method POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
 ```
 
 최신 커밋에 대한 Copilot 리뷰가 도착할 때까지 10초 간격으로 폴링합니다 (최대 10분):
