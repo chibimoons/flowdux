@@ -99,8 +99,9 @@ fun <S : State, A : Action> Store<S, A>.dispatchStartListening() {
 @Suppress("UNCHECKED_CAST")
 fun <S : State, A : Action> Store<S, A>.dispatchSessionListener(
     connection: TypedServerConnection<*>,
+    onComplete: (() -> Unit)? = null,
 ) {
-    dispatch(InternalSessionListener(connection) as A)
+    dispatch(InternalSessionListener(connection, onComplete) as A)
 }
 
 /** Dispatch [InternalSendToClient] via unchecked cast (type-erased at runtime). */
@@ -158,5 +159,15 @@ class MockTypedServerConnection<A : Action> : TypedServerConnection<A> {
     /** Simulate receiving a typed action from the client. */
     suspend fun simulateClientAction(action: A) {
         incomingChannel.send(action)
+    }
+
+    /** Close the incoming channel to simulate a clean disconnection. */
+    fun closeIncoming() {
+        incomingChannel.close()
+    }
+
+    /** Close the incoming channel with an error to simulate a connection failure. */
+    fun closeIncomingWithError(cause: Throwable) {
+        incomingChannel.close(cause)
     }
 }

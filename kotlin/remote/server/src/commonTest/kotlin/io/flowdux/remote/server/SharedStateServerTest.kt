@@ -394,4 +394,95 @@ class SharedStateServerTest {
         assertEquals(16, BroadcastConfig.Default.concurrency)
         assertEquals(64, BroadcastConfig.HighThroughput.concurrency)
     }
+
+    // -- Dead Session Cleanup Tests --
+
+    @Test
+    fun `handleClient removes session when connection incoming flow completes normally`() = runTest {
+        val connection = MockTypedServerConnection<ServerAction>()
+        val server = createSharedStateServer(
+            initialState = ServerState(),
+            reducer = serverReducer,
+            stateMapper = { ServerAction.SyncState(it) },
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        val clientJob = backgroundScope.launch {
+            server.handleClient("client-1", connection)
+        }
+        delay(100)
+        assertEquals(1, server.sessionCount())
+
+        // Simulate clean disconnection — incoming flow completes
+        connection.closeIncoming()
+        delay(200)
+
+        // Session should be removed automatically
+        assertEquals(0, server.sessionCount())
+        assertTrue(clientJob.isCompleted)
+    }
+
+    @Test
+    fun `handleClient removes session when connection incoming flow errors`() = runTest {
+        val connection = MockTypedServerConnection<ServerAction>()
+        val server = createSharedStateServer(
+            initialState = ServerState(),
+            reducer = serverReducer,
+            stateMapper = { ServerAction.SyncState(it) },
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        val clientJob = backgroundScope.launch {
+            server.handleClient("client-1", connection)
+        }
+        delay(100)
+        assertEquals(1, server.sessionCount())
+
+        // Simulate connection failure — incoming flow throws
+        connection.closeIncomingWithError(RuntimeException("connection lost"))
+        delay(200)
+
+        // Session should be removed automatically
+        assertEquals(0, server.sessionCount())
+        assertTrue(clientJob.isCompleted)
+    }
+
+    @Test
+    fun `dead session does not leak when other sessions remain active`() = runTest {
+        val conn1 = MockTypedServerConnection<ServerAction>()
+        val conn2 = MockTypedServerConnection<ServerAction>()
+
+        val server = createSharedStateServer(
+            initialState = ServerState(),
+            reducer = serverReducer,
+            stateMapper = { ServerAction.SyncState(it) },
+            errorProcessor = serverErrorProcessor,
+            scope = backgroundScope,
+        )
+
+        val job1 = backgroundScope.launch { server.handleClient("client-1", conn1) }
+        val job2 = backgroundScope.launch { server.handleClient("client-2", conn2) }
+        delay(100)
+        assertEquals(2, server.sessionCount())
+
+        // Client 1 disconnects with error
+        conn1.closeIncomingWithError(RuntimeException("network error"))
+        delay(200)
+
+        // Only dead session is removed; active session remains
+        assertEquals(1, server.sessionCount())
+        assertTrue(server.sessionIds().contains("client-2"))
+        assertFalse(server.sessionIds().contains("client-1"))
+        assertTrue(job1.isCompleted)
+        assertFalse(job2.isCompleted)
+
+        // Active session still works
+        conn2.simulateClientAction(ServerAction.ClientAdd(5))
+        delay(100)
+        assertEquals(5, server.currentState.count)
+
+        job2.cancel()
+    }
 }
