@@ -341,6 +341,90 @@ class ServerConnectionMultiplexerTest {
     }
 
     @Test
+    fun concurrentGetOrCreateRoomAndCloseDoesNotCorruptState() = runTest {
+        val physical = FakeTypedServerConnection<TestAction>()
+        val mux = ServerConnectionMultiplexer(physical, this)
+
+        // Race: one coroutine creates rooms while another closes the multiplexer.
+        // getOrCreateRoom should either succeed or throw ISE — never corrupt state.
+        val createJobs = (1..10).map { i ->
+            async {
+                try {
+                    mux.getOrCreateRoom("room-$i")
+                    true
+                } catch (_: IllegalStateException) {
+                    false // Expected: "Multiplexer is closed"
+                }
+            }
+        }
+        val closeJob = async { mux.close() }
+
+        closeJob.await()
+        val results = createJobs.awaitAll()
+
+        // Some rooms may have been created before close, others rejected
+        assertTrue(results.any { it } || results.all { !it })
+
+        // After close, new rooms must be rejected
+        assertFailsWith<IllegalStateException> {
+            mux.getOrCreateRoom("room-after-close")
+        }
+    }
+
+    @Test
+    fun concurrentCloseIsSafe() = runTest {
+        val physical = FakeTypedServerConnection<TestAction>()
+        val mux = ServerConnectionMultiplexer(physical, this)
+
+        mux.getOrCreateRoom("room-1")
+        mux.getOrCreateRoom("room-2")
+
+        // Multiple concurrent close calls should not throw
+        val jobs = (1..5).map {
+            async { mux.close() }
+        }
+        jobs.awaitAll()
+
+        assertEquals(emptySet(), mux.roomIds())
+        assertFailsWith<IllegalStateException> {
+            mux.getOrCreateRoom("room-3")
+        }
+    }
+
+    @Test
+    fun removeRoomDuringActiveRoutingIsSafe() = runTest {
+        val physical = FakeTypedServerConnection<TestAction>()
+        val mux = ServerConnectionMultiplexer(physical, this)
+
+        mux.getOrCreateRoom("room-1")
+        mux.getOrCreateRoom("room-2")
+
+        // Concurrent: remove room-1 while routing is active
+        mux.removeRoom("room-1")
+        assertFalse(mux.hasRoom("room-1"))
+
+        // Messages to removed room should be silently dropped (no crash)
+        physical.simulateIncoming(routed("room-1", TestAction.Message("to removed room")))
+        yield()
+
+        // room-2 should still work normally after room-1 removal
+        val room2 = mux.getOrCreateRoom("room-2")
+        val room2Actions = mutableListOf<TestAction>()
+        val job = launch {
+            room2.incoming.take(1).toList(room2Actions)
+        }
+        yield()
+
+        physical.simulateIncoming(routed("room-2", TestAction.Message("still works")))
+        withTimeout(1000) { job.join() }
+
+        val expected: List<TestAction> = listOf(TestAction.Message("still works"))
+        assertEquals(expected, room2Actions)
+
+        mux.close()
+    }
+
+    @Test
     fun removeRoomForNonexistentRoomIsSafe() = runTest {
         val physical = FakeTypedServerConnection<TestAction>()
         val mux = ServerConnectionMultiplexer(physical, this)
