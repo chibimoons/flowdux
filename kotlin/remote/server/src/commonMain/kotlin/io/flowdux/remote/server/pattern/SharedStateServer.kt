@@ -123,6 +123,9 @@ class SharedStateServer<S : State, A : Action> internal constructor(
             store.dispatch(
                 InternalSessionListener(connection) { listenerDone.complete(Unit) } as A,
             )
+            // Handle race: store may have closed between isClosed check and dispatch,
+            // causing dispatch to silently drop. Complete to avoid hanging.
+            if (store.isClosed) listenerDone.complete(Unit)
         }
         try {
             listenerDone.await()
