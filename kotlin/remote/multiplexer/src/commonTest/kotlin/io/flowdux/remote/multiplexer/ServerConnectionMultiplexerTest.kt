@@ -362,9 +362,6 @@ class ServerConnectionMultiplexerTest {
         closeJob.await()
         val results = createJobs.awaitAll()
 
-        // Some rooms may have been created before close, others rejected
-        assertTrue(results.any { it } || results.all { !it })
-
         // After close, new rooms must be rejected
         assertFailsWith<IllegalStateException> {
             mux.getOrCreateRoom("room-after-close")

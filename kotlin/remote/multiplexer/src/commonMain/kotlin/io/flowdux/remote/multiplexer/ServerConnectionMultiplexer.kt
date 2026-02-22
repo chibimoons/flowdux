@@ -159,7 +159,7 @@ class ServerConnectionMultiplexer<A : Action>(
      * and clears the room registry. After closing, no new rooms can be created.
      */
     suspend fun close() {
-        closed.store(true)
+        if (!closed.compareAndSet(expectedValue = false, newValue = true)) return
         val virtualConnections = mutex.withLock {
             val connections = rooms.values.toList()
             rooms.clear()
