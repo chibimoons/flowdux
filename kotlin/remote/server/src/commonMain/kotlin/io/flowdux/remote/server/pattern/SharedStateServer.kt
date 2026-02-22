@@ -117,9 +117,13 @@ class SharedStateServer<S : State, A : Action> internal constructor(
     ) {
         sessionRegistry.addSession(sessionId, connection)
         val listenerDone = CompletableDeferred<Unit>()
-        store.dispatch(
-            InternalSessionListener(connection) { listenerDone.complete(Unit) } as A,
-        )
+        if (store.isClosed) {
+            listenerDone.complete(Unit)
+        } else {
+            store.dispatch(
+                InternalSessionListener(connection) { listenerDone.complete(Unit) } as A,
+            )
+        }
         try {
             listenerDone.await()
         } finally {

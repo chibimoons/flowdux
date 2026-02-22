@@ -99,9 +99,9 @@ fun <S : State, A : Action> Store<S, A>.dispatchStartListening() {
 @Suppress("UNCHECKED_CAST")
 fun <S : State, A : Action> Store<S, A>.dispatchSessionListener(
     connection: TypedServerConnection<*>,
-    onComplete: (() -> Unit)? = null,
+    onTerminate: (() -> Unit)? = null,
 ) {
-    dispatch(InternalSessionListener(connection, onComplete) as A)
+    dispatch(InternalSessionListener(connection, onTerminate) as A)
 }
 
 /** Dispatch [InternalSendToClient] via unchecked cast (type-erased at runtime). */
