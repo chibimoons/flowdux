@@ -197,13 +197,13 @@ class KtorWebSocketClientConnectionTest {
 
     @Test
     fun `connect to unreachable server returns to DISCONNECTED`() = runBlocking {
-        // Use a TEST-NET-1 address (RFC 5737) that is unreachable in normal environments
-        val connection = KtorWebSocketClientConnection("ws://192.0.2.1:1/test")
+        // Use localhost with a closed port for fast, deterministic failure
+        val connection = KtorWebSocketClientConnection("ws://127.0.0.1:1/test")
         assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
 
         // connect() should throw or return, but state must return to DISCONNECTED
         try {
-            withTimeout(10_000) { connection.connect() }
+            withTimeout(3_000) { connection.connect() }
         } catch (_: Exception) {
             // Expected: connection failure
         } finally {
@@ -276,9 +276,12 @@ class KtorWebSocketClientConnectionTest {
                 connection.connectionState.first { it == ConnectionState.CONNECTED }
             }
 
-            // Wait for server to close
-            delay(500)
-            assertTrue(serverClosed.get(), "Server should have sent close frame")
+            // Wait for server to close by polling the flag
+            withTimeout(5_000) {
+                while (!serverClosed.get()) {
+                    delay(10)
+                }
+            }
 
             // Client calls disconnect to clean up
             connection.disconnect()
