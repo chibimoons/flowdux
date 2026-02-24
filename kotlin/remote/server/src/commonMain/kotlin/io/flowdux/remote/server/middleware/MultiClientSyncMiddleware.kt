@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
 
 // -- New top-level FlowHolderActions (direct dispatch, no middleware intermediary) --
 
@@ -30,11 +31,14 @@ import kotlinx.coroutines.flow.map
  */
 internal class InternalSessionListener(
     private val connection: TypedServerConnection<*>,
+    private val onTerminate: (() -> Unit)? = null,
 ) : FlowHolderAction {
     override val delivery: FlowActionDelivery get() = FlowActionDelivery.Dispatch
     override val strategy: ExecutionStrategy get() = concurrent()
 
-    override fun toFlowAction(): Flow<Action> = connection.incoming.map { it }
+    override fun toFlowAction(): Flow<Action> = connection.incoming
+        .map { it }
+        .onCompletion { runCatching { onTerminate?.invoke() } }
 }
 
 /**

@@ -19,10 +19,10 @@ import io.flowdux.remote.server.session.BroadcastConfig
 import io.flowdux.remote.server.session.InMemorySessionRegistry
 import io.flowdux.remote.server.session.SessionBroadcaster
 import io.flowdux.remote.server.session.SessionRegistry
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -103,7 +103,8 @@ class SharedStateServer<S : State, A : Action> internal constructor(
      * Handle a client connection.
      *
      * Registers the session in the registry and dispatches [InternalSessionListener]
-     * to start listening for incoming messages. Suspends until cancelled, then removes
+     * to start listening for incoming messages. Suspends until the connection's incoming
+     * flow terminates (error or completion) or until cancelled, then removes
      * the session from the registry directly to ensure cleanup even if the store is closed.
      *
      * @param sessionId Unique identifier for this client session.
@@ -115,9 +116,19 @@ class SharedStateServer<S : State, A : Action> internal constructor(
         connection: TypedServerConnection<A>,
     ) {
         sessionRegistry.addSession(sessionId, connection)
-        store.dispatch(InternalSessionListener(connection) as A)
+        val listenerDone = CompletableDeferred<Unit>()
+        if (store.isClosed) {
+            listenerDone.complete(Unit)
+        } else {
+            store.dispatch(
+                InternalSessionListener(connection) { listenerDone.complete(Unit) } as A,
+            )
+            // Handle race: store may have closed between isClosed check and dispatch,
+            // causing dispatch to silently drop. Complete to avoid hanging.
+            if (store.isClosed) listenerDone.complete(Unit)
+        }
         try {
-            awaitCancellation()
+            listenerDone.await()
         } finally {
             // Direct removal ensures cleanup even if store is already closed
             sessionRegistry.removeSession(sessionId)
