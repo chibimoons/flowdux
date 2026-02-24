@@ -1,5 +1,6 @@
 package io.flowdux.remote.nodemediator
 
+import app.cash.turbine.test
 import io.flowdux.Action
 import io.flowdux.State
 import io.flowdux.buildReducer
@@ -66,8 +67,13 @@ class NodeRoomServerTest {
         override val incoming: Flow<TestAction> = incomingFlow
 
         val sentActions = mutableListOf<TestAction>()
+        private val _sentFlow = MutableSharedFlow<TestAction>(extraBufferCapacity = 64)
+        val sentFlow: Flow<TestAction> = _sentFlow
 
-        override suspend fun send(action: TestAction) { sentActions.add(action) }
+        override suspend fun send(action: TestAction) {
+            sentActions.add(action)
+            _sentFlow.emit(action)
+        }
 
         fun simulateIncoming(action: TestAction) {
             incomingFlow.tryEmit(action)
@@ -366,6 +372,42 @@ class NodeRoomServerTest {
 
         assertEquals(0, transport.sentActions.size)
 
+        server.close()
+    }
+
+    @Test
+    fun clientReceivesSyncStateFlowViaTurbine() = runTest {
+        val transport = FakeNodeTransport()
+        val roomServer = createTestRoomServer(backgroundScope)
+        val server = NodeRoomServer("node-1", transport, roomServer, backgroundScope)
+        server.connect()
+        testScheduler.advanceTimeBy(1)
+
+        val clientConn = FakeClientConnection()
+
+        // Start Turbine collection BEFORE handleClient to capture initial state sync
+        clientConn.sentFlow.test {
+            val job = backgroundScope.launch {
+                server.handleClient("room-1", "session-1", clientConn)
+            }
+            testScheduler.advanceTimeBy(1)
+
+            // Initial SyncState on connection
+            assertEquals(TestAction.Sync(emptyList()), awaitItem())
+
+            // Central sends actions — verify client receives updated SyncState
+            transport.simulateIncoming(NodeAction("room-1", TestAction.Add("item-1")))
+            testScheduler.advanceTimeBy(1)
+            assertEquals(TestAction.Sync(listOf("item-1")), awaitItem())
+
+            transport.simulateIncoming(NodeAction("room-1", TestAction.Add("item-2")))
+            testScheduler.advanceTimeBy(1)
+            assertEquals(TestAction.Sync(listOf("item-1", "item-2")), awaitItem())
+
+            job.cancel()
+        }
+
+        testScheduler.advanceTimeBy(1)
         server.close()
     }
 }
