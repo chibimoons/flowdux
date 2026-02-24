@@ -9,44 +9,64 @@ import kotlin.test.assertFailsWith
 class KtorClientConnectionCommonTest {
 
     @Test
-    fun initialStateIsDisconnected() {
+    fun initialStateIsDisconnected() = runTest {
         val connection = KtorWebSocketClientConnection("ws://localhost:8080/test")
-        assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        try {
+            assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     @Test
-    fun factoryCreateBuildsCorrectWsUrl() {
+    fun factoryCreateWithCustomParamsInitializesConnection() = runTest {
         val connection = KtorWebSocketClientConnection.create(
             host = "example.com",
             port = 9090,
             path = "/ws",
             secure = false,
         )
-        assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        try {
+            assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     @Test
-    fun factoryCreateBuildsSecureWssUrl() {
+    fun factoryCreateWithSecureParamInitializesConnection() = runTest {
         val connection = KtorWebSocketClientConnection.create(
             host = "example.com",
             port = 443,
             path = "/ws",
             secure = true,
         )
-        assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        try {
+            assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     @Test
-    fun factoryCreateUsesDefaults() {
+    fun factoryCreateWithDefaultsInitializesConnection() = runTest {
         val connection = KtorWebSocketClientConnection.create()
-        assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        try {
+            assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        } finally {
+            connection.disconnect()
+        }
     }
 
     @Test
     fun sendBeforeConnectThrowsIllegalState() = runTest {
         val connection = KtorWebSocketClientConnection("ws://localhost:8080/test")
-        assertFailsWith<IllegalStateException> {
-            connection.send("hello")
+        try {
+            assertFailsWith<IllegalStateException> {
+                connection.send("hello")
+            }
+        } finally {
+            connection.disconnect()
         }
     }
 }
