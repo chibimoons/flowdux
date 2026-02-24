@@ -31,7 +31,7 @@ Add the dependency to your KMP project's `build.gradle.kts`:
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("io.github.chibimoons:flowdux:1.13.0")
+            implementation("io.github.chibimoons:flowdux:1.17.0")
         }
     }
 }
@@ -45,7 +45,7 @@ If your project is not KMP, add the dependency directly:
 
 ```kotlin
 dependencies {
-    implementation("io.github.chibimoons:flowdux:1.13.0")
+    implementation("io.github.chibimoons:flowdux:1.17.0")
 }
 ```
 
@@ -58,15 +58,15 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // Shared action markers (ServerSharedAction, ClientSharedAction)
-            implementation("io.github.chibimoons:flowdux-remote-core:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-core:1.17.0")
             // Client middleware (SyncMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-client:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-client:1.17.0")
             // Server middleware (SingleClientSyncMiddleware, MultiClientSyncMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-server:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-server:1.17.0")
             // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-            implementation("io.github.chibimoons:flowdux-remote-serialization:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-serialization:1.17.0")
             // Ktor WebSocket transport (JVM, iOS, JS — WASM not supported)
-            implementation("io.github.chibimoons:flowdux-remote-ktor:1.13.0")
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.17.0")
         }
     }
 }
@@ -101,7 +101,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flowdux: ^0.2.3
+  flowdux: ^0.3.2
 ```
 
 ### Flutter
@@ -110,8 +110,8 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  flowdux: ^0.2.3
-  flowdux_flutter: ^0.2.3
+  flowdux: ^0.3.2
+  flowdux_flutter: ^0.3.2
 ```
 
 ## Quick Start (Kotlin)
@@ -227,7 +227,7 @@ if (!store.isClosed) {
 
 ### Kotlin Version
 
-FlowDux 1.13.0 is built with **Kotlin 2.2.10**. For best compatibility, use the same Kotlin version in your project:
+FlowDux 1.17.0 is built with **Kotlin 2.2.10**. For best compatibility, use the same Kotlin version in your project:
 
 ```kotlin
 plugins {
