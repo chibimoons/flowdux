@@ -72,7 +72,7 @@ class NodeRoomServerTest {
 
         override suspend fun send(action: TestAction) {
             sentActions.add(action)
-            _sentFlow.emit(action)
+            _sentFlow.tryEmit(action)
         }
 
         fun simulateIncoming(action: TestAction) {
