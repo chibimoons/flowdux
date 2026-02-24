@@ -84,8 +84,11 @@ EOF
 
 ### 1-7. Copilot 리뷰 요청 & 대기
 
+> **주의**: `gh pr edit --add-reviewer copilot`은 재요청 시 트리거되지 않습니다. 초기/재요청 모두 `requested_reviewers` API를 사용하세요. Copilot은 GitHub App 봇이라 `requested_reviewers` 목록에 나타나지 않으므로, 리뷰 도착 확인은 **reviews API 폴링**으로 해야 합니다.
+
 ```bash
-gh pr edit <pr-number> --repo chibimoons/flowdux --add-reviewer copilot
+gh api repos/chibimoons/flowdux/pulls/<pr-number>/requested_reviewers \
+  -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
 ```
 
 최신 커밋에 대한 Copilot 리뷰가 도착할 때까지 10초 간격으로 폴링합니다 (최대 10분):
@@ -108,8 +111,6 @@ if [ "$count" -eq 0 ]; then
   echo "Timed out waiting for Copilot review (10min). Proceeding without it."
 fi
 ```
-
-> Copilot은 GitHub App 봇(`copilot-pull-request-reviewer[bot]`)이라 `requested_reviewers`에 나타나지 않습니다. reviews API로 확인해야 합니다.
 
 ---
 
