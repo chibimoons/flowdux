@@ -55,6 +55,17 @@ kotlin {
 }
 ```
 
+> **WASM not supported**: `flowdux-remote-ktor` uses Ktor's WebSocket client, which does not support WASM targets. If your project targets WASM, implement `ClientConnection` / `ServerConnection` with a WASM-compatible WebSocket library and use `flowdux-remote-client` / `flowdux-remote-server` directly without the Ktor transport module.
+
+### Platform Support (flowdux-remote-ktor)
+
+| Platform | Status |
+|----------|--------|
+| JVM | Supported |
+| iOS | Supported |
+| JS | Supported |
+| WASM | Not supported (Ktor client unavailable) |
+
 ## Version Compatibility
 
 FlowDux remote modules require matching Kotlin and serialization versions:
