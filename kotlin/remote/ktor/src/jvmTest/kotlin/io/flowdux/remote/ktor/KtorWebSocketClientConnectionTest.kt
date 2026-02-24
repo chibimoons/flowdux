@@ -194,4 +194,96 @@ class KtorWebSocketClientConnectionTest {
             server.stop(500, 1_000)
         }
     }
+
+    @Test
+    fun `connect to unreachable server returns to DISCONNECTED`() = runBlocking {
+        // Port 1 is unlikely to have a WebSocket server
+        val connection = KtorWebSocketClientConnection("ws://localhost:1/test")
+        assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+
+        // connect() should throw or return, but state must return to DISCONNECTED
+        try {
+            withTimeout(10_000) { connection.connect() }
+        } catch (_: Exception) {
+            // Expected: connection failure
+        }
+
+        assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+    }
+
+    @Test
+    fun `reconnect after disconnect succeeds`() = runBlocking {
+        val server = embeddedServer(CIO, port = 0) {
+            install(WebSockets)
+            routing {
+                webSocket("/test") {
+                    for (frame in incoming) { /* keep alive */ }
+                }
+            }
+        }.start(wait = false)
+
+        try {
+            val port = server.engine.resolvedConnectors().first().port
+
+            // First connection
+            val connection1 = KtorWebSocketClientConnection("ws://localhost:$port/test")
+            val job1 = launch(Dispatchers.Default) { connection1.connect() }
+            withTimeout(5_000) {
+                connection1.connectionState.first { it == ConnectionState.CONNECTED }
+            }
+            connection1.disconnect()
+            withTimeout(5_000) { job1.join() }
+            assertEquals(ConnectionState.DISCONNECTED, connection1.connectionState.value)
+
+            // Second connection (new instance, same server)
+            val connection2 = KtorWebSocketClientConnection("ws://localhost:$port/test")
+            val job2 = launch(Dispatchers.Default) { connection2.connect() }
+            withTimeout(5_000) {
+                connection2.connectionState.first { it == ConnectionState.CONNECTED }
+            }
+            assertEquals(ConnectionState.CONNECTED, connection2.connectionState.value)
+
+            connection2.disconnect()
+            withTimeout(5_000) { job2.join() }
+        } finally {
+            server.stop(500, 1_000)
+        }
+    }
+
+    @Test
+    fun `server initiated close allows client to detect and disconnect`() = runBlocking {
+        val serverClosed = AtomicBoolean(false)
+
+        val server = embeddedServer(CIO, port = 0) {
+            install(WebSockets)
+            routing {
+                webSocket("/test") {
+                    delay(200)
+                    close(CloseReason(CloseReason.Codes.NORMAL, "Server closing"))
+                    serverClosed.set(true)
+                }
+            }
+        }.start(wait = false)
+
+        try {
+            val port = server.engine.resolvedConnectors().first().port
+            val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+
+            val connectJob = launch(Dispatchers.Default) { connection.connect() }
+            withTimeout(5_000) {
+                connection.connectionState.first { it == ConnectionState.CONNECTED }
+            }
+
+            // Wait for server to close
+            delay(500)
+            assertTrue(serverClosed.get(), "Server should have sent close frame")
+
+            // Client calls disconnect to clean up
+            connection.disconnect()
+            withTimeout(5_000) { connectJob.join() }
+            assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        } finally {
+            server.stop(500, 1_000)
+        }
+    }
 }
