@@ -2,12 +2,17 @@ package io.flowdux
 
 import app.cash.turbine.test
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
@@ -368,5 +373,78 @@ class ScopeAndLifecycleTest {
 
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    // ==================== Concurrent Dispatch + Close Race Tests ====================
+    // NOTE: Using runBlocking with Dispatchers.Default to ensure real multi-threading
+
+    @Test
+    fun `concurrent close from multiple coroutines does not throw`() =
+        runBlocking {
+            val storeScope = CoroutineScope(Dispatchers.Default + Job())
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
+            delay(50) // Let store initialize
+
+            // Launch multiple coroutines that all try to close simultaneously
+            val jobs = (1..10).map {
+                launch(Dispatchers.Default) { store.close() }
+            }
+            jobs.joinAll()
+
+            assertTrue(store.isClosed)
+        }
+
+    @Test
+    fun `dispatch during close does not throw`() =
+        runBlocking {
+            val storeScope = CoroutineScope(Dispatchers.Default + Job())
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
+            delay(50) // Let store initialize
+
+            // Dispatch and close concurrently — neither should throw
+            val dispatchJob = launch(Dispatchers.Default) {
+                repeat(100) { store.dispatch(CounterAction.Increment) }
+            }
+            val closeJob = launch(Dispatchers.Default) {
+                store.close()
+            }
+
+            dispatchJob.join()
+            closeJob.join()
+            assertTrue(store.isClosed)
+        }
+
+    @Test
+    fun `closeGracefully during concurrent dispatch does not throw`() =
+        runBlocking {
+            val storeScope = CoroutineScope(Dispatchers.Default + Job())
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
+            delay(50) // Let store initialize
+
+            val dispatchJob = launch(Dispatchers.Default) {
+                repeat(50) { store.dispatch(CounterAction.Increment) }
+            }
+            val closeJob = launch(Dispatchers.Default) {
+                store.closeGracefully()
+            }
+
+            dispatchJob.join()
+            closeJob.join()
+            assertTrue(store.isClosed)
         }
 }
