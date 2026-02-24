@@ -8,6 +8,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.assertEquals
@@ -368,5 +369,66 @@ class ScopeAndLifecycleTest {
 
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    // ==================== Concurrent Dispatch + Close Race Tests ====================
+
+    @Test
+    fun `concurrent close from multiple coroutines does not throw`() =
+        runTest {
+            val storeScope = CoroutineScope(coroutineContext + Job())
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
+
+            // Launch multiple coroutines that all try to close simultaneously
+            val jobs = (1..10).map {
+                launch { store.close() }
+            }
+            jobs.forEach { it.join() }
+
+            assertTrue(store.isClosed)
+        }
+
+    @Test
+    fun `dispatch during close does not throw`() =
+        runTest {
+            val storeScope = CoroutineScope(coroutineContext + Job())
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
+            advanceUntilIdle()
+
+            // Dispatch and close concurrently — neither should throw
+            launch { repeat(100) { store.dispatch(CounterAction.Increment) } }
+            launch { store.close() }
+
+            advanceUntilIdle()
+            assertTrue(store.isClosed)
+        }
+
+    @Test
+    fun `closeGracefully during concurrent dispatch does not throw`() =
+        runTest {
+            val storeScope = CoroutineScope(coroutineContext + Job())
+            val store = createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
+            advanceUntilIdle()
+
+            launch { repeat(50) { store.dispatch(CounterAction.Increment) } }
+            launch { store.closeGracefully() }
+
+            advanceUntilIdle()
+            assertTrue(store.isClosed)
         }
 }

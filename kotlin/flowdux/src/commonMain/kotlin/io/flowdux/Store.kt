@@ -22,12 +22,14 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 private const val DEFAULT_CONCURRENCY = 16
 
-@OptIn(ExperimentalCoroutinesApi::class)
+@OptIn(ExperimentalCoroutinesApi::class, ExperimentalAtomicApi::class)
 class Store<S : State, A : Action> internal constructor(
     initialState: S,
     private val reducer: Reducer<S, A>,
@@ -38,10 +40,10 @@ class Store<S : State, A : Action> internal constructor(
     private val concurrency: Int,
 ) {
     private val actionFlow = Channel<A>()
-    private var _isClosed = false
+    private val _isClosed = AtomicBoolean(false)
     private val isLoggingEnabled = logger::class != NoOpStoreLogger::class
 
-    val isClosed: Boolean get() = _isClosed
+    val isClosed: Boolean get() = _isClosed.load()
 
     private val stateFlow = actionFlow
         .receiveAsFlow()
@@ -78,7 +80,7 @@ class Store<S : State, A : Action> internal constructor(
     val currentState: S get() = stateFlow.value
 
     fun dispatch(action: A) {
-        if (_isClosed) {
+        if (_isClosed.load()) {
             if (isLoggingEnabled) logger.onDispatchAfterClose(action)
             return
         }
@@ -94,8 +96,7 @@ class Store<S : State, A : Action> internal constructor(
     }
 
     fun close() {
-        if (_isClosed) return
-        _isClosed = true
+        if (!_isClosed.compareAndSet(expectedValue = false, newValue = true)) return
         actionFlow.close()
         scope.cancel()
     }
@@ -138,7 +139,7 @@ class Store<S : State, A : Action> internal constructor(
         timeout: Duration = 5.seconds,
         beforeClose: (suspend (dispatch: suspend (A) -> Unit) -> Unit)? = null,
     ) {
-        if (_isClosed) return
+        if (_isClosed.load()) return
         beforeClose?.invoke {
             if (isLoggingEnabled) logger.onActionDispatched(it)
             actionFlow.send(it)
