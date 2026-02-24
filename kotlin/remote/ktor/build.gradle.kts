@@ -37,6 +37,10 @@ kotlin {
             implementation(libs.ktor.client.core.multiplatform)
             implementation(libs.ktor.client.websockets.multiplatform)
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+        }
         jvmMain.dependencies {
             implementation(libs.ktor.client.cio.multiplatform)
             api(project(":kotlin:flowdux-remote-server"))
