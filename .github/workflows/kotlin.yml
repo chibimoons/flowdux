@@ -69,6 +69,16 @@ jobs:
       - name: Run flowdux-remote-node-mediator tests
         run: ./gradlew :kotlin:flowdux-remote-node-mediator:jvmTest
 
+      - name: Generate coverage report
+        run: ./gradlew koverXmlReport koverHtmlReport
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/reports/kover/
+
   # iOS/Native compilation check — catches issues like missing imports
   # that only surface on non-JVM targets (e.g. kotlin.concurrent.Volatile)
   compile-native:
