@@ -12,7 +12,7 @@ mavenPublishing {
 }
 
 // JitPack only publishes JVM artifacts to avoid variant resolution issues for JVM/Android consumers
-val isJitPack = System.getenv("JITPACK") == "true"
+val isJitPack = providers.environmentVariable("JITPACK").map { it == "true" }.getOrElse(false)
 
 kotlin {
     jvm()
