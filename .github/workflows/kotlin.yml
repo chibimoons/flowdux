@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   test:
@@ -71,6 +72,16 @@ jobs:
 
       - name: Generate coverage report
         run: ./gradlew koverXmlReport koverHtmlReport
+
+      - name: Add coverage report to PR
+        if: github.event_name == 'pull_request'
+        uses: mi-kas/kover-report@v1
+        with:
+          path: build/reports/kover/report.xml
+          title: Code Coverage
+          update-comment: true
+          min-coverage-overall: 0
+          min-coverage-changed-files: 0
 
       - name: Upload coverage report
         if: always()

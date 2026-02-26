@@ -30,6 +30,16 @@ import kotlinx.coroutines.sync.withLock
  * [connect] suspends until the connection is closed — the caller is responsible
  * for launching it in an appropriate coroutine scope.
  *
+ * ## Backpressure
+ *
+ * Both incoming and outgoing channels use [Channel.BUFFERED] (64 elements, SUSPEND overflow):
+ *
+ * - **Incoming**: When the buffer fills up, the WebSocket receive loop suspends until the
+ *   consumer collects messages from [incoming]. Consumers should collect promptly to avoid
+ *   blocking WebSocket frame processing, which applies backpressure to the server.
+ * - **Outgoing**: [send] suspends when the outgoing buffer is full, applying backpressure
+ *   to the caller until the WebSocket can transmit buffered messages.
+ *
  * @param url WebSocket URL to connect to (e.g., "ws://localhost:8080/path" or "wss://example.com/path")
  * @param httpClient Optional pre-configured HttpClient. If not provided, uses platform-default engine.
  */
