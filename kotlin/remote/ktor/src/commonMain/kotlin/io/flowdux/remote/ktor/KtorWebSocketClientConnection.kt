@@ -54,10 +54,10 @@ class KtorWebSocketClientConnection(
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     override val connectionState: StateFlow<ConnectionState> = _connectionState
 
-    private val incomingChannel = Channel<String>(Channel.UNLIMITED)
+    private val incomingChannel = Channel<String>(Channel.BUFFERED)
     override val incoming: Flow<String> = incomingChannel.receiveAsFlow()
 
-    private val outgoingChannel = Channel<String>(Channel.UNLIMITED)
+    private val outgoingChannel = Channel<String>(Channel.BUFFERED)
 
     private var session: WebSocketSession? = null
     private val connectMutex = Mutex()
