@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.Volatile
 
 /**
  * Ktor-based WebSocket client implementation of [ClientConnection].
@@ -69,6 +70,7 @@ class KtorWebSocketClientConnection(
 
     private val outgoingChannel = Channel<String>(Channel.BUFFERED)
 
+    @Volatile
     private var session: WebSocketSession? = null
     private val connectMutex = Mutex()
 
