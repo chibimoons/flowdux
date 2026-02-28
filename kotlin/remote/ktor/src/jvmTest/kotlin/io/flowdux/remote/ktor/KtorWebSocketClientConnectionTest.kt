@@ -291,4 +291,35 @@ class KtorWebSocketClientConnectionTest {
             server.stop(500, 1_000)
         }
     }
+
+    @Test
+    fun `server initiated close terminates connect without explicit disconnect`() = runBlocking {
+        val server = embeddedServer(CIO, port = 0) {
+            install(WebSockets)
+            routing {
+                webSocket("/test") {
+                    delay(200)
+                    close(CloseReason(CloseReason.Codes.NORMAL, "Server closing"))
+                }
+            }
+        }.start(wait = false)
+
+        var connection: KtorWebSocketClientConnection? = null
+        try {
+            val port = server.engine.resolvedConnectors().first().port
+            connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+
+            val connectJob = launch(Dispatchers.Default) { connection.connect() }
+            withTimeout(5_000) {
+                connection.connectionState.first { it == ConnectionState.CONNECTED }
+            }
+
+            // connect() should return on its own after the server closes
+            withTimeout(5_000) { connectJob.join() }
+            assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        } finally {
+            connection?.disconnect()
+            server.stop(500, 1_000)
+        }
+    }
 }

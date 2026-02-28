@@ -98,10 +98,17 @@ class KtorWebSocketClientConnection(
                 try {
                     coroutineScope {
                         launch {
-                            for (frame in incoming) {
-                                if (frame is Frame.Text) {
-                                    incomingChannel.send(frame.readText())
+                            try {
+                                for (frame in incoming) {
+                                    if (frame is Frame.Text) {
+                                        incomingChannel.send(frame.readText())
+                                    }
                                 }
+                            } finally {
+                                // Close outgoingChannel so the outgoing loop terminates
+                                // and any blocked senders fail fast. This is consistent
+                                // with disconnect() which also closes channels.
+                                outgoingChannel.close()
                             }
                         }
                         launch {
