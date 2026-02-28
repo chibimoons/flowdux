@@ -122,11 +122,6 @@ class KtorWebSocketClientConnection(
                 }
             }
         } finally {
-            // Close channels so that incoming flow collectors receive completion
-            // and send() fails fast. Channel.close() is idempotent, so this is
-            // safe even if disconnect() already closed them.
-            incomingChannel.close()
-            outgoingChannel.close()
             _connectionState.value = ConnectionState.DISCONNECTED
         }
     }

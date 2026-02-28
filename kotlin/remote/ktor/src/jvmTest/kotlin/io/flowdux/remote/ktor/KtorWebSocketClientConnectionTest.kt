@@ -304,9 +304,10 @@ class KtorWebSocketClientConnectionTest {
             }
         }.start(wait = false)
 
+        var connection: KtorWebSocketClientConnection? = null
         try {
             val port = server.engine.resolvedConnectors().first().port
-            val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+            connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
 
             val connectJob = launch(Dispatchers.Default) { connection.connect() }
             withTimeout(5_000) {
@@ -317,6 +318,7 @@ class KtorWebSocketClientConnectionTest {
             withTimeout(5_000) { connectJob.join() }
             assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
         } finally {
+            connection?.disconnect()
             server.stop(500, 1_000)
         }
     }
