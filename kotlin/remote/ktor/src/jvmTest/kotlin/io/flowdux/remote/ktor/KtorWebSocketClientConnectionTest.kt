@@ -322,4 +322,42 @@ class KtorWebSocketClientConnectionTest {
             server.stop(500, 1_000)
         }
     }
+
+    @Test
+    fun `disconnect during active message reception completes cleanly`() = runBlocking {
+        val server = embeddedServer(CIO, port = 0) {
+            install(WebSockets)
+            routing {
+                webSocket("/test") {
+                    // Stream messages continuously to keep the receive loop busy
+                    var i = 0
+                    while (true) {
+                        send(Frame.Text("msg-${i++}"))
+                        delay(10)
+                    }
+                }
+            }
+        }.start(wait = false)
+
+        try {
+            val port = server.engine.resolvedConnectors().first().port
+            val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+
+            val connectJob = launch(Dispatchers.Default) { connection.connect() }
+            withTimeout(5_000) {
+                connection.connectionState.first { it == ConnectionState.CONNECTED }
+            }
+
+            // Wait for some messages to flow through
+            withTimeout(5_000) { connection.incoming.first() }
+
+            // Disconnect while the receive loop is actively processing frames.
+            // This exercises the ClosedSendChannelException race condition path.
+            connection.disconnect()
+            withTimeout(5_000) { connectJob.join() }
+            assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        } finally {
+            server.stop(500, 1_000)
+        }
+    }
 }
