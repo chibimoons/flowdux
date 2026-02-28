@@ -97,24 +97,21 @@ class KtorWebSocketClientConnection(
                 _connectionState.value = ConnectionState.CONNECTED
                 try {
                     coroutineScope {
-                        launch {
-                            try {
-                                for (frame in incoming) {
-                                    if (frame is Frame.Text) {
-                                        incomingChannel.send(frame.readText())
-                                    }
-                                }
-                            } finally {
-                                // When the incoming loop ends (server closed the connection),
-                                // close outgoingChannel so the outgoing loop terminates too,
-                                // allowing connect() to return naturally.
-                                outgoingChannel.close()
-                            }
-                        }
-                        launch {
+                        val outgoingJob = launch {
                             for (message in outgoingChannel) {
                                 send(Frame.Text(message))
                             }
+                        }
+                        launch {
+                            for (frame in incoming) {
+                                if (frame is Frame.Text) {
+                                    incomingChannel.send(frame.readText())
+                                }
+                            }
+                            // When the incoming loop ends (server closed the connection),
+                            // cancel the outgoing loop so connect() returns naturally
+                            // without closing the shared outgoingChannel.
+                            outgoingJob.cancel()
                         }
                     }
                 } finally {
