@@ -101,7 +101,13 @@ class KtorWebSocketClientConnection(
                             try {
                                 for (frame in incoming) {
                                     if (frame is Frame.Text) {
-                                        incomingChannel.send(frame.readText())
+                                        try {
+                                            incomingChannel.send(frame.readText())
+                                        } catch (_: ClosedSendChannelException) {
+                                            // disconnect() closed incomingChannel concurrently.
+                                            // This is expected — break and let connect() terminate.
+                                            break
+                                        }
                                     }
                                 }
                             } finally {
