@@ -98,10 +98,17 @@ class KtorWebSocketClientConnection(
                 try {
                     coroutineScope {
                         launch {
-                            for (frame in incoming) {
-                                if (frame is Frame.Text) {
-                                    incomingChannel.send(frame.readText())
+                            try {
+                                for (frame in incoming) {
+                                    if (frame is Frame.Text) {
+                                        incomingChannel.send(frame.readText())
+                                    }
                                 }
+                            } finally {
+                                // When the incoming loop ends (server closed the connection),
+                                // close outgoingChannel so the outgoing loop terminates too,
+                                // allowing connect() to return naturally.
+                                outgoingChannel.close()
                             }
                         }
                         launch {
