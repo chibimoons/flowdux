@@ -421,8 +421,7 @@ class KtorWebSocketClientConnectionTest {
                     for (frame in incoming) {
                         if (frame is Frame.Text) {
                             serverReceivedMessages.add(frame.readText())
-                            // Slow server: delays reading to let the outgoing buffer fill up.
-                            // This forces the client's send() to suspend when the buffer (64) is full.
+                            // Slow server: delays reading to encourage the outgoing buffer to fill up.
                             delay(10)
                         }
                     }
