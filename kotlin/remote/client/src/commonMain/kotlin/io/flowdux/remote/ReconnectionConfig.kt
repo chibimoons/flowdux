@@ -37,12 +37,8 @@ data class ReconnectionConfig(
      */
     internal fun delayForAttempt(attempt: Int, random: () -> Double = { kotlin.random.Random.nextDouble() }): Duration {
         var delay = initialDelay
-        for (i in 0 until attempt) {
-            delay *= factor
-            if (delay >= maxDelay) {
-                delay = maxDelay
-                break
-            }
+        repeat(attempt) {
+            delay = (delay * factor).coerceAtMost(maxDelay)
         }
         val jitter = delay * jitterFactor * random()
         return (delay - jitter).coerceAtLeast(1.milliseconds)

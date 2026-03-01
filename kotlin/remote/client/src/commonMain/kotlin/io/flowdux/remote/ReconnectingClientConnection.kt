@@ -78,11 +78,8 @@ class ReconnectingClientConnection<A : Action>(
      * @throws IllegalStateException if the connection is not in [ConnectionState.CONNECTED] state.
      */
     override suspend fun send(action: A) {
-        if (_connectionState.value != ConnectionState.CONNECTED) {
-            throw IllegalStateException("Cannot send: not connected")
-        }
-        val conn = currentConnection
-            ?: throw IllegalStateException("Cannot send: not connected")
+        check(_connectionState.value == ConnectionState.CONNECTED) { "Cannot send: not connected" }
+        val conn = currentConnection ?: error("Cannot send: not connected")
         conn.send(action)
     }
 
@@ -105,112 +102,134 @@ class ReconnectingClientConnection<A : Action>(
         var lastException: Exception? = null
 
         while (!stopped && attempt < config.maxAttempts) {
-            if (attempt == 0) {
-                _connectionState.value = ConnectionState.CONNECTING
-            } else {
-                _connectionState.value = ConnectionState.RECONNECTING
-                val backoffDelay = config.delayForAttempt(attempt - 1)
-                safeOnEvent(ReconnectionEvent.AttemptStarted(attempt, config.maxAttempts, backoffDelay))
-                delay(backoffDelay)
-                if (stopped) break
-            }
-
-            if (stopped) break
-
-            try {
-                // Create the inner connection after the backoff delay to avoid
-                // eagerly allocating transport resources during the wait.
-                val conn = connectionFactory()
-                currentConnection = conn
-
-                // Re-check stopped after creating connection to handle disconnect()
-                // called between factory invocation and conn.connect() start.
-                if (stopped) {
-                    conn.disconnect()
-                    currentConnection = null
-                    break
+            if (!applyBackoff(attempt)) return
+            val result = attemptConnection(attempt)
+            when {
+                result.exception is CancellationException -> throw result.exception
+                result.exception != null -> {
+                    lastException = result.exception
+                    if (stopped) return
+                    safeOnEvent(ReconnectionEvent.AttemptFailed(attempt, config.maxAttempts, result.exception))
+                    attempt++
                 }
-
-                val wasConnected = AtomicBoolean(false)
-
-                supervisorScope {
-                    // Forward incoming actions from inner connection to shared channel
-                    val forwardJob: Job = launch {
-                        conn.incoming.collect { action ->
-                            try {
-                                incomingChannel.send(action)
-                            } catch (_: ClosedSendChannelException) {
-                                // Channel closed — stop forwarding
-                            }
-                        }
-                    }
-
-                    // Monitor inner connection state
-                    val stateJob: Job = launch {
-                        conn.connectionState.collect { state ->
-                            // Suppress state updates once stopped to prevent
-                            // overwriting DISCONNECTED set by disconnect().
-                            if (stopped) return@collect
-                            when (state) {
-                                ConnectionState.CONNECTED -> {
-                                    wasConnected.store(true)
-                                    _connectionState.value = ConnectionState.CONNECTED
-                                    safeOnEvent(ReconnectionEvent.Connected(attempt))
-                                }
-                                ConnectionState.CONNECTING -> {
-                                    if (_connectionState.value != ConnectionState.RECONNECTING) {
-                                        _connectionState.value = ConnectionState.CONNECTING
-                                    }
-                                }
-                                ConnectionState.DISCONNECTED -> {
-                                    // Will be handled when connect() returns
-                                }
-                                ConnectionState.RECONNECTING -> {
-                                    // Inner connection shouldn't emit this, but forward it
-                                    _connectionState.value = ConnectionState.RECONNECTING
-                                }
-                            }
-                        }
-                    }
-
-                    try {
-                        conn.connect()
-                    } finally {
-                        // conn.connect() returned — connection terminated.
-                        // Cancel state/forward jobs since the inner connection is done.
-                        stateJob.cancel()
-                        forwardJob.cancel()
-                    }
+                stopped -> return
+                result.wasConnected -> {
+                    attempt = 1
+                    lastException = null
                 }
-
-                // connect() returned normally — connection closed cleanly
-                currentConnection = null
-                if (!stopped) {
-                    // Reset attempt counter if we had a successful connection
-                    if (wasConnected.load()) {
-                        attempt = 1 // next iteration applies backoff for attempt 1
-                        lastException = null
-                    } else {
-                        attempt++
-                    }
-                    continue
-                }
-                break
-            } catch (e: CancellationException) {
-                currentConnection = null
-                throw e
-            } catch (e: Exception) {
-                currentConnection = null
-                lastException = e
-                if (stopped) break
-                safeOnEvent(ReconnectionEvent.AttemptFailed(attempt, config.maxAttempts, e))
-                attempt++
+                else -> attempt++
             }
         }
 
         if (!stopped && attempt >= config.maxAttempts) {
             _connectionState.value = ConnectionState.DISCONNECTED
             safeOnEvent(ReconnectionEvent.RetriesExhausted(config.maxAttempts, lastException))
+        }
+    }
+
+    /**
+     * Apply backoff delay for reconnection attempts.
+     *
+     * @return `false` if the loop should exit (stopped during backoff), `true` to continue.
+     */
+    private suspend fun applyBackoff(attempt: Int): Boolean {
+        if (attempt == 0) {
+            _connectionState.value = ConnectionState.CONNECTING
+        } else {
+            _connectionState.value = ConnectionState.RECONNECTING
+            val backoffDelay = config.delayForAttempt(attempt - 1)
+            safeOnEvent(ReconnectionEvent.AttemptStarted(attempt, config.maxAttempts, backoffDelay))
+            delay(backoffDelay)
+        }
+        return !stopped
+    }
+
+    /**
+     * Result of a single connection attempt.
+     *
+     * @param wasConnected Whether the connection was successfully established before it dropped.
+     * @param exception The exception that caused the attempt to fail, or `null` for clean termination.
+     */
+    private class AttemptResult(val wasConnected: Boolean, val exception: Exception?)
+
+    /**
+     * Execute a single connection attempt: create a connection, run it, and return the result.
+     */
+    private suspend fun attemptConnection(attempt: Int): AttemptResult {
+        try {
+            val conn = connectionFactory()
+            currentConnection = conn
+            if (stopped) {
+                conn.disconnect()
+                currentConnection = null
+                return AttemptResult(wasConnected = false, exception = null)
+            }
+            val wasConnected = runInnerConnection(conn, attempt)
+            currentConnection = null
+            return AttemptResult(wasConnected = wasConnected, exception = null)
+        } catch (e: CancellationException) {
+            currentConnection = null
+            return AttemptResult(wasConnected = false, exception = e)
+        } catch (e: Exception) {
+            currentConnection = null
+            return AttemptResult(wasConnected = false, exception = e)
+        }
+    }
+
+    /**
+     * Run the inner connection session within a [supervisorScope], forwarding
+     * incoming actions and monitoring state until the connection terminates.
+     *
+     * @return `true` if the connection was successfully established at some point.
+     */
+    private suspend fun runInnerConnection(conn: TypedClientConnection<A>, attempt: Int): Boolean {
+        val wasConnected = AtomicBoolean(false)
+        supervisorScope {
+            val forwardJob: Job = launch { forwardIncoming(conn) }
+            val stateJob: Job = launch { monitorState(conn, attempt, wasConnected) }
+            try {
+                conn.connect()
+            } finally {
+                stateJob.cancel()
+                forwardJob.cancel()
+            }
+        }
+        return wasConnected.load()
+    }
+
+    /** Forward incoming actions from inner connection to the shared channel. */
+    private suspend fun forwardIncoming(conn: TypedClientConnection<A>) {
+        conn.incoming.collect { action ->
+            try {
+                incomingChannel.send(action)
+            } catch (_: ClosedSendChannelException) {
+                // Channel closed — stop forwarding
+            }
+        }
+    }
+
+    /** Monitor inner connection state and propagate to the outer connection state. */
+    private suspend fun monitorState(conn: TypedClientConnection<A>, attempt: Int, wasConnected: AtomicBoolean) {
+        conn.connectionState.collect { state ->
+            if (stopped) return@collect
+            when (state) {
+                ConnectionState.CONNECTED -> {
+                    wasConnected.store(true)
+                    _connectionState.value = ConnectionState.CONNECTED
+                    safeOnEvent(ReconnectionEvent.Connected(attempt))
+                }
+                ConnectionState.CONNECTING -> {
+                    if (_connectionState.value != ConnectionState.RECONNECTING) {
+                        _connectionState.value = ConnectionState.CONNECTING
+                    }
+                }
+                ConnectionState.DISCONNECTED -> {
+                    // Will be handled when connect() returns
+                }
+                ConnectionState.RECONNECTING -> {
+                    _connectionState.value = ConnectionState.RECONNECTING
+                }
+            }
         }
     }
 

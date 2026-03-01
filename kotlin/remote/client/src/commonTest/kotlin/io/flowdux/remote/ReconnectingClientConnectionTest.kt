@@ -247,7 +247,7 @@ class ReconnectingClientConnectionTest {
         val conn = ReconnectingClientConnection(
             connectionFactory = {
                 connectCount++
-                FailingMockConnection(RuntimeException("fail $connectCount"))
+                FailingMockConnection(TestConnectionException("fail $connectCount"))
             },
             config = ReconnectionConfig(
                 maxAttempts = 3,
@@ -342,13 +342,13 @@ class ReconnectingClientConnectionTest {
     @Test
     fun eventCallbackExceptionsAreSwallowed() = runTest {
         val conn = ReconnectingClientConnection(
-            connectionFactory = { FailingMockConnection<TestAction>(RuntimeException("fail")) },
+            connectionFactory = { FailingMockConnection<TestAction>(TestConnectionException("fail")) },
             config = ReconnectionConfig(
                 maxAttempts = 2,
                 initialDelay = 10.milliseconds,
                 jitterFactor = 0.0,
             ),
-            onEvent = { throw RuntimeException("callback error") },
+            onEvent = { throw TestConnectionException("callback error") },
         )
 
         // Should not throw despite callback errors
@@ -366,7 +366,7 @@ class ReconnectingClientConnectionTest {
             connectionFactory = {
                 callCount++
                 if (callCount == 1) {
-                    FailingMockConnection(RuntimeException("initial failure"))
+                    FailingMockConnection(TestConnectionException("initial failure"))
                 } else {
                     SuspendingMockConnection<TestAction>().also { connections.add(it) }
                 }
@@ -455,6 +455,9 @@ class ReconnectingClientConnectionTest {
 
     // -- Test helpers --
 
+    /** Specific exception for test assertions instead of generic RuntimeException. */
+    private class TestConnectionException(message: String) : Exception(message)
+
     /**
      * Mock connection that suspends in [connect] until explicitly completed.
      * Supports simulating connection drops and server actions.
@@ -513,7 +516,7 @@ class ReconnectingClientConnectionTest {
 
         override val incoming: Flow<A> = Channel<A>().receiveAsFlow()
 
-        override suspend fun send(action: A): Unit = throw IllegalStateException("Not connected")
+        override suspend fun send(action: A): Unit = error("Not connected")
 
         override suspend fun connect(): Unit = throw exception
 
