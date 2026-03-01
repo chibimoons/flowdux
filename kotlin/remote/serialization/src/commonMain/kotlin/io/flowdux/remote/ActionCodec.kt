@@ -22,7 +22,7 @@ import kotlinx.coroutines.CancellationException
  * }
  * ```
  *
- * The typed connection layer ([TypedClientConnection] / [TypedServerConnection])
+ * The typed connection layer ([TypedClientConnection] / [io.flowdux.remote.server.connection.TypedServerConnection])
  * already handles decode failures via the `onDecodeError` callback —
  * unrecognized actions are skipped and processing continues.
  *
