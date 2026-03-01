@@ -8,7 +8,7 @@ paths:
 # Kotlin Test Rules
 
 - Connection, HttpClient 등 리소스 생성 시 반드시 `try/finally { resource.disconnect() }` 패턴 사용
-- 동시성/Race condition 테스트는 `runBlocking` + `Dispatchers.Default` 사용 (`runTest`는 단일 스레드 디스패처이므로 실제 동시성 테스트 불가)
+- 동시성/Race condition 테스트는 기본적으로 `runBlocking` + `Dispatchers.Default` 사용 권장 (`runTest`는 기본 단일 스레드 테스트 스케줄러를 사용하므로 실제 멀티스레드 race-condition 재현에는 적합하지 않음; 필요 시 실제 디스패처를 조합한 고급 사용은 신중히 적용)
 - 고정 `delay()`로 타이밍 대기 금지 — 다음 패턴 사용:
   ```kotlin
   withTimeout(5_000) { while (!condition) { delay(10) } }

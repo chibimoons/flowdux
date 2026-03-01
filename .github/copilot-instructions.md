@@ -244,7 +244,7 @@ class FetchDataAction with FlowHolderAction {
    // Good
    try { ... } catch (e: CancellationException) { throw e } catch (e: Exception) { handleError(e) }
    ```
-2. **Missing `@Volatile` on mutable properties accessed from multiple coroutines**: Any `var` read/written by multiple coroutines on Kotlin/Native requires `@Volatile` or `Atomic*`.
+2. **Missing thread-safety for mutable properties accessed from multiple threads**: Any `var` that may be read/written from different threads (for example via `Dispatchers.Default`, `Dispatchers.IO`, or custom threads) requires proper synchronization. Use `@Volatile` only for simple visibility of independent reads/writes; for read-modify-write operations (like increment, check-and-act, etc.) use `Atomic*` or other synchronization primitives instead.
 3. **Closing shared `Channel` breaks reconnect**: A `val channel = Channel<T>()` created once cannot be reused after `close()`. For reconnectable components, use per-connect channel creation or cancel the consumer Job instead.
 4. **`trySend()` result ignored**: When `trySend()` fails (buffer full), the message is silently dropped. Check the result and report via logging or event callback.
 5. **TOCTOU race with `isClosed` / boolean flags**: `if (!closed) { doSomething() }` has a race window. Use `AtomicBoolean.compareAndSet()` for check-and-act patterns.
@@ -309,7 +309,7 @@ class FetchDataAction with FlowHolderAction {
    }
    ```
 
-2. **`runTest` used for concurrency tests**: `runTest` provides a single-threaded `TestDispatcher` — concurrent launches run sequentially, defeating the purpose of race condition tests. Use `runBlocking` + `Dispatchers.Default` for real multi-threaded testing.
+2. **`runTest` used for race-condition tests**: `runTest` uses a test scheduler that does not provide real multi-threaded parallelism by default, making it unsuitable for reproducing race conditions. For tests that require actual concurrent thread execution, use `runBlocking` + `Dispatchers.Default` instead.
    ```kotlin
    // Bad: Single-threaded, no real concurrency
    @Test fun `concurrent close is safe`() = runTest {

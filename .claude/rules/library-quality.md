@@ -1,6 +1,6 @@
 ---
 paths:
-  - "kotlin/**/commonMain/**/*.kt"
+  - "kotlin/**/src/commonMain/**/*.kt"
 ---
 
 # Library Code Quality Rules

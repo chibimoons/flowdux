@@ -2,8 +2,7 @@
 paths:
   - "**/*.sh"
   - ".github/**/*.yml"
-  - "*.yml"
-  - "*.yaml"
+  - "**/*.yml"
   - "**/*.yaml"
   - ".claude/**/*.sh"
 ---
