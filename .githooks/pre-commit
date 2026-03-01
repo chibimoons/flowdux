@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Check if any staged files are Kotlin sources
+STAGED_KT=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(kt|kts)$' || true)
+
+if [ -z "$STAGED_KT" ]; then
+    exit 0
+fi
+
+echo "🔍 Running spotlessCheck on staged Kotlin files..."
+if ! ./gradlew spotlessCheck --quiet 2>/dev/null; then
+    echo ""
+    echo "❌ Formatting check failed."
+    echo "   Run: ./gradlew spotlessApply"
+    echo "   Then re-stage and commit."
+    exit 1
+fi
+
+echo "✅ Formatting check passed."
