@@ -9,7 +9,10 @@ import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -356,6 +359,147 @@ class KtorWebSocketClientConnectionTest {
             connection.disconnect()
             withTimeout(5_000) { connectJob.join() }
             assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        } finally {
+            server.stop(500, 1_000)
+        }
+    }
+
+    @Test
+    fun `incoming backpressure delivers all messages when consumer is slow`() = runBlocking {
+        val messageCount = 100
+        val server = embeddedServer(CIO, port = 0) {
+            install(WebSockets)
+            routing {
+                webSocket("/test") {
+                    // Send messages as fast as possible to overflow the buffer (64)
+                    for (i in 0 until messageCount) {
+                        send(Frame.Text("msg-$i"))
+                    }
+                    // Keep connection alive until client disconnects
+                    for (frame in incoming) { /* keep alive */ }
+                }
+            }
+        }.start(wait = false)
+
+        try {
+            val port = server.engine.resolvedConnectors().first().port
+            val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+
+            val connectJob = launch(Dispatchers.Default) { connection.connect() }
+            withTimeout(5_000) {
+                connection.connectionState.first { it == ConnectionState.CONNECTED }
+            }
+
+            // Consume all messages (slow consumer — backpressure should suspend the server)
+            val received = withTimeout(10_000) {
+                connection.incoming.take(messageCount).toList()
+            }
+
+            assertEquals(messageCount, received.size)
+            assertEquals("msg-0", received.first())
+            assertEquals("msg-${messageCount - 1}", received.last())
+
+            connection.disconnect()
+            connectJob.join()
+        } finally {
+            server.stop(500, 1_000)
+        }
+    }
+
+    @Test
+    fun `outgoing backpressure suspends send when buffer overflows`() = runBlocking {
+        val messageCount = 100
+        val serverReceived = AtomicInteger(0)
+
+        val server = embeddedServer(CIO, port = 0) {
+            install(WebSockets)
+            routing {
+                webSocket("/test") {
+                    for (frame in incoming) {
+                        if (frame is Frame.Text) {
+                            serverReceived.incrementAndGet()
+                        }
+                    }
+                }
+            }
+        }.start(wait = false)
+
+        try {
+            val port = server.engine.resolvedConnectors().first().port
+            val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+
+            val connectJob = launch(Dispatchers.Default) { connection.connect() }
+            withTimeout(5_000) {
+                connection.connectionState.first { it == ConnectionState.CONNECTED }
+            }
+
+            // Send more messages than the buffer can hold (64).
+            // send() should suspend when full, not drop messages.
+            withTimeout(10_000) {
+                for (i in 0 until messageCount) {
+                    connection.send("msg-$i")
+                }
+            }
+
+            // Allow server time to process remaining messages
+            withTimeout(5_000) {
+                while (serverReceived.get() < messageCount) {
+                    delay(50)
+                }
+            }
+
+            assertEquals(messageCount, serverReceived.get())
+
+            connection.disconnect()
+            connectJob.join()
+        } finally {
+            server.stop(500, 1_000)
+        }
+    }
+
+    @Test
+    fun `slow consumer receives messages in order under sustained backpressure`() = runBlocking {
+        val messageCount = 200 // Well above buffer size of 64
+        val server = embeddedServer(CIO, port = 0) {
+            install(WebSockets)
+            routing {
+                webSocket("/test") {
+                    for (i in 0 until messageCount) {
+                        send(Frame.Text("msg-$i"))
+                    }
+                    // Keep alive until client disconnects
+                    for (frame in incoming) { /* keep alive */ }
+                }
+            }
+        }.start(wait = false)
+
+        try {
+            val port = server.engine.resolvedConnectors().first().port
+            val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+
+            val connectJob = launch(Dispatchers.Default) { connection.connect() }
+            withTimeout(5_000) {
+                connection.connectionState.first { it == ConnectionState.CONNECTED }
+            }
+
+            // Collect slowly with periodic delays to exercise buffer fill/drain cycles.
+            // With BUFFERED (64, SUSPEND), the receive loop suspends when the buffer fills,
+            // then resumes as the consumer drains it. No messages should be dropped.
+            val consumed = mutableListOf<String>()
+            withTimeout(30_000) {
+                connection.incoming.take(messageCount).collect { msg ->
+                    consumed.add(msg)
+                    if (consumed.size % 10 == 0) delay(50)
+                }
+            }
+
+            assertEquals(messageCount, consumed.size)
+            for (i in 0 until messageCount) {
+                assertEquals("msg-$i", consumed[i], "Message $i out of order or missing")
+            }
+
+            connection.disconnect()
+            connectJob.join()
         } finally {
             server.stop(500, 1_000)
         }
