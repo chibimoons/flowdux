@@ -73,10 +73,13 @@ class ReconnectingClientConnection<A : Action>(
      *
      * This method suspends until [disconnect] is called or all reconnection
      * attempts are exhausted. The initial connection counts as attempt 0.
+     * The attempt counter resets to 0 after each successful connection,
+     * so transient failures do not accumulate across stable sessions.
      */
     override suspend fun connect() {
         stopped = false
         var attempt = 0
+        var lastException: Exception? = null
 
         while (!stopped && attempt < config.maxAttempts) {
             val conn = connectionFactory()
@@ -86,13 +89,19 @@ class ReconnectingClientConnection<A : Action>(
                 _connectionState.value = ConnectionState.CONNECTING
             } else {
                 _connectionState.value = ConnectionState.RECONNECTING
-                val delay = config.delayForAttempt(attempt - 1)
-                safeOnEvent(ReconnectionEvent.AttemptStarted(attempt, config.maxAttempts, delay))
-                delay(delay)
+                val backoffDelay = config.delayForAttempt(attempt - 1)
+                safeOnEvent(ReconnectionEvent.AttemptStarted(attempt, config.maxAttempts, backoffDelay))
+                delay(backoffDelay)
                 if (stopped) break
             }
 
+            // Re-check stopped after delay to avoid starting a connection
+            // that disconnect() already requested to stop.
+            if (stopped) break
+
             try {
+                var wasConnected = false
+
                 supervisorScope {
                     // Forward incoming actions from inner connection to shared channel
                     val forwardJob: Job = launch {
@@ -110,6 +119,7 @@ class ReconnectingClientConnection<A : Action>(
                         conn.connectionState.collect { state ->
                             when (state) {
                                 ConnectionState.CONNECTED -> {
+                                    wasConnected = true
                                     _connectionState.value = ConnectionState.CONNECTED
                                     safeOnEvent(ReconnectionEvent.Connected(attempt))
                                 }
@@ -142,8 +152,13 @@ class ReconnectingClientConnection<A : Action>(
                 // connect() returned normally — connection closed cleanly
                 currentConnection = null
                 if (!stopped) {
-                    // Connection dropped without disconnect() — reconnect
-                    attempt++
+                    // Reset attempt counter if we had a successful connection
+                    if (wasConnected) {
+                        attempt = 1 // next iteration applies backoff for attempt 1
+                        lastException = null
+                    } else {
+                        attempt++
+                    }
                     continue
                 }
                 break
@@ -152,6 +167,7 @@ class ReconnectingClientConnection<A : Action>(
                 throw e
             } catch (e: Exception) {
                 currentConnection = null
+                lastException = e
                 if (stopped) break
                 safeOnEvent(ReconnectionEvent.AttemptFailed(attempt, config.maxAttempts, e))
                 attempt++
@@ -160,7 +176,7 @@ class ReconnectingClientConnection<A : Action>(
 
         if (!stopped && attempt >= config.maxAttempts) {
             _connectionState.value = ConnectionState.DISCONNECTED
-            safeOnEvent(ReconnectionEvent.RetriesExhausted(config.maxAttempts, null))
+            safeOnEvent(ReconnectionEvent.RetriesExhausted(config.maxAttempts, lastException))
         }
     }
 
@@ -169,11 +185,14 @@ class ReconnectingClientConnection<A : Action>(
         _connectionState.value = ConnectionState.DISCONNECTED
         currentConnection?.disconnect()
         currentConnection = null
+        incomingChannel.close()
     }
 
     private fun safeOnEvent(event: ReconnectionEvent) {
         try {
             onEvent?.invoke(event)
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             // Swallow callback errors to avoid disrupting the reconnection loop.
         }

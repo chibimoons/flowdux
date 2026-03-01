@@ -258,7 +258,9 @@ class ReconnectingClientConnectionTest {
 
         assertEquals(3, connectCount)
         assertEquals(ConnectionState.DISCONNECTED, conn.connectionState.value)
-        assertTrue(events.any { it is ReconnectionEvent.RetriesExhausted })
+        val exhausted = events.filterIsInstance<ReconnectionEvent.RetriesExhausted>()
+        assertEquals(1, exhausted.size)
+        assertNotNull(exhausted[0].lastCause, "lastCause should contain the last failure")
         assertEquals(3, events.filterIsInstance<ReconnectionEvent.AttemptFailed>().size)
     }
 
@@ -392,12 +394,10 @@ class ReconnectingClientConnectionTest {
     @Test
     fun resetAttemptsAfterSuccessfulConnection() = runTest {
         val events = mutableListOf<ReconnectionEvent>()
-        var callCount = 0
         val connections = mutableListOf<SuspendingMockConnection<TestAction>>()
 
         val conn = ReconnectingClientConnection(
             connectionFactory = {
-                callCount++
                 SuspendingMockConnection<TestAction>().also { connections.add(it) }
             },
             config = ReconnectionConfig(
@@ -416,7 +416,7 @@ class ReconnectingClientConnectionTest {
         delay(50)
         assertEquals(ConnectionState.CONNECTED, conn.connectionState.value)
 
-        // Drop connection — should reconnect (attempt resets to 1, not exhausted)
+        // Drop connection — attempt counter resets to 1 after successful connection
         connections[0].simulateDisconnect()
         withTimeoutOrNull(2000) {
             while (connections.size < 2) { delay(10) }
@@ -426,15 +426,23 @@ class ReconnectingClientConnectionTest {
         delay(50)
         assertEquals(ConnectionState.CONNECTED, conn.connectionState.value)
 
-        // Drop again — should still reconnect since attempt counter continues from 1
-        // (first drop used attempt 1 out of 2)
-        // With maxAttempts=2 and this being the 3rd overall connection, it depends on implementation
-        // Actually: attempt 0 = initial, then drops, attempt 1 = reconnect, succeeds, drops, attempt 2 = over limit → exhausted
+        // Drop again — attempt counter resets again since connection was successful
+        // Without reset, maxAttempts=2 would be exhausted here
+        connections[1].simulateDisconnect()
+        withTimeoutOrNull(2000) {
+            while (connections.size < 3) { delay(10) }
+        }
+        assertNotNull(connections.getOrNull(2), "Third connection should be created (attempt reset)")
+        connections[2].completeConnect()
+        delay(50)
+        assertEquals(ConnectionState.CONNECTED, conn.connectionState.value)
 
         conn.disconnect()
         connectJob.join()
 
+        // Should NOT have exhausted retries since counter resets each time
         assertTrue(events.none { it is ReconnectionEvent.RetriesExhausted })
+        assertEquals(3, connections.size)
     }
 
     // -- Test helpers --

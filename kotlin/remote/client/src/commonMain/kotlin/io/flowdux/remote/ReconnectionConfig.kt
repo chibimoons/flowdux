@@ -36,9 +36,16 @@ data class ReconnectionConfig(
      * @return delay in milliseconds
      */
     internal fun delayForAttempt(attempt: Int, random: () -> Double = { kotlin.random.Random.nextDouble() }): Duration {
+        val maxDelayMs = maxDelay.inWholeMilliseconds.toDouble()
         var delayMs = initialDelay.inWholeMilliseconds.toDouble()
-        repeat(attempt) { delayMs *= factor }
-        delayMs = delayMs.coerceAtMost(maxDelay.inWholeMilliseconds.toDouble())
+        repeat(attempt) {
+            delayMs *= factor
+            if (delayMs >= maxDelayMs) {
+                delayMs = maxDelayMs
+                return@repeat
+            }
+        }
+        delayMs = delayMs.coerceAtMost(maxDelayMs)
         val jitter = delayMs * jitterFactor * random()
         return (delayMs - jitter).toLong().milliseconds
     }
