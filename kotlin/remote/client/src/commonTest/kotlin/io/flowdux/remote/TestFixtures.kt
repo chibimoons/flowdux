@@ -23,35 +23,48 @@ data class TestState(val count: Int = 0, val message: String = "") : State
 
 sealed interface TestAction : Action {
     data class Add(val value: Int) : TestAction
+
     data class SetMessage(val message: String) : TestAction
-    data class ServerAdd(val value: Int) : TestAction, ServerSharedAction
-    data class ServerSetMessage(val message: String) : TestAction, ServerSharedAction
+
+    data class ServerAdd(val value: Int) :
+        TestAction,
+        ServerSharedAction
+
+    data class ServerSetMessage(val message: String) :
+        TestAction,
+        ServerSharedAction
+
     data class ConnectionError(val message: String) : TestAction
+
     object LocalIncrement : TestAction
+
     object Connect : TestAction
+
     object Disconnect : TestAction
 
     /** Triggers emit(ServerSharedAction) to test auto-dispatch */
     data class TriggerEmitServerAction(val value: Int) : TestAction
 }
 
-val testReducer = Reducer<TestState, TestAction> { state, action ->
-    when (action) {
-        is TestAction.Add -> state.copy(count = state.count + action.value)
-        is TestAction.SetMessage -> state.copy(message = action.message)
-        is TestAction.ServerAdd -> state.copy(count = state.count + action.value)
-        is TestAction.ServerSetMessage -> state.copy(message = action.message)
-        is TestAction.ConnectionError -> state.copy(message = action.message)
-        is TestAction.LocalIncrement -> state.copy(count = state.count + 1)
-        is TestAction.Connect -> state
-        is TestAction.Disconnect -> state
-        is TestAction.TriggerEmitServerAction -> state // handled by processor, not reducer
+val testReducer =
+    Reducer<TestState, TestAction> { state, action ->
+        when (action) {
+            is TestAction.Add -> state.copy(count = state.count + action.value)
+            is TestAction.SetMessage -> state.copy(message = action.message)
+            is TestAction.ServerAdd -> state.copy(count = state.count + action.value)
+            is TestAction.ServerSetMessage -> state.copy(message = action.message)
+            is TestAction.ConnectionError -> state.copy(message = action.message)
+            is TestAction.LocalIncrement -> state.copy(count = state.count + 1)
+            is TestAction.Connect -> state
+            is TestAction.Disconnect -> state
+            is TestAction.TriggerEmitServerAction -> state // handled by processor, not reducer
+        }
     }
-}
 
-val testErrorProcessor = object : ErrorProcessor<TestAction> {
-    override fun process(throwable: Throwable): Flow<TestAction> = emptyFlow()
-}
+val testErrorProcessor =
+    object : ErrorProcessor<TestAction> {
+        override fun process(throwable: Throwable): Flow<TestAction> = emptyFlow()
+    }
 
 // -- Test SyncMiddleware subclass --
 
@@ -64,14 +77,15 @@ class TestSyncMiddleware(
     scope = scope,
     onConnectionError = onConnectionError,
 ) {
-    override val processors: ActionProcessorMap<TestState, TestAction> = buildProcessors {
-        on<TestAction.Connect> { _, _ ->
-            startConnection()
+    override val processors: ActionProcessorMap<TestState, TestAction> =
+        buildProcessors {
+            on<TestAction.Connect> { _, _ ->
+                startConnection()
+            }
+            on<TestAction.Disconnect> { _, _ ->
+                stopConnection()
+            }
         }
-        on<TestAction.Disconnect> { _, _ ->
-            stopConnection()
-        }
-    }
 }
 
 /**
@@ -79,27 +93,26 @@ class TestSyncMiddleware(
  * With [ServerSharedActionForwarder] (via createClientStore), the emitted action
  * is auto re-dispatched through the middleware pipeline and sent to the server.
  */
-class EmitServerActionTestMiddleware(
-    connection: TypedClientConnection<TestAction>,
-    scope: CoroutineScope? = null,
-) : SyncMiddleware<TestState, TestAction>(
-    connection = connection,
-    scope = scope,
-) {
-    override val processors: ActionProcessorMap<TestState, TestAction> = buildProcessors {
-        on<TestAction.Connect> { _, _ ->
-            startConnection()
+class EmitServerActionTestMiddleware(connection: TypedClientConnection<TestAction>, scope: CoroutineScope? = null) :
+    SyncMiddleware<TestState, TestAction>(
+        connection = connection,
+        scope = scope,
+    ) {
+    override val processors: ActionProcessorMap<TestState, TestAction> =
+        buildProcessors {
+            on<TestAction.Connect> { _, _ ->
+                startConnection()
+            }
+            on<TestAction.Disconnect> { _, _ ->
+                stopConnection()
+            }
+            on<TestAction.TriggerEmitServerAction> { _, action ->
+                // ServerSharedActionForwarder will auto re-dispatch this to the server
+                emit(TestAction.ServerAdd(action.value))
+                // Also emit a local action to verify processor runs
+                emit(TestAction.Add(1))
+            }
         }
-        on<TestAction.Disconnect> { _, _ ->
-            stopConnection()
-        }
-        on<TestAction.TriggerEmitServerAction> { _, action ->
-            // ServerSharedActionForwarder will auto re-dispatch this to the server
-            emit(TestAction.ServerAdd(action.value))
-            // Also emit a local action to verify processor runs
-            emit(TestAction.Add(1))
-        }
-    }
 }
 
 // -- Mock TypedClientConnection --

@@ -17,7 +17,6 @@ import kotlin.test.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FlowPipelineTest {
-
     @Test
     fun `stateIn with Dispatchers Default`(): Unit = runBlocking {
         println("\n=== stateIn with Dispatchers.Default ===\n")
@@ -26,23 +25,20 @@ class FlowPipelineTest {
 
         flow {
             listOf(1, 2, 3).forEach {
-                println("[${coroutineContext}] emit: $it")
+                println("[$coroutineContext] emit: $it")
                 emit(it)
             }
-        }
-            .map {
-                println("[${coroutineContext}] map1 start: $it")
-                delay(50)
-                println("[${coroutineContext}] map1 end: $it → ${it * 2}")
-                it * 2
-            }
-            .map {
-                println("[${coroutineContext}] map2 start: $it")
-                delay(50)
-                println("[${coroutineContext}] map2 end: $it → ${it + 1}")
-                it + 1
-            }
-            .stateIn(scope, SharingStarted.Eagerly, 0)
+        }.map {
+            println("[$coroutineContext] map1 start: $it")
+            delay(50)
+            println("[$coroutineContext] map1 end: $it → ${it * 2}")
+            it * 2
+        }.map {
+            println("[$coroutineContext] map2 start: $it")
+            delay(50)
+            println("[$coroutineContext] map2 end: $it → ${it + 1}")
+            it + 1
+        }.stateIn(scope, SharingStarted.Eagerly, 0)
             .let { stateFlow ->
                 delay(500)
                 println("\nFinal state: ${stateFlow.value}")
@@ -59,33 +55,29 @@ class FlowPipelineTest {
 
         flow {
             listOf(1, 2, 3).forEach {
-                println("[${coroutineContext}] emit: $it")
+                println("[$coroutineContext] emit: $it")
                 emit(it)
             }
-        }
-            .flatMapMerge { value ->
-                flow {
-                    println("[${coroutineContext}] flatMapMerge processing: $value")
-                    delay(50) // simulate async work
-                    emit(value)
-                }
+        }.flatMapMerge { value ->
+            flow {
+                println("[$coroutineContext] flatMapMerge processing: $value")
+                delay(50) // simulate async work
+                emit(value)
             }
-            .map {
-                println("[${coroutineContext}] map1 start: $it")
-                delay(30)
-                println("[${coroutineContext}] map1 end: $it → ${it * 10}")
-                it * 10
-            }
-            .map {
-                println("[${coroutineContext}] map2 start: $it")
-                delay(30)
-                println("[${coroutineContext}] map2 end: $it → ${it * 10}")
-                it * 10
-            }
-            .flowOn(Dispatchers.Default)
+        }.map {
+            println("[$coroutineContext] map1 start: $it")
+            delay(30)
+            println("[$coroutineContext] map1 end: $it → ${it * 10}")
+            it * 10
+        }.map {
+            println("[$coroutineContext] map2 start: $it")
+            delay(30)
+            println("[$coroutineContext] map2 end: $it → ${it * 10}")
+            it * 10
+        }.flowOn(Dispatchers.Default)
             .collect {
                 delay(500)
-                println("\nFinal state: ${it}")
+                println("\nFinal state: $it")
             }
 
         scope.coroutineContext[Job]?.cancel()
@@ -97,33 +89,29 @@ class FlowPipelineTest {
 
         flow {
             listOf(1, 2, 3).forEach {
-                println("[${coroutineContext}] emit: $it")
+                println("[$coroutineContext] emit: $it")
                 emit(it)
             }
-        }
-            .flatMapMerge { value ->
-                flow {
-                    println("[${coroutineContext}] flatMapMerge processing: $value")
-                    delay(50)
-                    emit(value)
-                }
+        }.flatMapMerge { value ->
+            flow {
+                println("[$coroutineContext] flatMapMerge processing: $value")
+                delay(50)
+                emit(value)
             }
+        }.map {
+            println("[$coroutineContext] map1 start: $it")
+            delay(30)
+            println("[$coroutineContext] map1 end: $it → ${it * 10}")
+            it * 10
+        }.flowOn(Dispatchers.Default) // 여기서 컨텍스트 변경!
             .map {
-                println("[${coroutineContext}] map1 start: $it")
+                println("[$coroutineContext] map2 start: $it")
                 delay(30)
-                println("[${coroutineContext}] map1 end: $it → ${it * 10}")
+                println("[$coroutineContext] map2 end: $it → ${it * 10}")
                 it * 10
-            }
-            .flowOn(Dispatchers.Default)  // 여기서 컨텍스트 변경!
-            .map {
-                println("[${coroutineContext}] map2 start: $it")
-                delay(30)
-                println("[${coroutineContext}] map2 end: $it → ${it * 10}")
-                it * 10
-            }
-            .flowOn(Dispatchers.Default)  // 여기서 컨텍스트 변경!
+            }.flowOn(Dispatchers.Default) // 여기서 컨텍스트 변경!
             .collect {
-                println("[${coroutineContext}] collect: $it")
+                println("[$coroutineContext] collect: $it")
             }
     }
 }

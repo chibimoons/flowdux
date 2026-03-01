@@ -90,7 +90,7 @@ fun main() {
         ╠════════════════════════════════════════════════╣
         ║  Default port: 8080                            ║
         ╚════════════════════════════════════════════════╝
-        """.trimIndent()
+        """.trimIndent(),
     )
     println()
 
@@ -118,10 +118,12 @@ fun main() {
         }
     }
 
-    Runtime.getRuntime().addShutdownHook(Thread {
-        println("[Central] Shutting down...")
-        kotlinx.coroutines.runBlocking { manager.close() }
-    })
+    Runtime.getRuntime().addShutdownHook(
+        Thread {
+            println("[Central] Shutting down...")
+            kotlinx.coroutines.runBlocking { manager.close() }
+        },
+    )
 
     server.start(wait = true)
 }

@@ -16,15 +16,10 @@ import kotlin.time.measureTime
  * - Concurrent dispatch performance
  * - Middleware overhead
  */
-class FlowDuxBenchmark(
-    private val config: BenchmarkConfig = BenchmarkConfig(),
-) {
+class FlowDuxBenchmark(private val config: BenchmarkConfig = BenchmarkConfig()) {
     // -- Test Fixtures --
 
-    data class BenchState(
-        val counter: Int = 0,
-        val lastAction: String = "",
-    ) : State
+    data class BenchState(val counter: Int = 0, val lastAction: String = "") : State
 
     sealed interface BenchAction : Action {
         data class Increment(val amount: Int = 1) : BenchAction
@@ -36,11 +31,11 @@ class FlowDuxBenchmark(
         when (action) {
             is BenchAction.Increment -> state.copy(
                 counter = state.counter + action.amount,
-                lastAction = "Increment"
+                lastAction = "Increment",
             )
             is BenchAction.SetValue -> state.copy(
                 counter = action.value,
-                lastAction = "SetValue"
+                lastAction = "SetValue",
             )
             is BenchAction.Reset -> BenchState()
         }
@@ -53,9 +48,7 @@ class FlowDuxBenchmark(
     }
 
     /** Middleware that does some work (simulates real middleware) */
-    private class WorkingMiddleware(
-        private val workIterations: Int = 100
-    ) : Middleware<BenchState, BenchAction> {
+    private class WorkingMiddleware(private val workIterations: Int = 100) : Middleware<BenchState, BenchAction> {
         override val name = "Working"
         override val processors: ActionProcessorMap<BenchState, BenchAction> = emptyMap()
 
@@ -77,55 +70,45 @@ class FlowDuxBenchmark(
      * Benchmark 1: Baseline (No Middleware)
      * Measures raw dispatch-to-state performance without middleware.
      */
-    suspend fun benchmarkBaseline(): BenchmarkResult {
-        return runBenchmark(
-            name = "Baseline (No Middleware)",
-            middlewares = emptyList()
-        )
-    }
+    suspend fun benchmarkBaseline(): BenchmarkResult = runBenchmark(
+        name = "Baseline (No Middleware)",
+        middlewares = emptyList(),
+    )
 
     /**
      * Benchmark 2: With Pass-through Middlewares
      * Measures middleware chain overhead with minimal work.
      */
-    suspend fun benchmarkWithPassThroughMiddleware(): BenchmarkResult {
-        return runBenchmark(
-            name = "With ${config.middlewareCount} PassThrough Middlewares",
-            middlewares = List(config.middlewareCount) { PassThroughMiddleware() }
-        )
-    }
+    suspend fun benchmarkWithPassThroughMiddleware(): BenchmarkResult = runBenchmark(
+        name = "With ${config.middlewareCount} PassThrough Middlewares",
+        middlewares = List(config.middlewareCount) { PassThroughMiddleware() },
+    )
 
     /**
      * Benchmark 3: With Working Middlewares
      * Measures realistic middleware overhead.
      */
-    suspend fun benchmarkWithWorkingMiddleware(): BenchmarkResult {
-        return runBenchmark(
-            name = "With ${config.middlewareCount} Working Middlewares",
-            middlewares = List(config.middlewareCount) { WorkingMiddleware() }
-        )
-    }
+    suspend fun benchmarkWithWorkingMiddleware(): BenchmarkResult = runBenchmark(
+        name = "With ${config.middlewareCount} Working Middlewares",
+        middlewares = List(config.middlewareCount) { WorkingMiddleware() },
+    )
 
     /**
      * Benchmark 4: Concurrent Dispatches
      * Measures performance under concurrent dispatch load.
      */
-    suspend fun benchmarkConcurrentDispatch(): BenchmarkResult {
-        return runConcurrentBenchmark(
-            name = "Concurrent (${config.concurrentDispatchers} dispatchers)",
-            concurrency = config.concurrentDispatchers
-        )
-    }
+    suspend fun benchmarkConcurrentDispatch(): BenchmarkResult = runConcurrentBenchmark(
+        name = "Concurrent (${config.concurrentDispatchers} dispatchers)",
+        concurrency = config.concurrentDispatchers,
+    )
 
     /**
      * Benchmark 5: Game Server Simulation
      * Simulates game server tick with multiple actions per tick.
      */
-    suspend fun benchmarkGameServerSimulation(): BenchmarkResult {
-        return runGameServerBenchmark(
-            name = "Game Server Sim (${config.targetTickRate} tps)"
-        )
-    }
+    suspend fun benchmarkGameServerSimulation(): BenchmarkResult = runGameServerBenchmark(
+        name = "Game Server Sim (${config.targetTickRate} tps)",
+    )
 
     /**
      * Run all benchmarks and return summary.
@@ -203,10 +186,7 @@ class FlowDuxBenchmark(
         calculateResult(name, latencies)
     }
 
-    private suspend fun runConcurrentBenchmark(
-        name: String,
-        concurrency: Int,
-    ): BenchmarkResult = coroutineScope {
+    private suspend fun runConcurrentBenchmark(name: String, concurrency: Int): BenchmarkResult = coroutineScope {
         val latencies = mutableListOf<Duration>()
         val actionsPerDispatcher = config.actionsPerBenchmark / concurrency
 
@@ -250,9 +230,7 @@ class FlowDuxBenchmark(
         calculateResult(name, latencies)
     }
 
-    private suspend fun runGameServerBenchmark(
-        name: String,
-    ): BenchmarkResult = coroutineScope {
+    private suspend fun runGameServerBenchmark(name: String): BenchmarkResult = coroutineScope {
         val latencies = mutableListOf<Duration>()
         val tickDurationMs = 1000L / config.targetTickRate
         val actionsPerTick = 10 // Simulate 10 player actions per tick

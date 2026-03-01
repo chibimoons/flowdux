@@ -22,5 +22,6 @@ import io.flowdux.Action
  */
 interface ActionCodec<A : Action> {
     fun encode(action: A): String
+
     fun decode(json: String): A
 }

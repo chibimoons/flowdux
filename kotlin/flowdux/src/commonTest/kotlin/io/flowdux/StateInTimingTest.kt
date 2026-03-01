@@ -26,26 +26,21 @@ import kotlin.test.assertEquals
  * @see <a href="https://github.com/chibimoons/flowdux/issues/80">Issue #80</a>
  */
 class StateInTimingTest {
-
     /**
      * Creates a middleware that adds random delay to Increment actions.
      * This forces concurrent execution through flatMapMerge to test race conditions.
      */
-    private fun createRandomDelayMiddleware(
-        maxDelayMs: Long = 20,
-    ): Middleware<CounterState, CounterAction> = object : Middleware<CounterState, CounterAction> {
-        override val processors: ActionProcessorMap<CounterState, CounterAction> = emptyMap()
+    private fun createRandomDelayMiddleware(maxDelayMs: Long = 20): Middleware<CounterState, CounterAction> =
+        object : Middleware<CounterState, CounterAction> {
+            override val processors: ActionProcessorMap<CounterState, CounterAction> = emptyMap()
 
-        override fun process(
-            getState: () -> CounterState,
-            action: CounterAction,
-        ): Flow<CounterAction> = flow {
-            if (action is CounterAction.Increment) {
-                delay(Random.nextLong(1, maxDelayMs))
+            override fun process(getState: () -> CounterState, action: CounterAction): Flow<CounterAction> = flow {
+                if (action is CounterAction.Increment) {
+                    delay(Random.nextLong(1, maxDelayMs))
+                }
+                emit(action)
             }
-            emit(action)
         }
-    }
 
     /**
      * Test 1: Lost Update Detection (Empirical Test)
@@ -59,13 +54,14 @@ class StateInTimingTest {
         val actionCount = 100
         val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
-        val store = createStore(
-            initialState = CounterState(count = 0),
-            reducer = counterReducer,
-            middlewares = listOf(createRandomDelayMiddleware(maxDelayMs = 20)),
-            errorProcessor = testErrorProcessor,
-            scope = storeScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(count = 0),
+                reducer = counterReducer,
+                middlewares = listOf(createRandomDelayMiddleware(maxDelayMs = 20)),
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
 
         try {
             repeat(actionCount) { store.dispatch(CounterAction.Increment) }
@@ -77,7 +73,7 @@ class StateInTimingTest {
                 actionCount,
                 store.state.value.count,
                 "Expected $actionCount but got ${store.state.value.count}. " +
-                    "This indicates lost updates due to stale state reads."
+                    "This indicates lost updates due to stale state reads.",
             )
         } finally {
             // store.close() internally cancels the scope, so no need for storeScope.cancel()
@@ -99,25 +95,27 @@ class StateInTimingTest {
         val readLog = mutableListOf<Pair<Int, Int>>() // (oldState.count, newState.count)
 
         // Logger that captures state before and after each reduction
-        val capturingLogger = object : NoOpStoreLogger<CounterState, CounterAction>() {
-            override fun onStateReduced(
-                action: CounterAction,
-                previousState: CounterState,
-                newState: CounterState,
-            ) {
-                // No synchronization needed - map operator in Store's Flow pipeline runs sequentially
-                readLog.add(previousState.count to newState.count)
+        val capturingLogger =
+            object : NoOpStoreLogger<CounterState, CounterAction>() {
+                override fun onStateReduced(
+                    action: CounterAction,
+                    previousState: CounterState,
+                    newState: CounterState,
+                ) {
+                    // No synchronization needed - map operator in Store's Flow pipeline runs sequentially
+                    readLog.add(previousState.count to newState.count)
+                }
             }
-        }
 
-        val store = createStore(
-            initialState = CounterState(count = 0),
-            reducer = counterReducer,
-            middlewares = listOf(createRandomDelayMiddleware(maxDelayMs = 10)),
-            errorProcessor = testErrorProcessor,
-            logger = capturingLogger,
-            scope = storeScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(count = 0),
+                reducer = counterReducer,
+                middlewares = listOf(createRandomDelayMiddleware(maxDelayMs = 10)),
+                errorProcessor = testErrorProcessor,
+                logger = capturingLogger,
+                scope = storeScope,
+            )
 
         try {
             repeat(actionCount) { store.dispatch(CounterAction.Increment) }
@@ -126,7 +124,7 @@ class StateInTimingTest {
             assertEquals(
                 actionCount,
                 readLog.size,
-                "Expected $actionCount reductions but got ${readLog.size}"
+                "Expected $actionCount reductions but got ${readLog.size}",
             )
 
             // Verify sequential progression in logging order: (0,1), (1,2), (2,3), ...
@@ -135,12 +133,12 @@ class StateInTimingTest {
                 assertEquals(
                     index,
                     old,
-                    "Reduction #$index read stale state: expected $index, got $old"
+                    "Reduction #$index read stale state: expected $index, got $old",
                 )
                 assertEquals(
                     index + 1,
                     new,
-                    "Reduction #$index produced wrong state: expected ${index + 1}, got $new"
+                    "Reduction #$index produced wrong state: expected ${index + 1}, got $new",
                 )
             }
         } finally {
@@ -162,13 +160,14 @@ class StateInTimingTest {
         repeat(trials) { trial ->
             val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
-            val store = createStore(
-                initialState = CounterState(count = 0),
-                reducer = counterReducer,
-                middlewares = listOf(createRandomDelayMiddleware(maxDelayMs = 15)),
-                errorProcessor = testErrorProcessor,
-                scope = storeScope,
-            )
+            val store =
+                createStore(
+                    initialState = CounterState(count = 0),
+                    reducer = counterReducer,
+                    middlewares = listOf(createRandomDelayMiddleware(maxDelayMs = 15)),
+                    errorProcessor = testErrorProcessor,
+                    scope = storeScope,
+                )
 
             try {
                 repeat(actionsPerTrial) { store.dispatch(CounterAction.Increment) }
@@ -177,7 +176,7 @@ class StateInTimingTest {
                 assertEquals(
                     actionsPerTrial,
                     store.state.value.count,
-                    "Trial #$trial: Lost update detected. Expected $actionsPerTrial, got ${store.state.value.count}"
+                    "Trial #$trial: Lost update detected. Expected $actionsPerTrial, got ${store.state.value.count}",
                 )
             } finally {
                 store.close()

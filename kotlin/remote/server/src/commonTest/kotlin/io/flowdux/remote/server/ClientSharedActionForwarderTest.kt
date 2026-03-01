@@ -7,19 +7,19 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ClientSharedActionForwarderTest {
-
     @Test
     fun clientSharedAction_emitted_from_processor_is_automatically_sent_to_client() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val middleware = EmitClientActionTestMiddleware(connection)
 
-        val store = createServerStore(
-            initialState = ServerState(),
-            syncMiddleware = middleware,
-            reducer = serverReducer,
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createServerStore(
+                initialState = ServerState(),
+                syncMiddleware = middleware,
+                reducer = serverReducer,
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // Start listening
         store.dispatchStartListening()
@@ -47,13 +47,14 @@ class ClientSharedActionForwarderTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val middleware = EmitClientActionTestMiddleware(connection)
 
-        val store = createServerStore(
-            initialState = ServerState(),
-            syncMiddleware = middleware,
-            reducer = serverReducer,
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createServerStore(
+                initialState = ServerState(),
+                syncMiddleware = middleware,
+                reducer = serverReducer,
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // Start listening
         store.dispatchStartListening()
@@ -77,13 +78,14 @@ class ClientSharedActionForwarderTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val middleware = EmitClientActionTestMiddleware(connection)
 
-        val store = createServerStore(
-            initialState = ServerState(),
-            syncMiddleware = middleware,
-            reducer = serverReducer,
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createServerStore(
+                initialState = ServerState(),
+                syncMiddleware = middleware,
+                reducer = serverReducer,
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // Start listening
         store.dispatchStartListening()
@@ -108,25 +110,28 @@ class ClientSharedActionForwarderTest {
         val connection = MockTypedServerConnection<ServerAction>()
 
         // Custom middleware that emits multiple ClientSharedActions
-        val middleware = object : io.flowdux.remote.server.middleware.SingleClientSyncMiddleware<ServerState, ServerAction>(
-            connection = connection,
-        ) {
-            override val processors = buildProcessors {
-                on<ServerAction.TriggerEmitClientAction> { _, action ->
-                    emit(ServerAction.Add(action.value))
-                    emit(ServerAction.SetValue(100))
-                    emit(ServerAction.InternalReset(1)) // local
-                }
+        val middleware =
+            object : io.flowdux.remote.server.middleware.SingleClientSyncMiddleware<ServerState, ServerAction>(
+                connection = connection,
+            ) {
+                override val processors =
+                    buildProcessors {
+                        on<ServerAction.TriggerEmitClientAction> { _, action ->
+                            emit(ServerAction.Add(action.value))
+                            emit(ServerAction.SetValue(100))
+                            emit(ServerAction.InternalReset(1)) // local
+                        }
+                    }
             }
-        }
 
-        val store = createServerStore(
-            initialState = ServerState(),
-            syncMiddleware = middleware,
-            reducer = serverReducer,
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createServerStore(
+                initialState = ServerState(),
+                syncMiddleware = middleware,
+                reducer = serverReducer,
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // Start listening
         store.dispatchStartListening()

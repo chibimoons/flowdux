@@ -12,10 +12,7 @@ import kotlin.time.Duration.Companion.seconds
  *   Used by [io.flowdux.remote.auth.server.AuthServerConnection] only; the client
  *   manages its own retry via `refreshProvider`.
  */
-data class AuthConfig(
-    val handshakeTimeout: Duration = 10.seconds,
-    val maxAuthAttempts: Int = 1,
-) {
+data class AuthConfig(val handshakeTimeout: Duration = 10.seconds, val maxAuthAttempts: Int = 1) {
     init {
         require(maxAuthAttempts >= 1) {
             "maxAuthAttempts must be at least 1, but was $maxAuthAttempts"

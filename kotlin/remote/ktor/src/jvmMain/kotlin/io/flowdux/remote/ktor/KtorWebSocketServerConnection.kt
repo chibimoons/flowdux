@@ -6,11 +6,11 @@ import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.readText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ClosedSendChannelException
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.isActive
 
 /**
  * Ktor-based WebSocket server implementation of [ServerConnection].
@@ -20,15 +20,14 @@ import kotlinx.coroutines.flow.receiveAsFlow
  *
  * @param session Ktor WebSocket session (typically a server session from a `webSocket` route)
  */
-class KtorWebSocketServerConnection(
-    private val session: WebSocketSession,
-) : ServerConnection {
-
+class KtorWebSocketServerConnection(private val session: WebSocketSession) : ServerConnection {
     override val isActive: Boolean get() = session.isActive
 
-    override val incoming: Flow<String> = session.incoming.receiveAsFlow()
-        .filterIsInstance<Frame.Text>()
-        .map { it.readText() }
+    override val incoming: Flow<String> =
+        session.incoming
+            .receiveAsFlow()
+            .filterIsInstance<Frame.Text>()
+            .map { it.readText() }
 
     @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
     override suspend fun send(message: String) {

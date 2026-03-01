@@ -13,26 +13,24 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
-fun CounterScreen(
-    viewModel: CounterViewModel = viewModel()
-) {
+fun CounterScreen(viewModel: CounterViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+        color = MaterialTheme.colorScheme.background,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             Text(
                 text = "Flowdux Counter",
                 style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
             )
 
             Spacer(modifier = Modifier.height(48.dp))
@@ -41,24 +39,24 @@ fun CounterScreen(
                 text = "${state.count}",
                 fontSize = 72.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.primary,
             )
 
             Spacer(modifier = Modifier.height(48.dp))
 
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Button(
                     onClick = { viewModel.decrement() },
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(64.dp),
                 ) {
                     Text("-", fontSize = 24.sp)
                 }
 
                 Button(
                     onClick = { viewModel.increment() },
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(64.dp),
                 ) {
                     Text("+", fontSize = 24.sp)
                 }
@@ -67,7 +65,7 @@ fun CounterScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             OutlinedButton(
-                onClick = { viewModel.reset() }
+                onClick = { viewModel.reset() },
             ) {
                 Text("Reset")
             }

@@ -11,24 +11,23 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SessionBroadcasterTest {
-
     private fun failingConnection(id: String = "failing"): TypedServerConnection<ServerAction> =
         object : TypedServerConnection<ServerAction> {
             override val isActive: Boolean = true
             override val incoming = emptyFlow<ServerAction>()
-            override suspend fun send(action: ServerAction) {
-                throw RuntimeException("Connection $id failed")
-            }
+
+            override suspend fun send(action: ServerAction): Unit = throw RuntimeException("Connection $id failed")
         }
 
     @Test
     fun `onSendError invoked with correct sessionId and exception on sendToClient`() = runTest {
         val errors = mutableListOf<Pair<String, Exception>>()
         val registry = InMemorySessionRegistry<ServerAction>()
-        val broadcaster = SessionBroadcaster(
-            registry = registry,
-            onSendError = { sessionId, e -> errors.add(sessionId to e) },
-        )
+        val broadcaster =
+            SessionBroadcaster(
+                registry = registry,
+                onSendError = { sessionId, e -> errors.add(sessionId to e) },
+            )
 
         registry.addSession("session-1", failingConnection())
 
@@ -43,11 +42,12 @@ class SessionBroadcasterTest {
     fun `onSendError invoked for each failing connection during broadcast`() = runTest {
         val errors = mutableListOf<Pair<String, Exception>>()
         val registry = InMemorySessionRegistry<ServerAction>()
-        val broadcaster = SessionBroadcaster(
-            registry = registry,
-            config = BroadcastConfig.Sequential,
-            onSendError = { sessionId, e -> errors.add(sessionId to e) },
-        )
+        val broadcaster =
+            SessionBroadcaster(
+                registry = registry,
+                config = BroadcastConfig.Sequential,
+                onSendError = { sessionId, e -> errors.add(sessionId to e) },
+            )
 
         registry.addSession("fail-1", failingConnection("fail-1"))
         registry.addSession("fail-2", failingConnection("fail-2"))
@@ -64,10 +64,11 @@ class SessionBroadcasterTest {
     fun `onSendError invoked during sendPerSession`() = runTest {
         val errors = mutableListOf<Pair<String, Exception>>()
         val registry = InMemorySessionRegistry<ServerAction>()
-        val broadcaster = SessionBroadcaster(
-            registry = registry,
-            onSendError = { sessionId, e -> errors.add(sessionId to e) },
-        )
+        val broadcaster =
+            SessionBroadcaster(
+                registry = registry,
+                onSendError = { sessionId, e -> errors.add(sessionId to e) },
+            )
 
         registry.addSession("session-x", failingConnection())
 
@@ -80,10 +81,11 @@ class SessionBroadcasterTest {
     @Test
     fun `null onSendError does not throw`() = runTest {
         val registry = InMemorySessionRegistry<ServerAction>()
-        val broadcaster = SessionBroadcaster(
-            registry = registry,
-            onSendError = null,
-        )
+        val broadcaster =
+            SessionBroadcaster(
+                registry = registry,
+                onSendError = null,
+            )
 
         registry.addSession("session-1", failingConnection())
 
@@ -98,10 +100,11 @@ class SessionBroadcasterTest {
         val errors = mutableListOf<Pair<String, Exception>>()
         val goodConn = MockTypedServerConnection<ServerAction>()
         val registry = InMemorySessionRegistry<ServerAction>()
-        val broadcaster = SessionBroadcaster(
-            registry = registry,
-            onSendError = { sessionId, e -> errors.add(sessionId to e) },
-        )
+        val broadcaster =
+            SessionBroadcaster(
+                registry = registry,
+                onSendError = { sessionId, e -> errors.add(sessionId to e) },
+            )
 
         registry.addSession("good-session", goodConn)
 

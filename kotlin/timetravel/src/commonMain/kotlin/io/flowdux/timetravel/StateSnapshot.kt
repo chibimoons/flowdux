@@ -8,5 +8,5 @@ data class StateSnapshot<S : State, A : Action>(
     val action: A?,
     val previousState: S?,
     val currentState: S,
-    val timestamp: Long
+    val timestamp: Long,
 )

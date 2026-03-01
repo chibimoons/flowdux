@@ -3,11 +3,10 @@ package io.flowdux.benchmark
 import io.flowdux.Action
 import io.flowdux.remote.ActionCodec
 import io.flowdux.remote.MessageCodec
-import io.flowdux.remote.serialization.JsonMessageCodec
 import io.flowdux.remote.ServerSharedAction
+import io.flowdux.remote.serialization.JsonMessageCodec
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.nanoseconds
-import kotlin.time.measureTime
 
 /**
  * Serialization performance benchmark for FlowDux remote modules.
@@ -18,30 +17,24 @@ import kotlin.time.measureTime
  * - Full round-trip (action → message → wire → message → action)
  * - Various payload sizes
  */
-class SerializationBenchmark(
-    private val config: BenchmarkConfig = BenchmarkConfig(),
-) {
+class SerializationBenchmark(private val config: BenchmarkConfig = BenchmarkConfig()) {
     // -- Test Fixtures --
 
     sealed interface BenchAction : Action {
         /** Small payload (~40 bytes) */
-        data class Small(val value: Int) : BenchAction, ServerSharedAction
+        data class Small(val value: Int) :
+            BenchAction,
+            ServerSharedAction
 
         /** Medium payload (~200 bytes) */
-        data class Medium(
-            val userId: String,
-            val message: String,
-            val timestamp: Long,
-            val metadata: String,
-        ) : BenchAction, ServerSharedAction
+        data class Medium(val userId: String, val message: String, val timestamp: Long, val metadata: String) :
+            BenchAction,
+            ServerSharedAction
 
         /** Large payload (~1KB+) */
-        data class Large(
-            val userId: String,
-            val items: List<String>,
-            val scores: List<Int>,
-            val nested: String,
-        ) : BenchAction, ServerSharedAction
+        data class Large(val userId: String, val items: List<String>, val scores: List<Int>, val nested: String) :
+            BenchAction,
+            ServerSharedAction
     }
 
     class BenchActionCodec : ActionCodec<BenchAction> {
@@ -91,13 +84,14 @@ class SerializationBenchmark(
         userId = "user-12345678",
         message = "Hello, this is a typical chat message with some content!",
         timestamp = 1706500000000L,
-        metadata = """{"platform":"android","version":"2.1.0","locale":"ko-KR"}"""
+        metadata = """{"platform":"android","version":"2.1.0","locale":"ko-KR"}""",
     )
     private val largeAction = BenchAction.Large(
         userId = "user-12345678",
         items = List(20) { "item-${it.toString().padStart(4, '0')}-abcdefghij" },
         scores = List(20) { it * 100 + 42 },
-        nested = """{"level":5,"experience":12500,"inventory":{"gold":9999,"gems":42},"achievements":["first_blood","veteran","master"]}"""
+        nested = """{"level":5,"experience":12500,"inventory":{"gold":9999,"gems":42},""" +
+            """"achievements":["first_blood","veteran","master"]}""",
     )
 
     // -- Benchmark Methods --
@@ -110,21 +104,27 @@ class SerializationBenchmark(
 
         // ActionCodec benchmarks
         print("  ActionCodec encode (small)...")
-        results.add(benchmarkOperation("ActionCodec Encode (Small ~40B)") {
-            actionCodec.encode(smallAction)
-        })
+        results.add(
+            benchmarkOperation("ActionCodec Encode (Small ~40B)") {
+                actionCodec.encode(smallAction)
+            },
+        )
         println(" done")
 
         print("  ActionCodec encode (medium)...")
-        results.add(benchmarkOperation("ActionCodec Encode (Medium ~200B)") {
-            actionCodec.encode(mediumAction)
-        })
+        results.add(
+            benchmarkOperation("ActionCodec Encode (Medium ~200B)") {
+                actionCodec.encode(mediumAction)
+            },
+        )
         println(" done")
 
         print("  ActionCodec encode (large)...")
-        results.add(benchmarkOperation("ActionCodec Encode (Large ~1KB)") {
-            actionCodec.encode(largeAction)
-        })
+        results.add(
+            benchmarkOperation("ActionCodec Encode (Large ~1KB)") {
+                actionCodec.encode(largeAction)
+            },
+        )
         println(" done")
 
         // Pre-encode for decode benchmarks
@@ -133,85 +133,98 @@ class SerializationBenchmark(
         val largeJson = actionCodec.encode(largeAction)
 
         print("  ActionCodec decode (small)...")
-        results.add(benchmarkOperation("ActionCodec Decode (Small ~40B)") {
-            actionCodec.decode(smallJson)
-        })
+        results.add(
+            benchmarkOperation("ActionCodec Decode (Small ~40B)") {
+                actionCodec.decode(smallJson)
+            },
+        )
         println(" done")
 
         print("  ActionCodec decode (medium)...")
-        results.add(benchmarkOperation("ActionCodec Decode (Medium ~200B)") {
-            actionCodec.decode(mediumJson)
-        })
+        results.add(
+            benchmarkOperation("ActionCodec Decode (Medium ~200B)") {
+                actionCodec.decode(mediumJson)
+            },
+        )
         println(" done")
 
         print("  ActionCodec decode (large)...")
-        results.add(benchmarkOperation("ActionCodec Decode (Large ~1KB)") {
-            actionCodec.decode(largeJson)
-        })
+        results.add(
+            benchmarkOperation("ActionCodec Decode (Large ~1KB)") {
+                actionCodec.decode(largeJson)
+            },
+        )
         println(" done")
 
         // MessageCodec benchmarks
         print("  MessageCodec encode...")
-        results.add(benchmarkOperation("MessageCodec EncodeAction") {
-            messageCodec.encodeActionMessage(mediumJson)
-        })
+        results.add(
+            benchmarkOperation("MessageCodec EncodeAction") {
+                messageCodec.encodeActionMessage(mediumJson)
+            },
+        )
         println(" done")
 
         val wireMessage = messageCodec.encodeServerResponse(listOf(smallJson, mediumJson))
         print("  MessageCodec decode...")
-        results.add(benchmarkOperation("MessageCodec DecodeServer (2 actions)") {
-            messageCodec.decodeServerMessage(wireMessage)
-        })
+        results.add(
+            benchmarkOperation("MessageCodec DecodeServer (2 actions)") {
+                messageCodec.decodeServerMessage(wireMessage)
+            },
+        )
         println(" done")
 
         // Full round-trip
         print("  Full round-trip (medium)...")
-        results.add(benchmarkOperation("Full Round-trip (Medium)") {
-            // Client side: action → wire
-            val encoded = actionCodec.encode(mediumAction)
-            val message = messageCodec.encodeActionMessage(encoded)
+        results.add(
+            benchmarkOperation("Full Round-trip (Medium)") {
+                // Client side: action → wire
+                val encoded = actionCodec.encode(mediumAction)
+                val message = messageCodec.encodeActionMessage(encoded)
 
-            // Server side: wire → action
-            val actionJson = messageCodec.decodeActionFromClient(message)
-            actionCodec.decode(actionJson)
+                // Server side: wire → action
+                val actionJson = messageCodec.decodeActionFromClient(message)
+                actionCodec.decode(actionJson)
 
-            // Server side: action → wire (response)
-            val responseEncoded = actionCodec.encode(mediumAction)
-            val response = messageCodec.encodeServerResponse(listOf(responseEncoded))
+                // Server side: action → wire (response)
+                val responseEncoded = actionCodec.encode(mediumAction)
+                val response = messageCodec.encodeServerResponse(listOf(responseEncoded))
 
-            // Client side: wire → action (response)
-            val serverResponse = messageCodec.decodeServerMessage(response)
-            for (json in serverResponse.actions) {
-                actionCodec.decode(json)
-            }
-        })
+                // Client side: wire → action (response)
+                val serverResponse = messageCodec.decodeServerMessage(response)
+                for (json in serverResponse.actions) {
+                    actionCodec.decode(json)
+                }
+            },
+        )
         println(" done")
 
         // Batch encoding (server broadcasting to N clients)
         print("  Batch encode (10 actions)...")
         val batchActions = List(10) { mediumJson }
-        results.add(benchmarkOperation("Batch Encode (10 actions)") {
-            messageCodec.encodeServerResponse(batchActions)
-        })
+        results.add(
+            benchmarkOperation("Batch Encode (10 actions)") {
+                messageCodec.encodeServerResponse(batchActions)
+            },
+        )
         println(" done")
 
         val batchWire = messageCodec.encodeServerResponse(batchActions)
         print("  Batch decode (10 actions)...")
-        results.add(benchmarkOperation("Batch Decode (10 actions)") {
-            val resp = messageCodec.decodeServerMessage(batchWire)
-            for (json in resp.actions) {
-                actionCodec.decode(json)
-            }
-        })
+        results.add(
+            benchmarkOperation("Batch Decode (10 actions)") {
+                val resp = messageCodec.decodeServerMessage(batchWire)
+                for (json in resp.actions) {
+                    actionCodec.decode(json)
+                }
+            },
+        )
         println(" done")
 
         return results
     }
 
-    private fun benchmarkOperation(
-        name: String,
-        operation: () -> Unit,
-    ): BenchmarkResult {
+    private fun benchmarkOperation(name: String, operation: () -> Unit): BenchmarkResult {
         val iterations = config.actionsPerBenchmark
         val latencies = mutableListOf<Duration>()
 

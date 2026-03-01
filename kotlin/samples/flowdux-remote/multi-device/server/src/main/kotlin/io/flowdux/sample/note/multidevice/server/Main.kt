@@ -47,13 +47,15 @@ fun main() {
         reducer = serverNoteReducer,
         processors = noteProcessors(),
         stateMapper = { state ->
-            println("[User ${state.userId}] State changed: devices=${state.connectedDevices}, notes=${state.notes.size}")
+            println(
+                "[User ${state.userId}] State changed: devices=${state.connectedDevices}, notes=${state.notes.size}",
+            )
             SharedNoteAction.SyncState(
                 NoteState(
                     notes = state.notes,
                     connectedDevices = state.connectedDevices,
                     lastEvent = state.lastEvent,
-                )
+                ),
             )
         },
         scope = applicationScope,
@@ -78,7 +80,8 @@ fun main() {
         }
     }
 
-    println("""
+    println(
+        """
         ╔══════════════════════════════════════════════════════╗
         ║     FlowDux Multi-Device Notes Server                ║
         ╠══════════════════════════════════════════════════════╣
@@ -90,7 +93,8 @@ fun main() {
         ╠══════════════════════════════════════════════════════╣
         ║  Same userId = same room = shared notes!             ║
         ╚══════════════════════════════════════════════════════╝
-    """.trimIndent())
+        """.trimIndent(),
+    )
     println()
 
     embeddedServer(CIO, port = 8080) {
@@ -99,7 +103,11 @@ fun main() {
         routing {
             get("/users") {
                 val userIds = roomServer.roomIds()
-                call.respondText("Active user sessions (${userIds.size}): ${userIds.joinToString(", ").ifEmpty { "(none)" }}")
+                call.respondText(
+                    "Active user sessions (${userIds.size}): ${userIds.joinToString(", ").ifEmpty {
+                        "(none)"
+                    }}",
+                )
             }
 
             // userId as roomId — all devices of the same user connect here
@@ -140,32 +148,35 @@ private suspend fun printStatus(roomServer: io.flowdux.remote.server.pattern.Roo
     } else {
         userIds.forEach { userId ->
             @Suppress("UNCHECKED_CAST")
-            val room = roomServer.getRoom(userId) as? io.flowdux.remote.server.pattern.SharedStateServer<ServerNoteState, NoteAction>
+            val room = roomServer.getRoom(
+                userId,
+            ) as? io.flowdux.remote.server.pattern.SharedStateServer<ServerNoteState, NoteAction>
             room?.let {
                 val state = it.currentState
-                println("  [$userId] devices=${state.connectedDevices}, notes=${state.notes.size}, edits=${state.totalEdits}")
+                println(
+                    "  [$userId] devices=${state.connectedDevices}, notes=${state.notes.size}, edits=${state.totalEdits}",
+                )
             }
         }
     }
     println("===========================\n")
 }
 
-private fun noteProcessors() =
-    Middleware.ActionProcessorBuilder<ServerNoteState, NoteAction>().apply {
-        on<SharedNoteAction.AddNote> { _, action ->
-            val noteId = UUID.randomUUID().toString().take(8)
-            emit(ServerNoteAction.NoteAdded(id = noteId, title = action.title, content = action.content))
-        }
-        on<SharedNoteAction.DeleteNote> { _, action ->
-            emit(ServerNoteAction.NoteDeleted(noteId = action.noteId))
-        }
-        on<SharedNoteAction.EditNote> { _, action ->
-            emit(ServerNoteAction.NoteEdited(noteId = action.noteId, title = action.title, content = action.content))
-        }
-        on<SharedNoteAction.DeviceConnected> { _, action ->
-            emit(ServerNoteAction.DeviceJoined(deviceName = action.deviceName))
-        }
-        on<SharedNoteAction.DeviceDisconnected> { _, action ->
-            emit(ServerNoteAction.DeviceLeft(deviceName = action.deviceName))
-        }
-    }.build()
+private fun noteProcessors() = Middleware.ActionProcessorBuilder<ServerNoteState, NoteAction>().apply {
+    on<SharedNoteAction.AddNote> { _, action ->
+        val noteId = UUID.randomUUID().toString().take(8)
+        emit(ServerNoteAction.NoteAdded(id = noteId, title = action.title, content = action.content))
+    }
+    on<SharedNoteAction.DeleteNote> { _, action ->
+        emit(ServerNoteAction.NoteDeleted(noteId = action.noteId))
+    }
+    on<SharedNoteAction.EditNote> { _, action ->
+        emit(ServerNoteAction.NoteEdited(noteId = action.noteId, title = action.title, content = action.content))
+    }
+    on<SharedNoteAction.DeviceConnected> { _, action ->
+        emit(ServerNoteAction.DeviceJoined(deviceName = action.deviceName))
+    }
+    on<SharedNoteAction.DeviceDisconnected> { _, action ->
+        emit(ServerNoteAction.DeviceLeft(deviceName = action.deviceName))
+    }
+}.build()

@@ -16,9 +16,7 @@ import io.flowdux.remote.server.middleware.InternalStartListening
  * @param wrapState Maps the current state to an action (typically a [ClientSharedAction][io.flowdux.remote.ClientSharedAction])
  *   that the server middleware will send to the client.
  */
-suspend fun <S : State, A : Action> Store<S, A>.serveState(
-    wrapState: (S) -> A,
-) {
+suspend fun <S : State, A : Action> Store<S, A>.serveState(wrapState: (S) -> A) {
     state.collect { dispatch(wrapState(it)) }
 }
 
@@ -33,9 +31,7 @@ suspend fun <S : State, A : Action> Store<S, A>.serveState(
  * }
  * ```
  */
-suspend inline fun <S : State, A : Action> Store<S, A>.use(
-    block: suspend Store<S, A>.() -> Unit,
-) {
+suspend inline fun <S : State, A : Action> Store<S, A>.use(block: suspend Store<S, A>.() -> Unit) {
     try {
         block()
     } finally {
@@ -63,9 +59,7 @@ suspend inline fun <S : State, A : Action> Store<S, A>.use(
  *   that the server middleware will send to the client.
  */
 @Suppress("UNCHECKED_CAST")
-suspend fun <S : State, A : Action> Store<S, A>.serve(
-    wrapState: (S) -> A,
-) = use {
+suspend fun <S : State, A : Action> Store<S, A>.serve(wrapState: (S) -> A) = use {
     dispatch(InternalStartListening() as A)
     serveState(wrapState)
 }

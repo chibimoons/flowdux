@@ -110,37 +110,47 @@ project(":kotlin:sample-remote-poker:client").projectDir = file("kotlin/samples/
 
 include(":kotlin:sample-remote-multiplexer:shared")
 project(":kotlin:sample-remote-multiplexer").projectDir = file("kotlin/samples/flowdux-remote/multiplexer")
-project(":kotlin:sample-remote-multiplexer:shared").projectDir = file("kotlin/samples/flowdux-remote/multiplexer/shared")
+project(":kotlin:sample-remote-multiplexer:shared").projectDir =
+    file("kotlin/samples/flowdux-remote/multiplexer/shared")
 
 include(":kotlin:sample-remote-multiplexer:server")
-project(":kotlin:sample-remote-multiplexer:server").projectDir = file("kotlin/samples/flowdux-remote/multiplexer/server")
+project(":kotlin:sample-remote-multiplexer:server").projectDir =
+    file("kotlin/samples/flowdux-remote/multiplexer/server")
 
 include(":kotlin:sample-remote-multiplexer:client")
-project(":kotlin:sample-remote-multiplexer:client").projectDir = file("kotlin/samples/flowdux-remote/multiplexer/client")
+project(":kotlin:sample-remote-multiplexer:client").projectDir =
+    file("kotlin/samples/flowdux-remote/multiplexer/client")
 
 include(":kotlin:sample-remote-node-mediator:shared")
 project(":kotlin:sample-remote-node-mediator").projectDir = file("kotlin/samples/flowdux-remote/node-mediator")
-project(":kotlin:sample-remote-node-mediator:shared").projectDir = file("kotlin/samples/flowdux-remote/node-mediator/shared")
+project(":kotlin:sample-remote-node-mediator:shared").projectDir =
+    file("kotlin/samples/flowdux-remote/node-mediator/shared")
 
 include(":kotlin:sample-remote-node-mediator:central")
-project(":kotlin:sample-remote-node-mediator:central").projectDir = file("kotlin/samples/flowdux-remote/node-mediator/central")
+project(":kotlin:sample-remote-node-mediator:central").projectDir =
+    file("kotlin/samples/flowdux-remote/node-mediator/central")
 
 include(":kotlin:sample-remote-node-mediator:node")
-project(":kotlin:sample-remote-node-mediator:node").projectDir = file("kotlin/samples/flowdux-remote/node-mediator/node")
+project(":kotlin:sample-remote-node-mediator:node").projectDir =
+    file("kotlin/samples/flowdux-remote/node-mediator/node")
 
 include(":kotlin:sample-remote-node-mediator:client")
-project(":kotlin:sample-remote-node-mediator:client").projectDir = file("kotlin/samples/flowdux-remote/node-mediator/client")
+project(":kotlin:sample-remote-node-mediator:client").projectDir =
+    file("kotlin/samples/flowdux-remote/node-mediator/client")
 
 // ── Samples: flowdux-remote (multi-device) ──
 include(":kotlin:sample-remote-multidevice:shared")
 project(":kotlin:sample-remote-multidevice").projectDir = file("kotlin/samples/flowdux-remote/multi-device")
-project(":kotlin:sample-remote-multidevice:shared").projectDir = file("kotlin/samples/flowdux-remote/multi-device/shared")
+project(":kotlin:sample-remote-multidevice:shared").projectDir =
+    file("kotlin/samples/flowdux-remote/multi-device/shared")
 
 include(":kotlin:sample-remote-multidevice:server")
-project(":kotlin:sample-remote-multidevice:server").projectDir = file("kotlin/samples/flowdux-remote/multi-device/server")
+project(":kotlin:sample-remote-multidevice:server").projectDir =
+    file("kotlin/samples/flowdux-remote/multi-device/server")
 
 include(":kotlin:sample-remote-multidevice:client")
-project(":kotlin:sample-remote-multidevice:client").projectDir = file("kotlin/samples/flowdux-remote/multi-device/client")
+project(":kotlin:sample-remote-multidevice:client").projectDir =
+    file("kotlin/samples/flowdux-remote/multi-device/client")
 
 // ── Samples: flowdux-remote (auth) ──
 include(":kotlin:sample-remote-auth:server")

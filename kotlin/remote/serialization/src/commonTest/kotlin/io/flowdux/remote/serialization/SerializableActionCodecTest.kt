@@ -9,11 +9,12 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class SerializableActionCodecTest {
-
     @Serializable
     sealed interface TestAction : Action {
         @Serializable data object Increment : TestAction
+
         @Serializable data class Add(val value: Int) : TestAction
+
         @Serializable data class SetName(val name: String) : TestAction
     }
 
@@ -52,13 +53,14 @@ class SerializableActionCodecTest {
 
     @Test
     fun roundTripAllVariants() {
-        val actions = listOf(
-            TestAction.Increment,
-            TestAction.Add(0),
-            TestAction.Add(-1),
-            TestAction.SetName(""),
-            TestAction.SetName("test"),
-        )
+        val actions =
+            listOf(
+                TestAction.Increment,
+                TestAction.Add(0),
+                TestAction.Add(-1),
+                TestAction.SetName(""),
+                TestAction.SetName("test"),
+            )
         for (action in actions) {
             val encoded = codec.encode(action)
             val decoded = codec.decode(encoded)

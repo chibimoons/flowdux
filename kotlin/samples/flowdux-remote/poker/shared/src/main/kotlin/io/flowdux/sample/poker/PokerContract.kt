@@ -12,17 +12,35 @@ interface PokerAction : Action
 @Serializable
 sealed interface SharedPokerAction : PokerAction {
     // Client → Server (player actions include playerId for validation)
-    @Serializable data class JoinTable(val playerId: String) : SharedPokerAction, ServerSharedAction
-    @Serializable data class PlaceBet(val playerId: String, val amount: Int) : SharedPokerAction, ServerSharedAction
-    @Serializable data class Fold(val playerId: String) : SharedPokerAction, ServerSharedAction
-    @Serializable data class Check(val playerId: String) : SharedPokerAction, ServerSharedAction
-    @Serializable data class Call(val playerId: String) : SharedPokerAction, ServerSharedAction
+    @Serializable data class JoinTable(val playerId: String) :
+        SharedPokerAction,
+        ServerSharedAction
+
+    @Serializable data class PlaceBet(val playerId: String, val amount: Int) :
+        SharedPokerAction,
+        ServerSharedAction
+
+    @Serializable data class Fold(val playerId: String) :
+        SharedPokerAction,
+        ServerSharedAction
+
+    @Serializable data class Check(val playerId: String) :
+        SharedPokerAction,
+        ServerSharedAction
+
+    @Serializable data class Call(val playerId: String) :
+        SharedPokerAction,
+        ServerSharedAction
 
     // Server → Client (public information - via Room Store)
-    @Serializable data class SyncTableState(val state: PublicTableState) : SharedPokerAction, ClientSharedAction
+    @Serializable data class SyncTableState(val state: PublicTableState) :
+        SharedPokerAction,
+        ClientSharedAction
 
     // Server → Client (private information - via Per-Client Store)
-    @Serializable data class SyncHand(val cards: List<Card>) : SharedPokerAction, ClientSharedAction
+    @Serializable data class SyncHand(val cards: List<Card>) :
+        SharedPokerAction,
+        ClientSharedAction
 }
 
 // -- Card Types --
@@ -31,8 +49,20 @@ enum class Suit { HEARTS, DIAMONDS, CLUBS, SPADES }
 
 @Serializable
 enum class Rank {
-    TWO, THREE, FOUR, FIVE, SIX, SEVEN, EIGHT, NINE, TEN,
-    JACK, QUEEN, KING, ACE;
+    TWO,
+    THREE,
+    FOUR,
+    FIVE,
+    SIX,
+    SEVEN,
+    EIGHT,
+    NINE,
+    TEN,
+    JACK,
+    QUEEN,
+    KING,
+    ACE,
+    ;
 
     override fun toString(): String = when (this) {
         TWO -> "2"
@@ -54,12 +84,13 @@ enum class Rank {
 @Serializable
 data class Card(val suit: Suit, val rank: Rank) {
     override fun toString(): String {
-        val suitSymbol = when (suit) {
-            Suit.HEARTS -> "♥"
-            Suit.DIAMONDS -> "♦"
-            Suit.CLUBS -> "♣"
-            Suit.SPADES -> "♠"
-        }
+        val suitSymbol =
+            when (suit) {
+                Suit.HEARTS -> "♥"
+                Suit.DIAMONDS -> "♦"
+                Suit.CLUBS -> "♣"
+                Suit.SPADES -> "♠"
+            }
         return "$rank$suitSymbol"
     }
 }
@@ -67,12 +98,12 @@ data class Card(val suit: Suit, val rank: Rank) {
 // -- Game State Types --
 @Serializable
 enum class GamePhase {
-    WAITING,      // Waiting for players
-    PRE_FLOP,     // Cards dealt, betting before flop
-    FLOP,         // 3 community cards revealed
-    TURN,         // 4th community card revealed
-    RIVER,        // 5th community card revealed
-    SHOWDOWN,     // Reveal hands and determine winner
+    WAITING, // Waiting for players
+    PRE_FLOP, // Cards dealt, betting before flop
+    FLOP, // 3 community cards revealed
+    TURN, // 4th community card revealed
+    RIVER, // 5th community card revealed
+    SHOWDOWN, // Reveal hands and determine winner
 }
 
 @Serializable
@@ -101,12 +132,20 @@ data class PublicTableState(
 @Serializable
 sealed interface TableEvent {
     @Serializable data class PlayerJoined(val playerId: String, val name: String) : TableEvent
+
     @Serializable data class PlayerLeft(val playerId: String) : TableEvent
+
     @Serializable data class PlayerBet(val playerId: String, val amount: Int) : TableEvent
+
     @Serializable data class PlayerFolded(val playerId: String) : TableEvent
+
     @Serializable data class PlayerChecked(val playerId: String) : TableEvent
+
     @Serializable data class PlayerCalled(val playerId: String, val amount: Int) : TableEvent
+
     @Serializable data class PhaseChanged(val phase: GamePhase) : TableEvent
+
     @Serializable data class GameStarted(val message: String) : TableEvent
+
     @Serializable data class GameEnded(val winnerId: String, val winnerName: String, val pot: Int) : TableEvent
 }

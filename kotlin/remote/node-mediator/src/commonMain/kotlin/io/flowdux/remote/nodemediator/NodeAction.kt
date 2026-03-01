@@ -19,7 +19,4 @@ import kotlinx.serialization.Serializable
  * @property action The actual action being transmitted
  */
 @Serializable
-data class NodeAction<A : Action>(
-    val roomId: String,
-    val action: A,
-) : Action
+data class NodeAction<A : Action>(val roomId: String, val action: A) : Action

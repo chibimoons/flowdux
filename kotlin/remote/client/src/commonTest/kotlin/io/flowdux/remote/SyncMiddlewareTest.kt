@@ -13,30 +13,31 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.test.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SyncMiddlewareTest {
-
     @Test
     fun `ServerSharedAction is intercepted and sent to server`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-        )
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+            )
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem()) // initial state
@@ -62,18 +63,20 @@ class SyncMiddlewareTest {
     @Test
     fun `non-ServerSharedAction passes through to local reducer`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-        )
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+            )
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem())
@@ -97,18 +100,20 @@ class SyncMiddlewareTest {
     @Test
     fun `server response actions are dispatched to local store`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-        )
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+            )
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem())
@@ -128,18 +133,20 @@ class SyncMiddlewareTest {
     @Test
     fun `non-ServerSharedAction server responses pass through without being sent to server`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-        )
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+            )
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem())
@@ -162,18 +169,20 @@ class SyncMiddlewareTest {
     @Test
     fun `multiple server response actions are all dispatched`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-        )
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+            )
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem())
@@ -205,18 +214,20 @@ class SyncMiddlewareTest {
         val cancellationSignal = CompletableDeferred<Boolean>()
         val connection = CancellationTrackingMockConnection<TestAction>(cancellationSignal)
 
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-        )
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+            )
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem())
@@ -232,9 +243,10 @@ class SyncMiddlewareTest {
             store.dispatch(TestAction.Disconnect)
 
             // Wait for cancellation signal
-            val wasCancelled = withTimeoutOrNull(1000) {
-                cancellationSignal.await()
-            }
+            val wasCancelled =
+                withTimeoutOrNull(1000) {
+                    cancellationSignal.await()
+                }
 
             assertNotNull(wasCancelled, "Connection job should be cancelled on disconnect")
             assertTrue(wasCancelled, "Connection job coroutine should have been cancelled")
@@ -246,18 +258,20 @@ class SyncMiddlewareTest {
     @Test
     fun `reconnect works after disconnect`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-        )
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+            )
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem())
@@ -299,22 +313,25 @@ class SyncMiddlewareTest {
 
     @Test
     fun `onConnectionError callback dispatches error action when connection fails`() = runTest {
-        val connection = MockTypedClientConnection<TestAction>(
-            connectException = RuntimeException("Connection failed"),
-        )
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-            onConnectionError = { e -> TestAction.ConnectionError(e.message ?: "Unknown error") },
-        )
+        val connection =
+            MockTypedClientConnection<TestAction>(
+                connectException = RuntimeException("Connection failed"),
+            )
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+                onConnectionError = { e -> TestAction.ConnectionError(e.message ?: "Unknown error") },
+            )
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem()) // initial state
@@ -331,22 +348,25 @@ class SyncMiddlewareTest {
 
     @Test
     fun `connection error without callback is silently ignored`() = runTest {
-        val connection = MockTypedClientConnection<TestAction>(
-            connectException = RuntimeException("Connection failed"),
-        )
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-            // No onConnectionError callback
-        )
+        val connection =
+            MockTypedClientConnection<TestAction>(
+                connectException = RuntimeException("Connection failed"),
+            )
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+                // No onConnectionError callback
+            )
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem()) // initial state
@@ -364,52 +384,55 @@ class SyncMiddlewareTest {
     @Test
     fun `reconnect after connection failure works`() = runTest {
         var shouldFail = true
-        val connection = object : TypedClientConnection<TestAction> {
-            private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
-            override val connectionState = _connectionState.asStateFlow()
+        val connection =
+            object : TypedClientConnection<TestAction> {
+                private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
+                override val connectionState = _connectionState.asStateFlow()
 
-            private val incomingChannel = Channel<TestAction>(Channel.BUFFERED)
-            override val incoming = incomingChannel.receiveAsFlow()
+                private val incomingChannel = Channel<TestAction>(Channel.BUFFERED)
+                override val incoming = incomingChannel.receiveAsFlow()
 
-            val sentActions = mutableListOf<TestAction>()
+                val sentActions = mutableListOf<TestAction>()
 
-            override suspend fun send(action: TestAction) {
-                sentActions.add(action)
-            }
-
-            override suspend fun connect() {
-                if (shouldFail) {
-                    throw RuntimeException("Connection failed")
+                override suspend fun send(action: TestAction) {
+                    sentActions.add(action)
                 }
-                _connectionState.value = ConnectionState.CONNECTED
-            }
 
-            override suspend fun disconnect() {
-                _connectionState.value = ConnectionState.DISCONNECTED
-            }
+                override suspend fun connect() {
+                    if (shouldFail) {
+                        throw RuntimeException("Connection failed")
+                    }
+                    _connectionState.value = ConnectionState.CONNECTED
+                }
 
-            suspend fun simulateServerAction(action: TestAction) {
-                incomingChannel.send(action)
+                override suspend fun disconnect() {
+                    _connectionState.value = ConnectionState.DISCONNECTED
+                }
+
+                suspend fun simulateServerAction(action: TestAction) {
+                    incomingChannel.send(action)
+                }
             }
-        }
 
         val errorActions = mutableListOf<String>()
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-            onConnectionError = { e ->
-                errorActions.add(e.message ?: "Unknown")
-                TestAction.ConnectionError(e.message ?: "Unknown error")
-            },
-        )
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+                onConnectionError = { e ->
+                    errorActions.add(e.message ?: "Unknown")
+                    TestAction.ConnectionError(e.message ?: "Unknown error")
+                },
+            )
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem())
@@ -442,46 +465,49 @@ class SyncMiddlewareTest {
         val errorCallbackInvoked = CompletableDeferred<Boolean>()
         val cancellationSignal = CompletableDeferred<Boolean>()
 
-        val connection = object : TypedClientConnection<TestAction> {
-            private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
-            override val connectionState = _connectionState.asStateFlow()
+        val connection =
+            object : TypedClientConnection<TestAction> {
+                private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
+                override val connectionState = _connectionState.asStateFlow()
 
-            private val incomingChannel = Channel<TestAction>(Channel.BUFFERED)
-            override val incoming = incomingChannel.receiveAsFlow()
+                private val incomingChannel = Channel<TestAction>(Channel.BUFFERED)
+                override val incoming = incomingChannel.receiveAsFlow()
 
-            override suspend fun send(action: TestAction) {}
+                override suspend fun send(action: TestAction) {}
 
-            override suspend fun connect() {
-                _connectionState.value = ConnectionState.CONNECTED
-                try {
-                    awaitCancellation()
-                } catch (e: CancellationException) {
-                    cancellationSignal.complete(true)
-                    throw e
+                override suspend fun connect() {
+                    _connectionState.value = ConnectionState.CONNECTED
+                    try {
+                        awaitCancellation()
+                    } catch (e: CancellationException) {
+                        cancellationSignal.complete(true)
+                        throw e
+                    }
+                }
+
+                override suspend fun disconnect() {
+                    _connectionState.value = ConnectionState.DISCONNECTED
                 }
             }
 
-            override suspend fun disconnect() {
-                _connectionState.value = ConnectionState.DISCONNECTED
-            }
-        }
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+                onConnectionError = { _ ->
+                    errorCallbackInvoked.complete(true)
+                    TestAction.ConnectionError("Should not be called")
+                },
+            )
 
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-            onConnectionError = { _ ->
-                errorCallbackInvoked.complete(true)
-                TestAction.ConnectionError("Should not be called")
-            },
-        )
-
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem())
@@ -502,7 +528,10 @@ class SyncMiddlewareTest {
             delay(200)
 
             // Error callback should NOT have been invoked for CancellationException
-            assertFalse(errorCallbackInvoked.isCompleted, "onConnectionError should not be called for CancellationException")
+            assertFalse(
+                errorCallbackInvoked.isCompleted,
+                "onConnectionError should not be called for CancellationException",
+            )
 
             // No error action should be dispatched
             expectNoEvents()
@@ -514,18 +543,20 @@ class SyncMiddlewareTest {
     @Test
     fun `rapid connect disconnect connect sequence works correctly`() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-        )
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+            )
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem())
@@ -546,5 +577,4 @@ class SyncMiddlewareTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
-
 }

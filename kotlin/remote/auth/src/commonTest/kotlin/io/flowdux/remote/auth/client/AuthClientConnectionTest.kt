@@ -14,18 +14,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class AuthClientConnectionTest {
-
     @Test
     fun happyPath_connectsAndAuthenticates() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"valid-token" },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "valid-token" },
+            )
 
         // Launch connect in background (it suspends for connection lifetime)
         val connectJob = launch { authConn.connect() }
@@ -48,10 +47,11 @@ class AuthClientConnectionTest {
     @Test
     fun happyPath_forwardsNonAuthMessages() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"token" },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "token" },
+            )
 
         val connectJob = launch { authConn.connect() }
 
@@ -81,17 +81,19 @@ class AuthClientConnectionTest {
     @Test
     fun authRejected_throwsAuthenticationException() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"bad-token" },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "bad-token" },
+            )
 
-        val ex = assertFailsWith<AuthenticationException> {
-            launch {
-                mock.simulateIncoming(AuthProtocol.encodeAuthError("Invalid credentials"))
+        val ex =
+            assertFailsWith<AuthenticationException> {
+                launch {
+                    mock.simulateIncoming(AuthProtocol.encodeAuthError("Invalid credentials"))
+                }
+                authConn.connect()
             }
-            authConn.connect()
-        }
 
         assertTrue(ex.message!!.contains("Authentication rejected by server"))
         assertTrue(ex.message!!.contains("Invalid credentials"))
@@ -100,15 +102,17 @@ class AuthClientConnectionTest {
     @Test
     fun timeout_throwsAuthenticationException() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"token" },
-            config = AuthConfig(handshakeTimeout = 100.milliseconds),
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "token" },
+                config = AuthConfig(handshakeTimeout = 100.milliseconds),
+            )
 
-        val ex = assertFailsWith<AuthenticationException> {
-            authConn.connect()
-        }
+        val ex =
+            assertFailsWith<AuthenticationException> {
+                authConn.connect()
+            }
 
         assertEquals("Auth handshake timed out", ex.message)
     }
@@ -116,10 +120,11 @@ class AuthClientConnectionTest {
     @Test
     fun preAuthMessages_areNotForwarded() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"token" },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "token" },
+            )
 
         val connectJob = launch { authConn.connect() }
 
@@ -149,10 +154,11 @@ class AuthClientConnectionTest {
     @Test
     fun connectionState_becomesDisconnectedAfterTransportCloses() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"token" },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "token" },
+            )
 
         val connectJob = launch { authConn.connect() }
 
@@ -171,10 +177,11 @@ class AuthClientConnectionTest {
     @Test
     fun sendBeforeAuth_suspendsUntilAuthThenProceeds() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"token" },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "token" },
+            )
 
         val connectJob = launch { authConn.connect() }
 
@@ -202,10 +209,11 @@ class AuthClientConnectionTest {
     @Test
     fun authError_reasonIncludedInException() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"bad-token" },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "bad-token" },
+            )
 
         launch {
             mock.simulateIncoming(AuthProtocol.encodeAuthError("Token expired at 2025-01-01"))
@@ -218,10 +226,11 @@ class AuthClientConnectionTest {
     @Test
     fun sendAfterAuthFailure_throwsAuthenticationException() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"bad-token" },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "bad-token" },
+            )
 
         // Connect and fail auth
         launch {
@@ -241,14 +250,15 @@ class AuthClientConnectionTest {
     fun refreshOnAuthError_retriesAndSucceeds() = runTest {
         val mock = MockClientConnection()
         var refreshCalled = false
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"expired-token" },
-            refreshProvider = {
-                refreshCalled = true
-                "fresh-token"
-            },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "expired-token" },
+                refreshProvider = {
+                    refreshCalled = true
+                    "fresh-token"
+                },
+            )
 
         val connectJob = launch { authConn.connect() }
 
@@ -274,18 +284,20 @@ class AuthClientConnectionTest {
     @Test
     fun refreshReturnsNull_propagatesOriginalFailure() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"expired-token" },
-            refreshProvider = { null },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "expired-token" },
+                refreshProvider = { null },
+            )
 
-        val ex = assertFailsWith<AuthenticationException> {
-            launch {
-                mock.simulateIncoming(AuthProtocol.encodeAuthError("Token expired"))
+        val ex =
+            assertFailsWith<AuthenticationException> {
+                launch {
+                    mock.simulateIncoming(AuthProtocol.encodeAuthError("Token expired"))
+                }
+                authConn.connect()
             }
-            authConn.connect()
-        }
 
         assertTrue(ex.message!!.contains("Token expired"))
     }
@@ -293,18 +305,20 @@ class AuthClientConnectionTest {
     @Test
     fun refreshThrows_propagatesOriginalFailure() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"expired-token" },
-            refreshProvider = { throw RuntimeException("Refresh server down") },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "expired-token" },
+                refreshProvider = { throw RuntimeException("Refresh server down") },
+            )
 
-        val ex = assertFailsWith<AuthenticationException> {
-            launch {
-                mock.simulateIncoming(AuthProtocol.encodeAuthError("Token expired"))
+        val ex =
+            assertFailsWith<AuthenticationException> {
+                launch {
+                    mock.simulateIncoming(AuthProtocol.encodeAuthError("Token expired"))
+                }
+                authConn.connect()
             }
-            authConn.connect()
-        }
 
         assertTrue(ex.message!!.contains("Token expired"))
     }
@@ -312,22 +326,24 @@ class AuthClientConnectionTest {
     @Test
     fun refreshSucceedsButSecondAuthRejected_throws() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"expired-token" },
-            refreshProvider = { "also-bad-token" },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "expired-token" },
+                refreshProvider = { "also-bad-token" },
+            )
 
-        val ex = assertFailsWith<AuthenticationException> {
-            launch {
-                // First: reject initial token
-                mock.simulateIncoming(AuthProtocol.encodeAuthError("Token expired"))
-                delay(100)
-                // Second: reject refreshed token too
-                mock.simulateIncoming(AuthProtocol.encodeAuthError("Still invalid"))
+        val ex =
+            assertFailsWith<AuthenticationException> {
+                launch {
+                    // First: reject initial token
+                    mock.simulateIncoming(AuthProtocol.encodeAuthError("Token expired"))
+                    delay(100)
+                    // Second: reject refreshed token too
+                    mock.simulateIncoming(AuthProtocol.encodeAuthError("Still invalid"))
+                }
+                authConn.connect()
             }
-            authConn.connect()
-        }
 
         // Error reason should be from the second rejection
         assertTrue(ex.message!!.contains("Still invalid"))
@@ -336,11 +352,12 @@ class AuthClientConnectionTest {
     @Test
     fun refreshOnAuthError_messagesForwardedAfterRetry() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"expired-token" },
-            refreshProvider = { "fresh-token" },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "expired-token" },
+                refreshProvider = { "fresh-token" },
+            )
 
         val connectJob = launch { authConn.connect() }
 
@@ -366,21 +383,23 @@ class AuthClientConnectionTest {
     @Test
     fun refreshTimeout_propagatesOriginalFailure() = runTest {
         val mock = MockClientConnection()
-        val authConn = AuthClientConnection(
-            delegate = mock,
-            tokenProvider = {"expired-token" },
-            config = AuthConfig(handshakeTimeout = 200.milliseconds),
-            refreshProvider = { "fresh-token" },
-        )
+        val authConn =
+            AuthClientConnection(
+                delegate = mock,
+                tokenProvider = { "expired-token" },
+                config = AuthConfig(handshakeTimeout = 200.milliseconds),
+                refreshProvider = { "fresh-token" },
+            )
 
-        val ex = assertFailsWith<AuthenticationException> {
-            launch {
-                // Reject initial token
-                mock.simulateIncoming(AuthProtocol.encodeAuthError("Token expired"))
-                // Don't send any response to the retry — let it timeout
+        val ex =
+            assertFailsWith<AuthenticationException> {
+                launch {
+                    // Reject initial token
+                    mock.simulateIncoming(AuthProtocol.encodeAuthError("Token expired"))
+                    // Don't send any response to the retry — let it timeout
+                }
+                authConn.connect()
             }
-            authConn.connect()
-        }
 
         // Should fail with the original error (refresh timed out)
         assertTrue(ex.message!!.contains("Token expired"))

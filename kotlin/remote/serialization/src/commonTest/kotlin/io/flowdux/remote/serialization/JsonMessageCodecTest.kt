@@ -1,10 +1,9 @@
 package io.flowdux.remote.serialization
 
-import kotlin.test.assertEquals
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class JsonMessageCodecTest {
-
     private val codec = JsonMessageCodec()
 
     @Test
@@ -63,10 +62,11 @@ class JsonMessageCodecTest {
 
     @Test
     fun roundtripServerResponse() {
-        val actions = listOf(
-            """{"type":"Add","value":1}""",
-            """{"type":"SetMessage","message":"hello"}""",
-        )
+        val actions =
+            listOf(
+                """{"type":"Add","value":1}""",
+                """{"type":"SetMessage","message":"hello"}""",
+            )
 
         val encoded = codec.encodeServerResponse(actions)
         val decoded = codec.decodeServerMessage(encoded)

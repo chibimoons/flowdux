@@ -83,27 +83,28 @@ class NodeMediator<A : Action>(
         }
 
         startRouting()
-        connectJob = scope.launch {
-            var connectFailed = false
-            try {
-                transport.connect()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                connectFailed = true
-                if (onEvent != null) {
-                    safeOnEvent(NodeMediatorEvent.ConnectionFailed(e))
-                } else {
+        connectJob =
+            scope.launch {
+                var connectFailed = false
+                try {
+                    transport.connect()
+                } catch (e: CancellationException) {
                     throw e
-                }
-            } finally {
-                connecting.store(false)
-                if (connectFailed) {
-                    routingJob?.cancel()
-                    routingJob = null
+                } catch (e: Exception) {
+                    connectFailed = true
+                    if (onEvent != null) {
+                        safeOnEvent(NodeMediatorEvent.ConnectionFailed(e))
+                    } else {
+                        throw e
+                    }
+                } finally {
+                    connecting.store(false)
+                    if (connectFailed) {
+                        routingJob?.cancel()
+                        routingJob = null
+                    }
                 }
             }
-        }
     }
 
     /**
@@ -132,48 +133,49 @@ class NodeMediator<A : Action>(
     }
 
     private fun startRouting() {
-        routingJob = scope.launch {
-            var transportError: Exception? = null
-            try {
-                transport.incoming.collect { nodeAction ->
-                    val roomId = nodeAction.roomId
-                    val handler = mutex.withLock { rooms[roomId] }
-                    if (handler != null) {
-                        try {
-                            handler.invoke(nodeAction.action)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            safeOnEvent(NodeMediatorEvent.CallbackFailed(roomId, e))
+        routingJob =
+            scope.launch {
+                var transportError: Exception? = null
+                try {
+                    transport.incoming.collect { nodeAction ->
+                        val roomId = nodeAction.roomId
+                        val handler = mutex.withLock { rooms[roomId] }
+                        if (handler != null) {
+                            try {
+                                handler.invoke(nodeAction.action)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                safeOnEvent(NodeMediatorEvent.CallbackFailed(roomId, e))
+                            }
+                        } else if (onUnknownRoom != null) {
+                            try {
+                                onUnknownRoom.invoke(roomId, nodeAction.action)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                safeOnEvent(NodeMediatorEvent.CallbackFailed(roomId, e))
+                            }
+                        } else {
+                            safeOnEvent(NodeMediatorEvent.MessageDropped(roomId))
                         }
-                    } else if (onUnknownRoom != null) {
-                        try {
-                            onUnknownRoom.invoke(roomId, nodeAction.action)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            safeOnEvent(NodeMediatorEvent.CallbackFailed(roomId, e))
-                        }
-                    } else {
-                        safeOnEvent(NodeMediatorEvent.MessageDropped(roomId))
                     }
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                transportError = e
-                if (onEvent != null) {
-                    safeOnEvent(NodeMediatorEvent.RoutingStopped(e))
-                } else {
+                } catch (e: CancellationException) {
                     throw e
+                } catch (e: Exception) {
+                    transportError = e
+                    if (onEvent != null) {
+                        safeOnEvent(NodeMediatorEvent.RoutingStopped(e))
+                    } else {
+                        throw e
+                    }
+                } finally {
+                    if (transportError != null) {
+                        transport.disconnect()
+                    }
+                    connecting.store(false)
                 }
-            } finally {
-                if (transportError != null) {
-                    transport.disconnect()
-                }
-                connecting.store(false)
             }
-        }
     }
 
     /**

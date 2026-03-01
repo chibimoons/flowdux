@@ -18,7 +18,6 @@ import kotlinx.coroutines.sync.withLock
  * @param A The action type used for typed connections.
  */
 class InMemorySessionRegistry<A : Action> : SessionRegistry<A> {
-
     private val sessions = mutableMapOf<String, TypedServerConnection<A>>()
     private val mutex = Mutex()
 

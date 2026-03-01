@@ -9,10 +9,7 @@ import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
 
 // State
-data class CounterState(
-    val count: Int = 0,
-    val isLoading: Boolean = false
-) : State
+data class CounterState(val count: Int = 0, val isLoading: Boolean = false) : State
 
 // Actions
 sealed interface CounterAction : Action {
@@ -92,7 +89,10 @@ private fun addLogEntry(message: String) {
 
 private fun currentTime(): String {
     val date = js("new Date()")
-    return "${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}"
+    return "${date.getHours()}:${date.getMinutes().toString().padStart(
+        2,
+        '0',
+    )}:${date.getSeconds().toString().padStart(2, '0')}"
 }
 
 private val scope = MainScope()
@@ -102,7 +102,7 @@ fun main() {
         initialState = CounterState(),
         reducer = counterReducer,
         middlewares = listOf(LoggingMiddleware(), CounterMiddleware()),
-        scope = scope
+        scope = scope,
     )
 
     // DOM elements

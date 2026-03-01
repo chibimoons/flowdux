@@ -83,28 +83,29 @@ class ClientConnectionMultiplexer<A : Action>(
         // Start routing first so we're ready to receive messages
         startRouting()
         // Launch connection in background (connect() suspends until closed)
-        connectJob = scope.launch {
-            var connectFailed = false
-            try {
-                physicalConnection.connect()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                connectFailed = true
-                if (onEvent != null) {
-                    safeOnEvent(MultiplexerEvent.ConnectionFailed(e))
-                } else {
+        connectJob =
+            scope.launch {
+                var connectFailed = false
+                try {
+                    physicalConnection.connect()
+                } catch (e: CancellationException) {
                     throw e
-                }
-            } finally {
-                connecting.store(false)
-                if (connectFailed) {
-                    // Clean up routing job to prevent zombie collectors
-                    routingJob?.cancel()
-                    routingJob = null
+                } catch (e: Exception) {
+                    connectFailed = true
+                    if (onEvent != null) {
+                        safeOnEvent(MultiplexerEvent.ConnectionFailed(e))
+                    } else {
+                        throw e
+                    }
+                } finally {
+                    connecting.store(false)
+                    if (connectFailed) {
+                        // Clean up routing job to prevent zombie collectors
+                        routingJob?.cancel()
+                        routingJob = null
+                    }
                 }
             }
-        }
     }
 
     /**
@@ -133,41 +134,42 @@ class ClientConnectionMultiplexer<A : Action>(
     }
 
     private fun startRouting() {
-        routingJob = scope.launch {
-            var transportError: Exception? = null
-            try {
-                physicalConnection.incoming.collect { routedAction ->
-                    val roomId = routedAction.roomId
-                    val virtualConnection = mutex.withLock { rooms[roomId] }
-                    if (virtualConnection != null) {
-                        val result = virtualConnection.channel.trySend(routedAction.action)
-                        if (result.isFailure) {
-                            safeOnEvent(MultiplexerEvent.MessageDropped(roomId))
+        routingJob =
+            scope.launch {
+                var transportError: Exception? = null
+                try {
+                    physicalConnection.incoming.collect { routedAction ->
+                        val roomId = routedAction.roomId
+                        val virtualConnection = mutex.withLock { rooms[roomId] }
+                        if (virtualConnection != null) {
+                            val result = virtualConnection.channel.trySend(routedAction.action)
+                            if (result.isFailure) {
+                                safeOnEvent(MultiplexerEvent.MessageDropped(roomId))
+                            }
                         }
+                        // Unknown rooms: silent drop (as per design decision)
                     }
-                    // Unknown rooms: silent drop (as per design decision)
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                transportError = e
-                if (onEvent != null) {
-                    safeOnEvent(MultiplexerEvent.RoutingStopped(e))
-                } else {
+                } catch (e: CancellationException) {
                     throw e
+                } catch (e: Exception) {
+                    transportError = e
+                    if (onEvent != null) {
+                        safeOnEvent(MultiplexerEvent.RoutingStopped(e))
+                    } else {
+                        throw e
+                    }
+                } finally {
+                    // Transport error: clean up physical connection to avoid zombie state
+                    // (routing dead but connection alive). Skipped on normal cancellation
+                    // since disconnect()/close() already handle cleanup.
+                    // Must disconnect before resetting connecting flag to prevent a
+                    // concurrent connect() from starting a new connection that we then kill.
+                    if (transportError != null) {
+                        physicalConnection.disconnect()
+                    }
+                    connecting.store(false)
                 }
-            } finally {
-                // Transport error: clean up physical connection to avoid zombie state
-                // (routing dead but connection alive). Skipped on normal cancellation
-                // since disconnect()/close() already handle cleanup.
-                // Must disconnect before resetting connecting flag to prevent a
-                // concurrent connect() from starting a new connection that we then kill.
-                if (transportError != null) {
-                    physicalConnection.disconnect()
-                }
-                connecting.store(false)
             }
-        }
     }
 
     /**
@@ -187,9 +189,10 @@ class ClientConnectionMultiplexer<A : Action>(
      * @param roomId The room identifier to remove
      */
     suspend fun removeRoom(roomId: String) {
-        val virtualConnection = mutex.withLock {
-            rooms.remove(roomId)
-        }
+        val virtualConnection =
+            mutex.withLock {
+                rooms.remove(roomId)
+            }
         virtualConnection?.channel?.close()
     }
 
@@ -219,11 +222,12 @@ class ClientConnectionMultiplexer<A : Action>(
      */
     suspend fun close() {
         closed.store(true)
-        val virtualConnections = mutex.withLock {
-            val connections = rooms.values.toList()
-            rooms.clear()
-            connections
-        }
+        val virtualConnections =
+            mutex.withLock {
+                val connections = rooms.values.toList()
+                rooms.clear()
+                connections
+            }
         virtualConnections.forEach { it.channel.close() }
         connecting.store(false)
         val routingSnapshot = routingJob
@@ -253,9 +257,7 @@ class ClientConnectionMultiplexer<A : Action>(
         }
     }
 
-    private inner class VirtualClientConnection(
-        private val roomId: String,
-    ) : TypedClientConnection<A> {
+    private inner class VirtualClientConnection(private val roomId: String) : TypedClientConnection<A> {
         val channel = Channel<A>(Channel.BUFFERED)
 
         override val connectionState: StateFlow<ConnectionState> =

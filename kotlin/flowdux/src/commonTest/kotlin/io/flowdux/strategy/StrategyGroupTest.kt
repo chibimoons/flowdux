@@ -21,46 +21,48 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.test.Test
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StrategyGroupTest {
-
     @Test
     fun `group shares strategy instance across different action types`() = runTest {
         val executionOrder = mutableListOf<String>()
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                // Both Fetch and Search share the same takeLatest instance
-                group(takeLatest()) {
-                    on<TestAction.Fetch> { _, action ->
-                        executionOrder.add("fetch-start-${action.id}")
-                        delay(100)
-                        executionOrder.add("fetch-end-${action.id}")
-                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        // Both Fetch and Search share the same takeLatest instance
+                        group(takeLatest()) {
+                            on<TestAction.Fetch> { _, action ->
+                                executionOrder.add("fetch-start-${action.id}")
+                                delay(100)
+                                executionOrder.add("fetch-end-${action.id}")
+                                emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                            }
+                            on<TestAction.Search> { _, action ->
+                                executionOrder.add("search-start-${action.query}")
+                                delay(100)
+                                executionOrder.add("search-end-${action.query}")
+                                emit(TestAction.SearchResult(action.query, listOf(action.query)))
+                            }
+                        }
                     }
-                    on<TestAction.Search> { _, action ->
-                        executionOrder.add("search-start-${action.query}")
-                        delay(100)
-                        executionOrder.add("search-end-${action.query}")
-                        emit(TestAction.SearchResult(action.query, listOf(action.query)))
-                    }
-                }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -89,30 +91,33 @@ class StrategyGroupTest {
     fun `group with takeLeading blocks across different action types`() = runTest {
         val executionOrder = mutableListOf<String>()
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                group(takeLeading()) {
-                    on<TestAction.Fetch> { _, action ->
-                        executionOrder.add("fetch-${action.id}")
-                        delay(100)
-                        emit(TestAction.FetchSuccess(action.id, action.id))
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        group(takeLeading()) {
+                            on<TestAction.Fetch> { _, action ->
+                                executionOrder.add("fetch-${action.id}")
+                                delay(100)
+                                emit(TestAction.FetchSuccess(action.id, action.id))
+                            }
+                            on<TestAction.Search> { _, action ->
+                                executionOrder.add("search-${action.query}")
+                                delay(100)
+                                emit(TestAction.SearchResult(action.query, listOf(action.query)))
+                            }
+                        }
                     }
-                    on<TestAction.Search> { _, action ->
-                        executionOrder.add("search-${action.query}")
-                        delay(100)
-                        emit(TestAction.SearchResult(action.query, listOf(action.query)))
-                    }
-                }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -137,32 +142,35 @@ class StrategyGroupTest {
         val groupAExecutions = mutableListOf<String>()
         val groupBExecutions = mutableListOf<String>()
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                group(takeLatest()) {
-                    on<TestAction.Fetch> { _, action ->
-                        delay(50)
-                        groupAExecutions.add(action.id)
-                        emit(TestAction.FetchSuccess(action.id, action.id))
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        group(takeLatest()) {
+                            on<TestAction.Fetch> { _, action ->
+                                delay(50)
+                                groupAExecutions.add(action.id)
+                                emit(TestAction.FetchSuccess(action.id, action.id))
+                            }
+                        }
+                        group(takeLatest()) {
+                            on<TestAction.Search> { _, action ->
+                                delay(50)
+                                groupBExecutions.add(action.query)
+                                emit(TestAction.SearchResult(action.query, listOf(action.query)))
+                            }
+                        }
                     }
-                }
-                group(takeLatest()) {
-                    on<TestAction.Search> { _, action ->
-                        delay(50)
-                        groupBExecutions.add(action.query)
-                        emit(TestAction.SearchResult(action.query, listOf(action.query)))
-                    }
-                }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -192,28 +200,31 @@ class StrategyGroupTest {
     fun `group with debounce resets timer across different action types`() = runTest {
         val executionOrder = mutableListOf<String>()
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                group(debounce(100.milliseconds)) {
-                    on<TestAction.Fetch> { _, action ->
-                        executionOrder.add("fetch-${action.id}")
-                        emit(TestAction.FetchSuccess(action.id, action.id))
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        group(debounce(100.milliseconds)) {
+                            on<TestAction.Fetch> { _, action ->
+                                executionOrder.add("fetch-${action.id}")
+                                emit(TestAction.FetchSuccess(action.id, action.id))
+                            }
+                            on<TestAction.Search> { _, action ->
+                                executionOrder.add("search-${action.query}")
+                                emit(TestAction.SearchResult(action.query, listOf(action.query)))
+                            }
+                        }
                     }
-                    on<TestAction.Search> { _, action ->
-                        executionOrder.add("search-${action.query}")
-                        emit(TestAction.SearchResult(action.query, listOf(action.query)))
-                    }
-                }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -240,28 +251,31 @@ class StrategyGroupTest {
         val executionOrder = mutableListOf<String>()
         val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                group(throttle(500.milliseconds)) {
-                    on<TestAction.Fetch> { _, action ->
-                        executionOrder.add("fetch-${action.id}")
-                        emit(TestAction.FetchSuccess(action.id, action.id))
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        group(throttle(500.milliseconds)) {
+                            on<TestAction.Fetch> { _, action ->
+                                executionOrder.add("fetch-${action.id}")
+                                emit(TestAction.FetchSuccess(action.id, action.id))
+                            }
+                            on<TestAction.Search> { _, action ->
+                                executionOrder.add("search-${action.query}")
+                                emit(TestAction.SearchResult(action.query, listOf(action.query)))
+                            }
+                        }
                     }
-                    on<TestAction.Search> { _, action ->
-                        executionOrder.add("search-${action.query}")
-                        emit(TestAction.SearchResult(action.query, listOf(action.query)))
-                    }
-                }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = storeScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
 
         try {
             store.state.test {
@@ -294,38 +308,41 @@ class StrategyGroupTest {
     fun `group with retry retries failed actions within the group`() = runTest {
         val attemptCounts = mutableMapOf<String, Int>()
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                group(retry(3)) {
-                    on<TestAction.Fetch> { _, action ->
-                        val key = "fetch-${action.id}"
-                        val count = attemptCounts.getOrPut(key) { 0 } + 1
-                        attemptCounts[key] = count
-                        if (action.id == "fail" && count < 3) {
-                            throw RuntimeException("Simulated failure $count")
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        group(retry(3)) {
+                            on<TestAction.Fetch> { _, action ->
+                                val key = "fetch-${action.id}"
+                                val count = attemptCounts.getOrPut(key) { 0 } + 1
+                                attemptCounts[key] = count
+                                if (action.id == "fail" && count < 3) {
+                                    throw RuntimeException("Simulated failure $count")
+                                }
+                                emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                            }
+                            on<TestAction.Search> { _, action ->
+                                val key = "search-${action.query}"
+                                val count = attemptCounts.getOrPut(key) { 0 } + 1
+                                attemptCounts[key] = count
+                                if (action.query == "fail" && count < 2) {
+                                    throw RuntimeException("Simulated failure $count")
+                                }
+                                emit(TestAction.SearchResult(action.query, listOf(action.query)))
+                            }
                         }
-                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
                     }
-                    on<TestAction.Search> { _, action ->
-                        val key = "search-${action.query}"
-                        val count = attemptCounts.getOrPut(key) { 0 } + 1
-                        attemptCounts[key] = count
-                        if (action.query == "fail" && count < 2) {
-                            throw RuntimeException("Simulated failure $count")
-                        }
-                        emit(TestAction.SearchResult(action.query, listOf(action.query)))
-                    }
-                }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -348,7 +365,7 @@ class StrategyGroupTest {
             // Verify retry counts
             assertEquals(3, attemptCounts["fetch-fail"]) // Fetch "fail" retried 3 times
             assertEquals(2, attemptCounts["search-fail"]) // Search "fail" retried 2 times
-            assertEquals(1, attemptCounts["fetch-ok"])   // Fetch "ok" succeeded first time
+            assertEquals(1, attemptCounts["fetch-ok"]) // Fetch "ok" succeeded first time
 
             cancelAndIgnoreRemainingEvents()
         }

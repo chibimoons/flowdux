@@ -124,7 +124,8 @@ inline fun <reified Wire : A, reified A : Action> ServerConnection.typedJsonAs(
  * @param Super The broader action type that [Sub] extends
  * @throws IllegalArgumentException if [send] is called with an action that is not a [Sub] instance
  */
-inline fun <reified Sub : Super, reified Super : Action> TypedClientConnection<Sub>.upcast(): TypedClientConnection<Super> =
+inline fun <reified Sub : Super, reified Super : Action> TypedClientConnection<Sub>.upcast():
+    TypedClientConnection<Super> =
     UpcastTypedClientConnection(this, Sub::class)
 
 /**
@@ -150,7 +151,8 @@ inline fun <reified Sub : Super, reified Super : Action> TypedClientConnection<S
  * @param Super The broader action type that [Sub] extends
  * @throws IllegalArgumentException if [send] is called with an action that is not a [Sub] instance
  */
-inline fun <reified Sub : Super, reified Super : Action> TypedServerConnection<Sub>.upcast(): TypedServerConnection<Super> =
+inline fun <reified Sub : Super, reified Super : Action> TypedServerConnection<Sub>.upcast():
+    TypedServerConnection<Super> =
     UpcastTypedServerConnection(this, Sub::class)
 
 /**
@@ -158,10 +160,7 @@ inline fun <reified Sub : Super, reified Super : Action> TypedServerConnection<S
  * @throws IllegalArgumentException if the action type doesn't match
  */
 @Suppress("UNCHECKED_CAST")
-internal fun <Sub : Super, Super : Action> validateAndCast(
-    action: Super,
-    subClass: kotlin.reflect.KClass<Sub>,
-): Sub {
+internal fun <Sub : Super, Super : Action> validateAndCast(action: Super, subClass: kotlin.reflect.KClass<Sub>): Sub {
     require(subClass.isInstance(action)) {
         "Cannot send ${action::class.simpleName} through connection typed for ${subClass.simpleName}"
     }

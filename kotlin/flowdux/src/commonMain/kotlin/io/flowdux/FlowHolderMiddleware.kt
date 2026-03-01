@@ -28,7 +28,6 @@ internal class FlowHolderMiddleware<S : State, A : Action>(
     private val logger: StoreLogger<S, A>,
     private val dispatch: (A) -> Unit,
 ) : Middleware<S, A> {
-
     override val processors: ActionProcessorMap<S, A> = emptyMap()
     private val isLoggingEnabled = logger::class != NoOpStoreLogger::class
 
@@ -47,45 +46,49 @@ internal class FlowHolderMiddleware<S : State, A : Action>(
         val wrapped = getOrCreateWrappedProcessor(action)
 
         return when (action.delivery) {
-            FlowActionDelivery.Emit -> flow {
-                wrapped.invoke(this, getState(), action)
-            }.transform { innerAction ->
-                if (innerAction is FlowHolderAction) {
-                    // Recursive processing for nested FlowHolderActions
-                    emitAll(process(getState, innerAction as A))
-                } else {
-                    emit(innerAction)
+            FlowActionDelivery.Emit ->
+                flow {
+                    wrapped.invoke(this, getState(), action)
+                }.transform { innerAction ->
+                    if (innerAction is FlowHolderAction) {
+                        // Recursive processing for nested FlowHolderActions
+                        emitAll(process(getState, innerAction as A))
+                    } else {
+                        emit(innerAction)
+                    }
                 }
-            }
 
-            FlowActionDelivery.Dispatch -> flow<A> {
-                wrapped.invoke(this, getState(), action)
-            }.onEach { innerAction ->
-                // Re-dispatch through full pipeline; nested FlowHolderActions
-                // will be processed when they reach this middleware again
-                dispatch(innerAction)
-            }.transform {
-                // Don't emit anything; all inner actions are re-dispatched
-            }
+            FlowActionDelivery.Dispatch ->
+                flow<A> {
+                    wrapped.invoke(this, getState(), action)
+                }.onEach { innerAction ->
+                    // Re-dispatch through full pipeline; nested FlowHolderActions
+                    // will be processed when they reach this middleware again
+                    dispatch(innerAction)
+                }.transform {
+                    // Don't emit anything; all inner actions are re-dispatched
+                }
         }
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun getOrCreateWrappedProcessor(action: FlowHolderAction): WrappedProcessor<S, A> {
-        return wrappedProcessors.getOrPut(action::class) {
+    private fun getOrCreateWrappedProcessor(action: FlowHolderAction): WrappedProcessor<S, A> =
+        wrappedProcessors.getOrPut(action::class) {
             val baseProcessor: suspend FlowCollector<A>.(S, A) -> Unit = { _, a ->
                 emitAll(
-                    (a as FlowHolderAction).toFlowAction()
+                    (a as FlowHolderAction)
+                        .toFlowAction()
                         .run {
-                            if (isLoggingEnabled) onEach { logger.onFlowHolderActionEmitted(it as A) }
-                            else this
-                        }
-                        .map { it as A }
+                            if (isLoggingEnabled) {
+                                onEach { logger.onFlowHolderActionEmitted(it as A) }
+                            } else {
+                                this
+                            }
+                        }.map { it as A },
                 )
             }
             action.strategy.wrap(baseProcessor)
         }
-    }
 }
 
 private typealias WrappedProcessor<S, A> = suspend FlowCollector<A>.(S, A) -> Unit

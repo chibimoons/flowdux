@@ -14,7 +14,6 @@ import kotlinx.coroutines.sync.withLock
  * implement [RoomRegistry] with an external store like Redis.
  */
 class InMemoryRoomRegistry : RoomRegistry {
-
     private val assignments = mutableMapOf<String, String>()
     private val mutex = Mutex()
 

@@ -1,18 +1,14 @@
 package io.flowdux.sample.multiplexer.client
 
-import io.flowdux.Store
-import io.flowdux.createStore
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.multiplexer.ClientConnectionMultiplexer
 import io.flowdux.remote.multiplexer.typedRoutedJson
-import io.flowdux.sample.multiplexer.ChatAction
 import io.flowdux.sample.multiplexer.SharedChatAction
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
@@ -36,30 +32,32 @@ fun main(args: Array<String>) = runBlocking {
 
     println(
         """
-        ╔══════════════════════════════════════════════════════════╗
-        ║     FlowDux Connection Multiplexer Demo Client           ║
-        ╠══════════════════════════════════════════════════════════╣
-        ║  Single WebSocket, multiple rooms!                       ║
-        ╠══════════════════════════════════════════════════════════╣
-        ║  Commands:                                               ║
-        ║    /join <room>   - Join a room                          ║
-        ║    /leave <room>  - Leave a room                         ║
-        ║    /rooms         - List joined rooms                    ║
-        ║    /switch <room> - Switch active room                   ║
-        ║    /quit          - Disconnect and exit                  ║
-        ║    <message>      - Send message to active room          ║
-        ╚══════════════════════════════════════════════════════════╝
-        """.trimIndent()
+            ╔══════════════════════════════════════════════════════════╗
+            ║     FlowDux Connection Multiplexer Demo Client           ║
+            ╠══════════════════════════════════════════════════════════╣
+            ║  Single WebSocket, multiple rooms!                       ║
+            ╠══════════════════════════════════════════════════════════╣
+            ║  Commands:                                               ║
+            ║    /join <room>   - Join a room                          ║
+            ║    /leave <room>  - Leave a room                         ║
+            ║    /rooms         - List joined rooms                    ║
+            ║    /switch <room> - Switch active room                   ║
+            ║    /quit          - Disconnect and exit                  ║
+            ║    <message>      - Send message to active room          ║
+            ╚══════════════════════════════════════════════════════════╝
+        """.trimIndent(),
     )
     println()
     println("Welcome, $username!")
 
     // Create the physical connection
-    val physicalConnection = KtorWebSocketClientConnection.create(
-        host = "localhost",
-        port = 8080,
-        path = "/ws",
-    ).typedRoutedJson<SharedChatAction>()
+    val physicalConnection =
+        KtorWebSocketClientConnection
+            .create(
+                host = "localhost",
+                port = 8080,
+                path = "/ws",
+            ).typedRoutedJson<SharedChatAction>()
 
     // Create the multiplexer
     val multiplexer = ClientConnectionMultiplexer(physicalConnection, scope)

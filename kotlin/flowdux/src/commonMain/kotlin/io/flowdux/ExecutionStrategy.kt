@@ -17,12 +17,15 @@ import kotlin.time.TimeSource
 enum class StrategyCategory {
     /** Timing strategies control when to execute (debounce, throttle) */
     TIMING,
+
     /** Concurrency strategies control how to handle concurrent executions (takeLatest, takeLeading) */
     CONCURRENCY,
+
     /** Resilience strategies control how to handle failures (retry, circuitBreaker) */
     RESILIENCE,
+
     /** Chained strategies composed of multiple strategies */
-    CHAINED
+    CHAINED,
 }
 
 /**
@@ -39,7 +42,7 @@ sealed interface ExecutionStrategy {
      * The wrapper manages the execution lifecycle according to the strategy.
      */
     fun <S, A, T : A> wrap(
-        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit,
     ): suspend FlowCollector<A>.(state: S, action: T) -> Unit
 }
 
@@ -56,7 +59,7 @@ class TakeLatest : ExecutionStrategy {
     private var currentJob: Job? = null
 
     override fun <S, A, T : A> wrap(
-        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit,
     ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
         val job = currentCoroutineContext()[Job]!!
 
@@ -92,16 +95,17 @@ class TakeLeading : ExecutionStrategy {
     private var isActive = false
 
     override fun <S, A, T : A> wrap(
-        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit,
     ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
-        val shouldExecute = mutex.withLock {
-            if (isActive) {
-                false
-            } else {
-                isActive = true
-                true
+        val shouldExecute =
+            mutex.withLock {
+                if (isActive) {
+                    false
+                } else {
+                    isActive = true
+                    true
+                }
             }
-        }
 
         if (shouldExecute) {
             try {
@@ -128,7 +132,7 @@ class Sequential : ExecutionStrategy {
     private val mutex = Mutex()
 
     override fun <S, A, T : A> wrap(
-        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit,
     ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
         mutex.withLock {
             processor(state, action)
@@ -149,7 +153,7 @@ class Debounce(private val duration: Duration) : ExecutionStrategy {
     private var pendingJob: Job? = null
 
     override fun <S, A, T : A> wrap(
-        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit,
     ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
         val currentJob = currentCoroutineContext()[Job]!!
 
@@ -160,9 +164,10 @@ class Debounce(private val duration: Duration) : ExecutionStrategy {
 
         delay(duration)
 
-        val shouldExecute = mutex.withLock {
-            pendingJob === currentJob
-        }
+        val shouldExecute =
+            mutex.withLock {
+                pendingJob === currentJob
+            }
 
         if (shouldExecute) {
             processor(state, action)
@@ -184,19 +189,20 @@ class Throttle(private val duration: Duration) : ExecutionStrategy {
     private var lastExecutionMark: TimeSource.Monotonic.ValueTimeMark? = null
 
     override fun <S, A, T : A> wrap(
-        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit,
     ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
         val now = timeSource.markNow()
 
-        val shouldExecute = mutex.withLock {
-            val last = lastExecutionMark
-            if (last == null || now - last >= duration) {
-                lastExecutionMark = now
-                true
-            } else {
-                false
+        val shouldExecute =
+            mutex.withLock {
+                val last = lastExecutionMark
+                if (last == null || now - last >= duration) {
+                    lastExecutionMark = now
+                    true
+                } else {
+                    false
+                }
             }
-        }
 
         if (shouldExecute) {
             processor(state, action)
@@ -211,10 +217,7 @@ class Throttle(private val duration: Duration) : ExecutionStrategy {
  * @param retryIf Optional predicate to determine if a specific exception should trigger a retry.
  *                Defaults to retrying on all non-cancellation exceptions.
  */
-class Retry(
-    private val maxAttempts: Int,
-    private val retryIf: (Throwable) -> Boolean = { true }
-) : ExecutionStrategy {
+class Retry(private val maxAttempts: Int, private val retryIf: (Throwable) -> Boolean = { true }) : ExecutionStrategy {
     override val category = StrategyCategory.RESILIENCE
 
     init {
@@ -222,7 +225,7 @@ class Retry(
     }
 
     override fun <S, A, T : A> wrap(
-        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit,
     ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
         for (attempt in 0 until maxAttempts) {
             try {
@@ -260,7 +263,7 @@ class RetryWithBackoff(
     private val maxDelay: Duration = Duration.INFINITE,
     private val factor: Double = 2.0,
     private val jitter: Double = 0.0,
-    private val retryIf: (Throwable) -> Boolean = { true }
+    private val retryIf: (Throwable) -> Boolean = { true },
 ) : ExecutionStrategy {
     override val category = StrategyCategory.RESILIENCE
 
@@ -271,7 +274,7 @@ class RetryWithBackoff(
     }
 
     override fun <S, A, T : A> wrap(
-        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit,
     ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = { state, action ->
         for (attempt in 0 until maxAttempts) {
             try {
@@ -289,12 +292,13 @@ class RetryWithBackoff(
                 val cappedDelay = minOf(baseDelay, maxDelay)
 
                 // Apply jitter
-                val jitterAmount = if (jitter > 0.0) {
-                    // jitter is a factor (0.0–1.0); this yields an extra delay in [0, cappedDelay * jitter]
-                    cappedDelay * jitter * kotlin.random.Random.nextDouble()
-                } else {
-                    Duration.ZERO
-                }
+                val jitterAmount =
+                    if (jitter > 0.0) {
+                        // jitter is a factor (0.0–1.0); this yields an extra delay in [0, cappedDelay * jitter]
+                        cappedDelay * jitter * kotlin.random.Random.nextDouble()
+                    } else {
+                        Duration.ZERO
+                    }
 
                 val finalDelay = (cappedDelay + jitterAmount).coerceAtLeast(Duration.ZERO)
                 delay(finalDelay)
@@ -319,7 +323,7 @@ class Concurrent : ExecutionStrategy {
     override val category = StrategyCategory.CONCURRENCY
 
     override fun <S, A, T : A> wrap(
-        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit,
     ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = processor
 }
 
@@ -388,10 +392,7 @@ fun throttle(timeMs: Long): ExecutionStrategy = Throttle(timeMs.milliseconds)
  * @param maxAttempts Maximum number of attempts (including the initial attempt)
  * @param retryIf Optional predicate to determine if a specific exception should trigger a retry
  */
-fun retry(
-    maxAttempts: Int,
-    retryIf: (Throwable) -> Boolean = { true }
-): ExecutionStrategy = Retry(maxAttempts, retryIf)
+fun retry(maxAttempts: Int, retryIf: (Throwable) -> Boolean = { true }): ExecutionStrategy = Retry(maxAttempts, retryIf)
 
 /**
  * Creates a [RetryWithBackoff] strategy that retries failed executions with exponential backoff.
@@ -409,7 +410,7 @@ fun retryWithBackoff(
     maxDelay: Duration = Duration.INFINITE,
     factor: Double = 2.0,
     jitter: Double = 0.0,
-    retryIf: (Throwable) -> Boolean = { true }
+    retryIf: (Throwable) -> Boolean = { true },
 ): ExecutionStrategy = RetryWithBackoff(maxAttempts, initialDelay, maxDelay, factor, jitter, retryIf)
 
 // Strategy chaining
@@ -424,10 +425,8 @@ fun retryWithBackoff(
  * @param second The inner strategy (runs second)
  * @throws IllegalArgumentException if both strategies belong to the same category
  */
-class ChainedStrategy(
-    private val first: ExecutionStrategy,
-    private val second: ExecutionStrategy
-) : ExecutionStrategy {
+class ChainedStrategy(private val first: ExecutionStrategy, private val second: ExecutionStrategy) :
+    ExecutionStrategy {
     override val category = StrategyCategory.CHAINED
 
     private val categories: Set<StrategyCategory>
@@ -447,9 +446,8 @@ class ChainedStrategy(
     }
 
     override fun <S, A, T : A> wrap(
-        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
-    ): suspend FlowCollector<A>.(state: S, action: T) -> Unit =
-        first.wrap(second.wrap(processor))
+        processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit,
+    ): suspend FlowCollector<A>.(state: S, action: T) -> Unit = first.wrap(second.wrap(processor))
 }
 
 /**
@@ -466,5 +464,4 @@ class ChainedStrategy(
  * @return A new [ChainedStrategy] combining both strategies
  * @throws IllegalArgumentException if both strategies belong to the same category
  */
-infix fun ExecutionStrategy.then(next: ExecutionStrategy): ExecutionStrategy =
-    ChainedStrategy(this, next)
+infix fun ExecutionStrategy.then(next: ExecutionStrategy): ExecutionStrategy = ChainedStrategy(this, next)

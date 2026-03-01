@@ -14,25 +14,26 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PerClientServerTest {
-
     @Test
     fun `handleClient creates session and serves state`() = runTest {
-        val perClientServer = createPerClientServer(
-            initialStateFactory = { sessionId -> ServerState(count = sessionId.length) },
-            reducer = serverReducer,
-            stateMapper = { ServerAction.SyncState(it) },
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val perClientServer =
+            createPerClientServer(
+                initialStateFactory = { sessionId -> ServerState(count = sessionId.length) },
+                reducer = serverReducer,
+                stateMapper = { ServerAction.SyncState(it) },
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         val conn = MockTypedServerConnection<ServerAction>()
 
         assertEquals(0, perClientServer.sessionCount())
 
         // Connect client
-        val clientJob = backgroundScope.launch {
-            perClientServer.handleClient("player-1", conn)
-        }
+        val clientJob =
+            backgroundScope.launch {
+                perClientServer.handleClient("player-1", conn)
+            }
         delay(100)
 
         // Session created
@@ -50,19 +51,21 @@ class PerClientServerTest {
 
     @Test
     fun `handleClient removes session on disconnect`() = runTest {
-        val perClientServer = createPerClientServer(
-            initialStateFactory = { ServerState() },
-            reducer = serverReducer,
-            stateMapper = { ServerAction.SyncState(it) },
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val perClientServer =
+            createPerClientServer(
+                initialStateFactory = { ServerState() },
+                reducer = serverReducer,
+                stateMapper = { ServerAction.SyncState(it) },
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         val conn = MockTypedServerConnection<ServerAction>()
 
-        val clientJob = backgroundScope.launch {
-            perClientServer.handleClient("player-1", conn)
-        }
+        val clientJob =
+            backgroundScope.launch {
+                perClientServer.handleClient("player-1", conn)
+            }
         delay(100)
 
         assertEquals(1, perClientServer.sessionCount())
@@ -79,24 +82,27 @@ class PerClientServerTest {
 
     @Test
     fun `each client has independent state`() = runTest {
-        val perClientServer = createPerClientServer(
-            initialStateFactory = { ServerState() },
-            reducer = serverReducer,
-            stateMapper = { ServerAction.SyncState(it) },
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val perClientServer =
+            createPerClientServer(
+                initialStateFactory = { ServerState() },
+                reducer = serverReducer,
+                stateMapper = { ServerAction.SyncState(it) },
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
 
         // Connect two clients
-        val job1 = backgroundScope.launch {
-            perClientServer.handleClient("player-1", conn1)
-        }
-        val job2 = backgroundScope.launch {
-            perClientServer.handleClient("player-2", conn2)
-        }
+        val job1 =
+            backgroundScope.launch {
+                perClientServer.handleClient("player-1", conn1)
+            }
+        val job2 =
+            backgroundScope.launch {
+                perClientServer.handleClient("player-2", conn2)
+            }
         delay(100)
 
         assertEquals(2, perClientServer.sessionCount())
@@ -131,22 +137,24 @@ class PerClientServerTest {
 
     @Test
     fun `getSession returns active session`() = runTest {
-        val perClientServer = createPerClientServer(
-            initialStateFactory = { ServerState() },
-            reducer = serverReducer,
-            stateMapper = { ServerAction.SyncState(it) },
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val perClientServer =
+            createPerClientServer(
+                initialStateFactory = { ServerState() },
+                reducer = serverReducer,
+                stateMapper = { ServerAction.SyncState(it) },
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         val conn = MockTypedServerConnection<ServerAction>()
 
         // No session yet
         assertNull(perClientServer.getSession("player-1"))
 
-        val clientJob = backgroundScope.launch {
-            perClientServer.handleClient("player-1", conn)
-        }
+        val clientJob =
+            backgroundScope.launch {
+                perClientServer.handleClient("player-1", conn)
+            }
         delay(100)
 
         // Session exists
@@ -168,25 +176,27 @@ class PerClientServerTest {
     fun `custom session factory is used`() = runTest {
         var factoryCalledWith: String? = null
 
-        val perClientServer = createPerClientServer(
-            stateMapper = { ServerAction.SyncState(it) },
-            scope = backgroundScope,
-        ) { sessionId, connection ->
-            factoryCalledWith = sessionId
-            createSingleClientServer(
-                initialState = ServerState(count = 42),
-                reducer = serverReducer,
-                connection = connection,
-                errorProcessor = serverErrorProcessor,
+        val perClientServer =
+            createPerClientServer(
+                stateMapper = { ServerAction.SyncState(it) },
                 scope = backgroundScope,
-            )
-        }
+            ) { sessionId, connection ->
+                factoryCalledWith = sessionId
+                createSingleClientServer(
+                    initialState = ServerState(count = 42),
+                    reducer = serverReducer,
+                    connection = connection,
+                    errorProcessor = serverErrorProcessor,
+                    scope = backgroundScope,
+                )
+            }
 
         val conn = MockTypedServerConnection<ServerAction>()
 
-        val clientJob = backgroundScope.launch {
-            perClientServer.handleClient("custom-player", conn)
-        }
+        val clientJob =
+            backgroundScope.launch {
+                perClientServer.handleClient("custom-player", conn)
+            }
         delay(100)
 
         // Factory was called with correct sessionId
@@ -202,26 +212,31 @@ class PerClientServerTest {
 
     @Test
     fun `processors work with PerClientServer`() = runTest {
-        val processors = Middleware.ActionProcessorBuilder<ServerState, ServerAction>().apply {
-            on<ServerAction.ClientAdd> { _, action ->
-                emit(ServerAction.InternalReset(action.value * 5))
-            }
-        }.build()
+        val processors =
+            Middleware
+                .ActionProcessorBuilder<ServerState, ServerAction>()
+                .apply {
+                    on<ServerAction.ClientAdd> { _, action ->
+                        emit(ServerAction.InternalReset(action.value * 5))
+                    }
+                }.build()
 
-        val perClientServer = createPerClientServer(
-            initialStateFactory = { ServerState() },
-            reducer = serverReducer,
-            stateMapper = { ServerAction.SyncState(it) },
-            processors = processors,
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val perClientServer =
+            createPerClientServer(
+                initialStateFactory = { ServerState() },
+                reducer = serverReducer,
+                stateMapper = { ServerAction.SyncState(it) },
+                processors = processors,
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         val conn = MockTypedServerConnection<ServerAction>()
 
-        val clientJob = backgroundScope.launch {
-            perClientServer.handleClient("player-1", conn)
-        }
+        val clientJob =
+            backgroundScope.launch {
+                perClientServer.handleClient("player-1", conn)
+            }
         delay(100)
 
         conn.sentActions.clear()
@@ -239,23 +254,26 @@ class PerClientServerTest {
 
     @Test
     fun `close shuts down all sessions`() = runTest {
-        val perClientServer = createPerClientServer(
-            initialStateFactory = { ServerState() },
-            reducer = serverReducer,
-            stateMapper = { ServerAction.SyncState(it) },
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val perClientServer =
+            createPerClientServer(
+                initialStateFactory = { ServerState() },
+                reducer = serverReducer,
+                stateMapper = { ServerAction.SyncState(it) },
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         val conn1 = MockTypedServerConnection<ServerAction>()
         val conn2 = MockTypedServerConnection<ServerAction>()
 
-        val job1 = backgroundScope.launch {
-            perClientServer.handleClient("player-1", conn1)
-        }
-        val job2 = backgroundScope.launch {
-            perClientServer.handleClient("player-2", conn2)
-        }
+        val job1 =
+            backgroundScope.launch {
+                perClientServer.handleClient("player-1", conn1)
+            }
+        val job2 =
+            backgroundScope.launch {
+                perClientServer.handleClient("player-2", conn2)
+            }
         delay(100)
 
         assertEquals(2, perClientServer.sessionCount())

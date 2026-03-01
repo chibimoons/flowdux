@@ -17,14 +17,14 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 
 class AuthServerConnectionTest {
-
     @Test
     fun happyPath_authenticatesAndForwardsMessages() = runTest {
         val mock = MockServerConnection()
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = acceptAllVerifier,
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = acceptAllVerifier,
+            )
 
         // Send auth request from "client"
         mock.simulateIncoming(AuthProtocol.encodeAuthRequest("user-42"))
@@ -55,10 +55,11 @@ class AuthServerConnectionTest {
     @Test
     fun invalidToken_returnsFailure() = runTest {
         val mock = MockServerConnection()
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = rejectAllVerifier,
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = rejectAllVerifier,
+            )
 
         mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-token"))
 
@@ -76,10 +77,11 @@ class AuthServerConnectionTest {
     @Test
     fun nonAuthFirstMessage_returnsFailure() = runTest {
         val mock = MockServerConnection()
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = acceptAllVerifier,
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = acceptAllVerifier,
+            )
 
         // Send a non-auth message as the first message
         mock.simulateIncoming("""{"type":"action","data":"oops"}""")
@@ -97,11 +99,12 @@ class AuthServerConnectionTest {
     @Test
     fun timeout_returnsFailure() = runTest {
         val mock = MockServerConnection()
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = acceptAllVerifier,
-            config = AuthConfig(handshakeTimeout = 100.milliseconds),
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = acceptAllVerifier,
+                config = AuthConfig(handshakeTimeout = 100.milliseconds),
+            )
 
         // Don't send any message — should timeout
         val result = authConn.awaitAuth(backgroundScope)
@@ -114,10 +117,11 @@ class AuthServerConnectionTest {
     fun specificTokenVerifier_acceptsValidToken() = runTest {
         val mock = MockServerConnection()
         val verifier = tokenVerifier("secret-123")
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = verifier,
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = verifier,
+            )
 
         mock.simulateIncoming(AuthProtocol.encodeAuthRequest("secret-123"))
         val result = authConn.awaitAuth(backgroundScope)
@@ -129,10 +133,11 @@ class AuthServerConnectionTest {
     fun specificTokenVerifier_rejectsInvalidToken() = runTest {
         val mock = MockServerConnection()
         val verifier = tokenVerifier("secret-123")
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = verifier,
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = verifier,
+            )
 
         mock.simulateIncoming(AuthProtocol.encodeAuthRequest("wrong-token"))
         val result = authConn.awaitAuth(backgroundScope)
@@ -143,10 +148,11 @@ class AuthServerConnectionTest {
     @Test
     fun authMessages_filteredFromForwarding() = runTest {
         val mock = MockServerConnection()
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = acceptAllVerifier,
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = acceptAllVerifier,
+            )
 
         mock.simulateIncoming(AuthProtocol.encodeAuthRequest("user-1"))
         val result = authConn.awaitAuth(backgroundScope)
@@ -168,10 +174,11 @@ class AuthServerConnectionTest {
     @Test
     fun connectionClosedBeforeAuth_returnsFailure() = runTest {
         val mock = MockServerConnection()
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = acceptAllVerifier,
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = acceptAllVerifier,
+            )
 
         // Close the connection before sending any message
         mock.closeIncoming()
@@ -185,10 +192,11 @@ class AuthServerConnectionTest {
     @Test
     fun malformedAuthMessage_returnsFailure() = runTest {
         val mock = MockServerConnection()
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = acceptAllVerifier,
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = acceptAllVerifier,
+            )
 
         // Send an auth message with missing token field
         mock.simulateIncoming("""{"type":"auth"}""")
@@ -205,10 +213,11 @@ class AuthServerConnectionTest {
     @Test
     fun verifierThrows_returnsFailureAndSendsAuthError() = runTest {
         val mock = MockServerConnection()
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = throwingVerifier,
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = throwingVerifier,
+            )
 
         mock.simulateIncoming(AuthProtocol.encodeAuthRequest("any-token"))
 
@@ -225,10 +234,11 @@ class AuthServerConnectionTest {
     @Test
     fun authOkAsFirstMessage_returnsFailure() = runTest {
         val mock = MockServerConnection()
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = acceptAllVerifier,
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = acceptAllVerifier,
+            )
 
         // Client sends auth_ok instead of auth request — unexpected auth type
         mock.simulateIncoming(AuthProtocol.encodeAuthSuccess())
@@ -246,11 +256,12 @@ class AuthServerConnectionTest {
     fun retryAuth_secondAttemptSucceeds() = runTest {
         val mock = MockServerConnection()
         val verifier = tokenVerifier("valid-token")
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = verifier,
-            config = AuthConfig(maxAuthAttempts = 2),
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = verifier,
+                config = AuthConfig(maxAuthAttempts = 2),
+            )
 
         // First: bad token, Second: valid token
         mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-token"))
@@ -270,11 +281,12 @@ class AuthServerConnectionTest {
     @Test
     fun retryAuth_bothAttemptsFail() = runTest {
         val mock = MockServerConnection()
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = rejectAllVerifier,
-            config = AuthConfig(maxAuthAttempts = 2),
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = rejectAllVerifier,
+                config = AuthConfig(maxAuthAttempts = 2),
+            )
 
         mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-1"))
         mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-2"))
@@ -293,11 +305,12 @@ class AuthServerConnectionTest {
     fun retryAuth_messagesForwardedAfterRetrySuccess() = runTest {
         val mock = MockServerConnection()
         val verifier = tokenVerifier("valid-token")
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = verifier,
-            config = AuthConfig(maxAuthAttempts = 2),
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = verifier,
+                config = AuthConfig(maxAuthAttempts = 2),
+            )
 
         mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-token"))
         mock.simulateIncoming(AuthProtocol.encodeAuthRequest("valid-token"))
@@ -317,11 +330,12 @@ class AuthServerConnectionTest {
     fun defaultMaxAttempts_singleAttemptOnly() = runTest {
         val mock = MockServerConnection()
         val verifier = tokenVerifier("valid-token")
-        val authConn = AuthServerConnection(
-            delegate = mock,
-            verifier = verifier,
-            // default: maxAuthAttempts = 1
-        )
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = verifier,
+                // default: maxAuthAttempts = 1
+            )
 
         mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-token"))
 

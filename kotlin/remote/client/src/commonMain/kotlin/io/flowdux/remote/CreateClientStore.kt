@@ -69,14 +69,15 @@ fun <S : State, A : Action> createClientStore(
     // Order: additionalMiddlewares -> syncMiddleware -> forwarder
     val allMiddlewares = additionalMiddlewares + syncMiddleware + forwarder
 
-    store = createStore(
-        initialState = initialState,
-        middlewares = allMiddlewares,
-        reducer = reducer,
-        errorProcessor = errorProcessor,
-        logger = logger,
-        scope = scope,
-        concurrency = concurrency,
-    )
+    store =
+        createStore(
+            initialState = initialState,
+            middlewares = allMiddlewares,
+            reducer = reducer,
+            errorProcessor = errorProcessor,
+            logger = logger,
+            scope = scope,
+            concurrency = concurrency,
+        )
     return store
 }

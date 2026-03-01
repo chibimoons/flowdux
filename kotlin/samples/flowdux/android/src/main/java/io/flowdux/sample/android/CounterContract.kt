@@ -3,9 +3,7 @@ package io.flowdux.sample.android
 import io.flowdux.*
 
 // State
-data class CounterState(
-    val count: Int = 0
-) : State
+data class CounterState(val count: Int = 0) : State
 
 // Actions
 sealed interface CounterAction : Action {

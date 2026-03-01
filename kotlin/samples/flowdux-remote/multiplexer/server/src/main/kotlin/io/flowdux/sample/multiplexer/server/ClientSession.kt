@@ -85,12 +85,13 @@ class ClientSession(
         // Track the job so we can cancel it when leaving the room
         // The upcast is needed because SharedChatAction extends ChatAction
         @Suppress("UNCHECKED_CAST")
-        val job = scope.launch {
-            room.handleClient(
-                sessionId,
-                virtualConnection as io.flowdux.remote.server.connection.TypedServerConnection<ChatAction>,
-            )
-        }
+        val job =
+            scope.launch {
+                room.handleClient(
+                    sessionId,
+                    virtualConnection as io.flowdux.remote.server.connection.TypedServerConnection<ChatAction>,
+                )
+            }
 
         // Store the job for cleanup on leave
         roomJobs[roomId] = job

@@ -48,7 +48,7 @@ fun main() {
                     messages = serverState.messages,
                     users = serverState.users,
                     lastEvent = serverState.lastEvent,
-                )
+                ),
             )
         },
         scope = applicationScope,
@@ -93,15 +93,14 @@ fun main() {
     server.close()
 }
 
-private fun chatProcessors() =
-    Middleware.ActionProcessorBuilder<ServerChatState, ChatAction>().apply {
-        on<SharedChatAction.SendMessage> { _, action ->
-            emit(ServerChatAction.MessageReceived(user = action.user, text = action.text))
-        }
-        on<SharedChatAction.JoinRoom> { _, action ->
-            emit(ServerChatAction.UserJoined(user = action.user))
-        }
-        on<SharedChatAction.LeaveRoom> { _, action ->
-            emit(ServerChatAction.UserLeft(user = action.user))
-        }
-    }.build()
+private fun chatProcessors() = Middleware.ActionProcessorBuilder<ServerChatState, ChatAction>().apply {
+    on<SharedChatAction.SendMessage> { _, action ->
+        emit(ServerChatAction.MessageReceived(user = action.user, text = action.text))
+    }
+    on<SharedChatAction.JoinRoom> { _, action ->
+        emit(ServerChatAction.UserJoined(user = action.user))
+    }
+    on<SharedChatAction.LeaveRoom> { _, action ->
+        emit(ServerChatAction.UserLeft(user = action.user))
+    }
+}.build()

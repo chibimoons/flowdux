@@ -9,7 +9,6 @@ data class ServerChatState(
     val messages: List<ChatMessage> = emptyList(),
     val users: Set<String> = emptySet(),
     val lastEvent: ChatEvent? = null,
-
     // Server-local
     val totalMessagesProcessed: Int = 0,
 ) : State

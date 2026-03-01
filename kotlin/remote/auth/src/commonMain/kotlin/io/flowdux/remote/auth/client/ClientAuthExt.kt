@@ -12,10 +12,8 @@ import io.flowdux.remote.auth.AuthConfig
  *     .typedJson<SharedAction>()
  * ```
  */
-fun ClientConnection.withAuth(
-    token: String,
-    config: AuthConfig = AuthConfig(),
-): ClientConnection = AuthClientConnection(this, { token }, config)
+fun ClientConnection.withAuth(token: String, config: AuthConfig = AuthConfig()): ClientConnection =
+    AuthClientConnection(this, { token }, config)
 
 /**
  * Add authentication to a client connection with a token provider lambda.
@@ -26,10 +24,8 @@ fun ClientConnection.withAuth(
  *     .typedJson<SharedAction>()
  * ```
  */
-fun ClientConnection.withAuth(
-    config: AuthConfig = AuthConfig(),
-    token: suspend () -> String,
-): ClientConnection = AuthClientConnection(this, token, config)
+fun ClientConnection.withAuth(config: AuthConfig = AuthConfig(), token: suspend () -> String): ClientConnection =
+    AuthClientConnection(this, token, config)
 
 /**
  * Add authentication with token refresh support.

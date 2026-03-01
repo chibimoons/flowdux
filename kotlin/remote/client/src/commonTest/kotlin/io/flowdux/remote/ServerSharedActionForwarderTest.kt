@@ -10,22 +10,23 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ServerSharedActionForwarderTest {
-
     @Test
     fun serverSharedAction_emitted_from_processor_is_automatically_sent_to_server() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = EmitServerActionTestMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-        )
+        val middleware =
+            EmitServerActionTestMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+            )
 
-        val store = createClientStore(
-            initialState = TestState(),
-            syncMiddleware = middleware,
-            reducer = testReducer,
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createClientStore(
+                initialState = TestState(),
+                syncMiddleware = middleware,
+                reducer = testReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem()) // initial state
@@ -54,18 +55,20 @@ class ServerSharedActionForwarderTest {
     @Test
     fun non_serverSharedAction_emitted_from_processor_passes_through_normally() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = EmitServerActionTestMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-        )
+        val middleware =
+            EmitServerActionTestMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+            )
 
-        val store = createClientStore(
-            initialState = TestState(),
-            syncMiddleware = middleware,
-            reducer = testReducer,
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createClientStore(
+                initialState = TestState(),
+                syncMiddleware = middleware,
+                reducer = testReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem()) // initial state
@@ -87,18 +90,20 @@ class ServerSharedActionForwarderTest {
     @Test
     fun clientSharedAction_from_server_is_not_re_dispatched_prevents_infinite_loop() = runTest {
         val connection = MockTypedClientConnection<TestAction>()
-        val middleware = TestSyncMiddleware(
-            connection = connection,
-            scope = backgroundScope,
-        )
+        val middleware =
+            TestSyncMiddleware(
+                connection = connection,
+                scope = backgroundScope,
+            )
 
-        val store = createClientStore(
-            initialState = TestState(),
-            syncMiddleware = middleware,
-            reducer = testReducer,
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createClientStore(
+                initialState = TestState(),
+                syncMiddleware = middleware,
+                reducer = testReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem()) // initial state
@@ -124,27 +129,30 @@ class ServerSharedActionForwarderTest {
         val connection = MockTypedClientConnection<TestAction>()
 
         // Custom middleware that emits multiple ServerSharedActions
-        val middleware = object : SyncMiddleware<TestState, TestAction>(
-            connection = connection,
-            scope = backgroundScope,
-        ) {
-            override val processors = buildProcessors {
-                on<TestAction.Connect> { _, _ -> startConnection() }
-                on<TestAction.TriggerEmitServerAction> { _, action ->
-                    emit(TestAction.ServerAdd(action.value))
-                    emit(TestAction.ServerSetMessage("test"))
-                    emit(TestAction.Add(1)) // local
-                }
+        val middleware =
+            object : SyncMiddleware<TestState, TestAction>(
+                connection = connection,
+                scope = backgroundScope,
+            ) {
+                override val processors =
+                    buildProcessors {
+                        on<TestAction.Connect> { _, _ -> startConnection() }
+                        on<TestAction.TriggerEmitServerAction> { _, action ->
+                            emit(TestAction.ServerAdd(action.value))
+                            emit(TestAction.ServerSetMessage("test"))
+                            emit(TestAction.Add(1)) // local
+                        }
+                    }
             }
-        }
 
-        val store = createClientStore(
-            initialState = TestState(),
-            syncMiddleware = middleware,
-            reducer = testReducer,
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createClientStore(
+                initialState = TestState(),
+                syncMiddleware = middleware,
+                reducer = testReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(TestState(), awaitItem())

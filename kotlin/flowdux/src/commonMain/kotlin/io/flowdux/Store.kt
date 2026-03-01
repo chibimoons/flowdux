@@ -1,12 +1,12 @@
 package io.flowdux
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.Flow
@@ -45,11 +45,12 @@ class Store<S : State, A : Action> internal constructor(
 
     val isClosed: Boolean get() = _isClosed.load()
 
-    private val stateFlow = actionFlow
-        .receiveAsFlow()
-        .flatMapMerge(concurrency) { processAction(it) }
-        .map { reduceAction(state.value, it) }
-        .stateIn(scope, SharingStarted.Eagerly, initialState)
+    private val stateFlow =
+        actionFlow
+            .receiveAsFlow()
+            .flatMapMerge(concurrency) { processAction(it) }
+            .map { reduceAction(state.value, it) }
+            .stateIn(scope, SharingStarted.Eagerly, initialState)
 
     private fun processAction(a: A): Flow<A> = middlewares
         .fold(flowOf(a)) { flow, middleware ->
@@ -60,18 +61,22 @@ class Store<S : State, A : Action> internal constructor(
                     action = currentAction,
                 )
             }
-        }
-        .run {
-            if (isLoggingEnabled) onEach { logger.onMiddlewaresCompleted(it) }
-            else this
-        }
-        .catch { error ->
+        }.run {
+            if (isLoggingEnabled) {
+                onEach { logger.onMiddlewaresCompleted(it) }
+            } else {
+                this
+            }
+        }.catch { error ->
             if (isLoggingEnabled) logger.onErrorOccurred(error)
             emitAll(
                 errorProcessor.process(error).run {
-                    if (isLoggingEnabled) onEach { logger.onErrorHandled(it) }
-                    else this
-                }
+                    if (isLoggingEnabled) {
+                        onEach { logger.onErrorHandled(it) }
+                    } else {
+                        this
+                    }
+                },
             )
         }
 
@@ -173,16 +178,18 @@ fun <S : State, A : Action> createStore(
     concurrency: Int = DEFAULT_CONCURRENCY,
 ): Store<S, A> {
     lateinit var store: Store<S, A>
-    val allMiddlewares = middlewares +
-        FlowHolderMiddleware<S, A>(logger, dispatch = { store.dispatch(it) })
-    store = Store(
-        initialState = initialState,
-        reducer = reducer,
-        middlewares = allMiddlewares,
-        errorProcessor = errorProcessor,
-        logger = logger,
-        scope = scope,
-        concurrency = concurrency,
-    )
+    val allMiddlewares =
+        middlewares +
+            FlowHolderMiddleware<S, A>(logger, dispatch = { store.dispatch(it) })
+    store =
+        Store(
+            initialState = initialState,
+            reducer = reducer,
+            middlewares = allMiddlewares,
+            errorProcessor = errorProcessor,
+            logger = logger,
+            scope = scope,
+            concurrency = concurrency,
+        )
     return store
 }

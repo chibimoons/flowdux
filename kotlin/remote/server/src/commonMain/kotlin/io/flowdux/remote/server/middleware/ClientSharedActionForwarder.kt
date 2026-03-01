@@ -25,10 +25,8 @@ import kotlinx.coroutines.flow.flowOf
  *
  * @param dispatch Function to re-dispatch actions through the full Store pipeline.
  */
-internal class ClientSharedActionForwarder<S : State, A : Action>(
-    private val dispatch: (A) -> Unit,
-) : Middleware<S, A> {
-
+internal class ClientSharedActionForwarder<S : State, A : Action>(private val dispatch: (A) -> Unit) :
+    Middleware<S, A> {
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     override fun process(getState: () -> S, action: A): Flow<A> {
