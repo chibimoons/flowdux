@@ -117,22 +117,29 @@ class CentralNodeManager<A : Action>(
             cause = e
         } finally {
             withContext(NonCancellable) {
-                val wasReplaced = mutex.withLock {
+                val shouldCleanupRooms = mutex.withLock {
                     // Only remove if this entry is still the current one (not replaced by a newer connection)
                     if (nodes[nodeId] === entry) {
                         nodes.remove(nodeId)
-                        false
-                    } else {
                         true
+                    } else {
+                        false
                     }
                 }
                 // Only unassign rooms if this connection was NOT replaced by a newer one.
                 // When a node reconnects, the new connection takes over room ownership,
                 // and the old connection's cleanup must not revoke those assignments.
-                if (!wasReplaced) {
-                    val rooms = roomRegistry.getRoomsForNode(nodeId)
-                    for (roomId in rooms) {
-                        roomRegistry.unassignRoom(roomId)
+                if (shouldCleanupRooms) {
+                    // Re-check that no new connection registered with this nodeId
+                    // between our removal and room cleanup. This prevents a race where
+                    // a new handleNode() registers the same nodeId after we released the
+                    // mutex but before room cleanup starts.
+                    val replacedSinceRemoval = mutex.withLock { nodes.containsKey(nodeId) }
+                    if (!replacedSinceRemoval) {
+                        val rooms = roomRegistry.getRoomsForNode(nodeId)
+                        for (roomId in rooms) {
+                            roomRegistry.unassignRoom(roomId)
+                        }
                     }
                 }
             }
