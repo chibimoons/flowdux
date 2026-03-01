@@ -90,6 +90,11 @@ class ReconnectingClientConnection<A : Action>(
      * attempts are exhausted. The initial connection counts as attempt 0.
      * The attempt counter resets to 0 after each successful connection,
      * so transient failures do not accumulate across stable sessions.
+     *
+     * [disconnect] sets a stop flag that the reconnection loop checks after each
+     * backoff delay. When used via [SyncMiddleware], the coroutine running this
+     * method is also cancelled by `stopConnection()`, which immediately interrupts
+     * any in-progress backoff delay.
      */
     override suspend fun connect() {
         stopped = false
@@ -107,14 +112,20 @@ class ReconnectingClientConnection<A : Action>(
                 if (stopped) break
             }
 
-            // Re-check stopped after delay to avoid starting a connection
-            // that disconnect() already requested to stop.
             if (stopped) break
 
             // Create the inner connection after the backoff delay to avoid
             // eagerly allocating transport resources during the wait.
             val conn = connectionFactory()
             currentConnection = conn
+
+            // Re-check stopped after creating connection to handle disconnect()
+            // called between factory invocation and conn.connect() start.
+            if (stopped) {
+                conn.disconnect()
+                currentConnection = null
+                break
+            }
 
             try {
                 var wasConnected = false
@@ -199,6 +210,11 @@ class ReconnectingClientConnection<A : Action>(
 
     /**
      * Stop the reconnection loop and disconnect the current inner connection.
+     *
+     * Sets a stop flag that the reconnection loop checks after each backoff
+     * delay and before each connection attempt. When used via [SyncMiddleware],
+     * `stopConnection()` also cancels the coroutine running [connect], which
+     * immediately interrupts any in-progress backoff delay.
      *
      * The shared [incoming] channel remains open so that this instance can be
      * reused with a subsequent [connect] call (matching [SyncMiddleware]'s
