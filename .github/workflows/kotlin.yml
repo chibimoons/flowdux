@@ -9,6 +9,9 @@ on:
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
       - 'gradle.properties'
+      - 'detekt.yml'
+      - 'detekt-baseline.xml'
+      - '.editorconfig'
   pull_request:
     paths:
       - 'kotlin/**'

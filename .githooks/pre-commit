@@ -9,7 +9,7 @@ if [ -z "$STAGED_KT" ]; then
 fi
 
 echo "🔍 Running spotlessCheck on staged Kotlin files..."
-if ! ./gradlew spotlessCheck --quiet 2>/dev/null; then
+if ! ./gradlew spotlessCheck --quiet; then
     echo ""
     echo "❌ Formatting check failed."
     echo "   Run: ./gradlew spotlessApply"

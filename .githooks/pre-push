@@ -4,13 +4,13 @@ set -euo pipefail
 echo "🔍 Running pre-push checks..."
 
 echo "  → detekt (static analysis)..."
-if ! ./gradlew detekt --quiet 2>/dev/null; then
+if ! ./gradlew detekt --quiet ; then
     echo "❌ detekt failed. Fix issues before pushing."
     exit 1
 fi
 
 echo "  → compileKotlinJvm (build check)..."
-if ! ./gradlew compileKotlinJvm --quiet 2>/dev/null; then
+if ! ./gradlew compileKotlinJvm --quiet ; then
     echo "❌ Compilation failed. Fix errors before pushing."
     exit 1
 fi
