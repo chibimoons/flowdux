@@ -16,6 +16,14 @@ import kotlinx.serialization.serializer
  * To use short names like `{"type":"SendMessage", ...}`, annotate subclasses
  * with `@SerialName("SendMessage")`.
  *
+ * ## Forward compatibility
+ *
+ * [DefaultJson] enables `ignoreUnknownKeys`, so actions serialized by a newer
+ * schema version (with additional fields) can still be decoded by an older version.
+ * Unknown type discriminators (entirely new action subclasses) will still throw
+ * [kotlinx.serialization.SerializationException] — use [io.flowdux.remote.decodeOrNull] or the
+ * `onDecodeError` callback on typed connections to handle those gracefully.
+ *
  * Usage:
  * ```kotlin
  * val codec = actionCodecOf<ChatAction>()
@@ -33,6 +41,7 @@ class SerializableActionCodec<A : Action>(
         val DefaultJson: Json =
             Json {
                 classDiscriminator = "type"
+                ignoreUnknownKeys = true
             }
     }
 }

@@ -18,6 +18,7 @@ package io.flowdux.remote.nodemediator
  *             is NodeMediatorEvent.ConnectionFailed -> logger.error("Connection failed", event.cause)
  *             is NodeMediatorEvent.NodeDisconnected -> logger.info("Node ${event.nodeId} disconnected")
  *             is NodeMediatorEvent.NodeConnected -> logger.info("Node ${event.nodeId} connected")
+ *             is NodeMediatorEvent.NodeReconnected -> logger.info("Node ${event.nodeId} reconnected")
  *             is NodeMediatorEvent.CallbackFailed -> logger.error("Callback failed", event.cause)
  *         }
  *     },
@@ -54,6 +55,13 @@ sealed interface NodeMediatorEvent {
      * Emitted by [CentralNodeManager] when a node establishes a connection.
      */
     data class NodeConnected(val nodeId: String) : NodeMediatorEvent
+
+    /**
+     * A node reconnected to the Central server while its previous connection was still registered.
+     * Emitted by [CentralNodeManager] when a node connects with a nodeId that is already present.
+     * Room assignments are preserved across reconnection.
+     */
+    data class NodeReconnected(val nodeId: String) : NodeMediatorEvent
 
     /**
      * An [NodeMediator.onUnknownRoom] or [CentralNodeManager.onUpstreamAction] callback
