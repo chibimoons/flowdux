@@ -128,10 +128,13 @@ class SerializableActionCodecTest {
 
     // --- ignoreUnknownKeys (forward compatibility) ---
 
+    private val typePrefix =
+        "io.flowdux.remote.serialization.SerializableActionCodecTest.TestAction"
+
     @Test
     fun decodeIgnoresUnknownFields() {
         val json =
-            """{"type":"io.flowdux.remote.serialization.SerializableActionCodecTest.TestAction.Add","value":10,"newField":"ignored"}"""
+            """{"type":"$typePrefix.Add","value":10,"newField":"ignored"}"""
         val decoded = codec.decode(json)
         assertEquals(TestAction.Add(10), decoded)
     }
@@ -139,7 +142,7 @@ class SerializableActionCodecTest {
     @Test
     fun decodeIgnoresUnknownFieldsOnDataObject() {
         val json =
-            """{"type":"io.flowdux.remote.serialization.SerializableActionCodecTest.TestAction.Increment","extraKey":true}"""
+            """{"type":"$typePrefix.Increment","extraKey":true}"""
         val decoded = codec.decode(json)
         assertEquals(TestAction.Increment, decoded)
     }
