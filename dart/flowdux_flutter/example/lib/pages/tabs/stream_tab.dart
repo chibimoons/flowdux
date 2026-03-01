@@ -203,17 +203,15 @@ class _SymbolButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor:
-            isActive ? Theme.of(context).colorScheme.primary : null,
+        backgroundColor: isActive
+            ? Theme.of(context).colorScheme.primary
+            : null,
         foregroundColor: isActive ? Colors.white : null,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       ),
       child: Text(
         symbol,
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -302,11 +300,7 @@ class _ChartPainter extends CustomPainter {
     final lastNormalized = (prices.last - minPrice) / effectiveRange;
     final lastY = size.height - (lastNormalized * size.height * 0.8) - 20;
 
-    canvas.drawCircle(
-      Offset(lastX, lastY),
-      5,
-      Paint()..color = lineColor,
-    );
+    canvas.drawCircle(Offset(lastX, lastY), 5, Paint()..color = lineColor);
   }
 
   @override

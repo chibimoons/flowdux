@@ -84,7 +84,8 @@ class ChainedStrategy implements ExecutionStrategy {
     final secondCategories = _collectCategories(second);
 
     for (final category in firstCategories) {
-      if (category != StrategyCategory.chained && secondCategories.contains(category)) {
+      if (category != StrategyCategory.chained &&
+          secondCategories.contains(category)) {
         throw DuplicateCategoryException(
           category: category,
           firstName: _getStrategyName(first, category),
@@ -109,7 +110,10 @@ class ChainedStrategy implements ExecutionStrategy {
   }
 
   /// Gets the name of the strategy with the given category.
-  static String _getStrategyName(ExecutionStrategy strategy, StrategyCategory category) {
+  static String _getStrategyName(
+    ExecutionStrategy strategy,
+    StrategyCategory category,
+  ) {
     if (strategy is ChainedStrategy) {
       // Search in nested strategies
       final firstName = _tryGetStrategyName(strategy.first, category);
@@ -125,7 +129,10 @@ class ChainedStrategy implements ExecutionStrategy {
     return strategy.runtimeType.toString();
   }
 
-  static String? _tryGetStrategyName(ExecutionStrategy strategy, StrategyCategory category) {
+  static String? _tryGetStrategyName(
+    ExecutionStrategy strategy,
+    StrategyCategory category,
+  ) {
     if (strategy is ChainedStrategy) {
       final firstName = _tryGetStrategyName(strategy.first, category);
       if (firstName != null) return firstName;

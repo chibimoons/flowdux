@@ -41,12 +41,11 @@ class AppState {
 
   AppState({this.count = 0, this.loading = false, this.data});
 
-  AppState copyWith({int? count, bool? loading, String? data}) =>
-      AppState(
-        count: count ?? this.count,
-        loading: loading ?? this.loading,
-        data: data ?? this.data,
-      );
+  AppState copyWith({int? count, bool? loading, String? data}) => AppState(
+    count: count ?? this.count,
+    loading: loading ?? this.loading,
+    data: data ?? this.data,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -61,7 +60,8 @@ class AppState {
   int get hashCode => Object.hash(count, loading, data);
 
   @override
-  String toString() => 'AppState(count: $count, loading: $loading, data: $data)';
+  String toString() =>
+      'AppState(count: $count, loading: $loading, data: $data)';
 }
 
 // Test Middlewares using new DSL
@@ -170,8 +170,9 @@ class AppReducer extends ReducerBase<AppState, Action> {
     on<DecrementAction>((state, _) => state.copyWith(count: state.count - 1));
     on<SetValueAction>((state, action) => state.copyWith(count: action.value));
     on<LoadingAction>((state, _) => state.copyWith(loading: true));
-    on<DataLoadedAction>((state, action) =>
-        state.copyWith(loading: false, data: action.data));
+    on<DataLoadedAction>(
+      (state, action) => state.copyWith(loading: false, data: action.data),
+    );
     on<TransformedAction>((state, _) => state.copyWith(count: 999));
   }
 }
@@ -209,7 +210,10 @@ void main() {
       store.dispatch(TransformAction());
       await Future.delayed(Duration(milliseconds: 50));
 
-      expect(store.currentState.count, 999); // TransformedAction sets count to 999
+      expect(
+        store.currentState.count,
+        999,
+      ); // TransformedAction sets count to 999
 
       await store.close();
     });
@@ -233,7 +237,12 @@ void main() {
       final store = createStore<AppState, Action>(
         initialState: AppState(),
         reducer: reducer,
-        middlewares: [AsyncMiddleware(delay: Duration(milliseconds: 20), data: 'async data')],
+        middlewares: [
+          AsyncMiddleware(
+            delay: Duration(milliseconds: 20),
+            data: 'async data',
+          ),
+        ],
       );
 
       store.dispatch(FetchDataAction());
@@ -297,8 +306,14 @@ void main() {
       expect(store.currentState.count, 1);
 
       // Both middlewares should have processed
-      expect(logger.logs, contains('middleware:CounterMiddleware:IncrementAction'));
-      expect(logger.logs, contains('middleware:TransformMiddleware:IncrementAction'));
+      expect(
+        logger.logs,
+        contains('middleware:CounterMiddleware:IncrementAction'),
+      );
+      expect(
+        logger.logs,
+        contains('middleware:TransformMiddleware:IncrementAction'),
+      );
 
       await store.close();
     });
@@ -335,7 +350,9 @@ void main() {
 
       expect(
         exception.toString(),
-        contains("Processor for action type 'IncrementAction' is already registered"),
+        contains(
+          "Processor for action type 'IncrementAction' is already registered",
+        ),
       );
     });
   });
@@ -353,8 +370,9 @@ void main() {
       store.dispatch(IncrementAction());
       await Future.delayed(Duration(milliseconds: 50));
 
-      final middlewareProcessingLogs =
-          logger.logs.where((log) => log.startsWith('middleware:')).toList();
+      final middlewareProcessingLogs = logger.logs
+          .where((log) => log.startsWith('middleware:'))
+          .toList();
       // 2 user middlewares + 1 FlowHolderMiddleware
       expect(middlewareProcessingLogs.length, 3);
 
@@ -382,7 +400,10 @@ void main() {
   group('ErrorProcessor', () {
     test('DefaultErrorProcessor swallows errors', () async {
       final errorProcessor = DefaultErrorProcessor<Action>();
-      final stream = errorProcessor.process(Exception('test'), StackTrace.current);
+      final stream = errorProcessor.process(
+        Exception('test'),
+        StackTrace.current,
+      );
 
       final actions = await stream.toList();
       expect(actions, isEmpty);
@@ -390,7 +411,10 @@ void main() {
 
     test('custom ErrorProcessor can emit recovery actions', () async {
       final errorProcessor = _TestErrorProcessor();
-      final stream = errorProcessor.process(Exception('test'), StackTrace.current);
+      final stream = errorProcessor.process(
+        Exception('test'),
+        StackTrace.current,
+      );
 
       final actions = await stream.toList();
       expect(actions.length, 1);

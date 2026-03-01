@@ -63,7 +63,8 @@ class AppState {
       flowHolderSymbol: flowHolderSymbol ?? this.flowHolderSymbol,
       flowHolderPrice: flowHolderPrice ?? this.flowHolderPrice,
       flowHolderHistory: flowHolderHistory ?? this.flowHolderHistory,
-      isFlowHolderStreaming: isFlowHolderStreaming ?? this.isFlowHolderStreaming,
+      isFlowHolderStreaming:
+          isFlowHolderStreaming ?? this.isFlowHolderStreaming,
     );
   }
 
@@ -88,19 +89,19 @@ class AppState {
 
   @override
   int get hashCode => Object.hash(
-        count,
-        isLoading,
-        searchQuery,
-        searchResults.length,
-        error,
-        message,
-        activeSymbol,
-        currentPrice,
-        priceHistory.length,
-        isStreaming,
-        flowHolderSymbol,
-        flowHolderPrice,
-        flowHolderHistory.length,
-        isFlowHolderStreaming,
-      );
+    count,
+    isLoading,
+    searchQuery,
+    searchResults.length,
+    error,
+    message,
+    activeSymbol,
+    currentPrice,
+    priceHistory.length,
+    isStreaming,
+    flowHolderSymbol,
+    flowHolderPrice,
+    flowHolderHistory.length,
+    isFlowHolderStreaming,
+  );
 }

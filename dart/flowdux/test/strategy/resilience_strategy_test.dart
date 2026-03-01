@@ -46,24 +46,27 @@ void main() {
       var attemptCount = 0;
       final strategy = retry(3);
 
-      final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>(
-        (state, action) async* {
-          attemptCount++;
-          if (attemptCount < 3) {
-            throw NetworkException('Network error');
-          }
-          yield DataAction('success');
-        },
-      );
+      final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>((
+        state,
+        action,
+      ) async* {
+        attemptCount++;
+        if (attemptCount < 3) {
+          throw NetworkException('Network error');
+        }
+        yield DataAction('success');
+      });
 
       final state = AppState();
       final results = <String>[];
       Object? caughtError;
 
-      await wrappedProcessor(state, FetchAction()).listen(
-        (a) => results.add((a as DataAction).data),
-        onError: (e) => caughtError = e,
-      ).asFuture();
+      await wrappedProcessor(state, FetchAction())
+          .listen(
+            (a) => results.add((a as DataAction).data),
+            onError: (e) => caughtError = e,
+          )
+          .asFuture();
 
       expect(attemptCount, 3);
       expect(results, ['success']);
@@ -74,12 +77,13 @@ void main() {
       var attemptCount = 0;
       final strategy = retry(3);
 
-      final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>(
-        (state, action) async* {
-          attemptCount++;
-          throw NetworkException('Network error $attemptCount');
-        },
-      );
+      final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>((
+        state,
+        action,
+      ) async* {
+        attemptCount++;
+        throw NetworkException('Network error $attemptCount');
+      });
 
       final state = AppState();
       Object? caughtError;
@@ -107,12 +111,13 @@ void main() {
       var attemptCount = 0;
       final strategy = retry(3);
 
-      final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>(
-        (state, action) async* {
-          attemptCount++;
-          throw CancellationException('Operation cancelled');
-        },
-      );
+      final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>((
+        state,
+        action,
+      ) async* {
+        attemptCount++;
+        throw CancellationException('Operation cancelled');
+      });
 
       final state = AppState();
       Object? caughtError;
@@ -138,20 +143,18 @@ void main() {
 
     test('respects retryIf predicate', () async {
       var attemptCount = 0;
-      final strategy = retry(
-        3,
-        retryIf: (e) => e is NetworkException,
-      );
+      final strategy = retry(3, retryIf: (e) => e is NetworkException);
 
-      final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>(
-        (state, action) async* {
-          attemptCount++;
-          if (attemptCount == 1) {
-            throw NetworkException('Network error');
-          }
-          throw ValidationException('Validation error');
-        },
-      );
+      final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>((
+        state,
+        action,
+      ) async* {
+        attemptCount++;
+        if (attemptCount == 1) {
+          throw NetworkException('Network error');
+        }
+        throw ValidationException('Validation error');
+      });
 
       final state = AppState();
       Object? caughtError;
@@ -185,19 +188,21 @@ void main() {
       var attemptCount = 0;
       final strategy = retry(3);
 
-      final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>(
-        (state, action) async* {
-          attemptCount++;
-          yield DataAction('success');
-        },
-      );
+      final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>((
+        state,
+        action,
+      ) async* {
+        attemptCount++;
+        yield DataAction('success');
+      });
 
       final state = AppState();
       final results = <String>[];
 
-      await wrappedProcessor(state, FetchAction()).listen(
-        (a) => results.add((a as DataAction).data),
-      ).asFuture();
+      await wrappedProcessor(
+        state,
+        FetchAction(),
+      ).listen((a) => results.add((a as DataAction).data)).asFuture();
 
       expect(attemptCount, 1);
       expect(results, ['success']);
@@ -217,27 +222,29 @@ void main() {
           factor: 2.0,
         );
 
-        final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>(
-          (state, action) async* {
-            final now = DateTime.now();
-            if (attemptCount > 0) {
-              delays.add(now.difference(lastAttemptTime));
-            }
-            lastAttemptTime = now;
-            attemptCount++;
-            if (attemptCount < 4) {
-              throw NetworkException('Network error');
-            }
-            yield DataAction('success');
-          },
-        );
+        final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>((
+          state,
+          action,
+        ) async* {
+          final now = DateTime.now();
+          if (attemptCount > 0) {
+            delays.add(now.difference(lastAttemptTime));
+          }
+          lastAttemptTime = now;
+          attemptCount++;
+          if (attemptCount < 4) {
+            throw NetworkException('Network error');
+          }
+          yield DataAction('success');
+        });
 
         final state = AppState();
         final results = <String>[];
 
-        wrappedProcessor(state, FetchAction()).listen(
-          (a) => results.add((a as DataAction).data),
-        );
+        wrappedProcessor(
+          state,
+          FetchAction(),
+        ).listen((a) => results.add((a as DataAction).data));
 
         // First attempt immediately
         async.elapse(Duration.zero);
@@ -268,15 +275,16 @@ void main() {
           factor: 2.0,
         );
 
-        final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>(
-          (state, action) async* {
-            attemptCount++;
-            if (attemptCount < 5) {
-              throw NetworkException('Network error');
-            }
-            yield DataAction('success');
-          },
-        );
+        final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>((
+          state,
+          action,
+        ) async* {
+          attemptCount++;
+          if (attemptCount < 5) {
+            throw NetworkException('Network error');
+          }
+          yield DataAction('success');
+        });
 
         final state = AppState();
 
@@ -322,25 +330,23 @@ void main() {
     test('never retries CancellationException', () {
       fakeAsync((async) {
         var attemptCount = 0;
-        final strategy = retryWithBackoff(
-          3,
-          Duration(milliseconds: 100),
-        );
+        final strategy = retryWithBackoff(3, Duration(milliseconds: 100));
 
-        final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>(
-          (state, action) async* {
-            attemptCount++;
-            throw CancellationException('Cancelled');
-          },
-        );
+        final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>((
+          state,
+          action,
+        ) async* {
+          attemptCount++;
+          throw CancellationException('Cancelled');
+        });
 
         final state = AppState();
         Object? caughtError;
 
-        wrappedProcessor(state, FetchAction()).listen(
-          (_) {},
-          onError: (e) => caughtError = e,
-        );
+        wrappedProcessor(
+          state,
+          FetchAction(),
+        ).listen((_) {}, onError: (e) => caughtError = e);
 
         async.elapse(Duration.zero);
 
@@ -364,20 +370,20 @@ void main() {
           retryIf: (e) => e is NetworkException,
         );
 
-        final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>(
-          (state, action) async* {
-            attemptCount++;
-            throw ValidationException('Invalid');
-          },
-        );
+        final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>((
+          state,
+          action,
+        ) async* {
+          attemptCount++;
+          throw ValidationException('Invalid');
+        });
 
         final state = AppState();
 
-        wrappedProcessor(state, FetchAction()).listen(
-          (_) {},
-          onError: (e) => caughtError = e,
-          cancelOnError: false,
-        );
+        wrappedProcessor(
+          state,
+          FetchAction(),
+        ).listen((_) {}, onError: (e) => caughtError = e, cancelOnError: false);
 
         async.elapse(Duration.zero);
         expect(attemptCount, 1);
@@ -491,7 +497,10 @@ class _RetryMiddleware extends Middleware<AppState, Action> {
 
 class _RetryWithBackoffMiddleware extends Middleware<AppState, Action> {
   _RetryWithBackoffMiddleware({required void Function() onProcess}) {
-    apply(retryWithBackoff(3, Duration(milliseconds: 10))).on<FetchAction>((state, action) async* {
+    apply(retryWithBackoff(3, Duration(milliseconds: 10))).on<FetchAction>((
+      state,
+      action,
+    ) async* {
       onProcess();
       yield DataAction('success');
     });

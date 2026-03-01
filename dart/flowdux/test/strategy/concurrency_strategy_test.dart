@@ -66,29 +66,33 @@ class AppState {
     bool? submitting,
     List<int>? savedValues,
     List<String>? searchResults,
-  }) =>
-      AppState(
-        results: results ?? this.results,
-        submitting: submitting ?? this.submitting,
-        savedValues: savedValues ?? this.savedValues,
-        searchResults: searchResults ?? this.searchResults,
-      );
+  }) => AppState(
+    results: results ?? this.results,
+    submitting: submitting ?? this.submitting,
+    savedValues: savedValues ?? this.savedValues,
+    searchResults: searchResults ?? this.searchResults,
+  );
 
   @override
-  String toString() => 'AppState(results: $results, submitting: $submitting, savedValues: $savedValues)';
+  String toString() =>
+      'AppState(results: $results, submitting: $submitting, savedValues: $savedValues)';
 }
 
 // Test Reducer
 class AppReducer extends ReducerBase<AppState, Action> {
   AppReducer() {
-    on<ResultAction>((state, action) =>
-        state.copyWith(results: [...state.results, action.id]));
+    on<ResultAction>(
+      (state, action) => state.copyWith(results: [...state.results, action.id]),
+    );
     on<SubmittingAction>((state, _) => state.copyWith(submitting: true));
     on<SubmittedAction>((state, _) => state.copyWith(submitting: false));
-    on<SavedAction>((state, action) =>
-        state.copyWith(savedValues: [...state.savedValues, action.value]));
-    on<SearchResultAction>((state, action) =>
-        state.copyWith(searchResults: action.results));
+    on<SavedAction>(
+      (state, action) =>
+          state.copyWith(savedValues: [...state.savedValues, action.value]),
+    );
+    on<SearchResultAction>(
+      (state, action) => state.copyWith(searchResults: action.results),
+    );
   }
 }
 
@@ -297,31 +301,40 @@ void main() {
       final executionOrder = <String>[];
 
       // Start three concurrent operations
-      unawaited(lock.synchronized(() async {
-        executionOrder.add('a:start');
-        await Future.delayed(Duration(milliseconds: 30));
-        executionOrder.add('a:end');
-      }));
+      unawaited(
+        lock.synchronized(() async {
+          executionOrder.add('a:start');
+          await Future.delayed(Duration(milliseconds: 30));
+          executionOrder.add('a:end');
+        }),
+      );
 
-      unawaited(lock.synchronized(() async {
-        executionOrder.add('b:start');
-        await Future.delayed(Duration(milliseconds: 20));
-        executionOrder.add('b:end');
-      }));
+      unawaited(
+        lock.synchronized(() async {
+          executionOrder.add('b:start');
+          await Future.delayed(Duration(milliseconds: 20));
+          executionOrder.add('b:end');
+        }),
+      );
 
-      unawaited(lock.synchronized(() async {
-        executionOrder.add('c:start');
-        await Future.delayed(Duration(milliseconds: 10));
-        executionOrder.add('c:end');
-      }));
+      unawaited(
+        lock.synchronized(() async {
+          executionOrder.add('c:start');
+          await Future.delayed(Duration(milliseconds: 10));
+          executionOrder.add('c:end');
+        }),
+      );
 
       await Future.delayed(Duration(milliseconds: 150));
 
       // Should execute in order: a complete, then b complete, then c complete
       expect(executionOrder, [
-        'a:start', 'a:end',
-        'b:start', 'b:end',
-        'c:start', 'c:end',
+        'a:start',
+        'a:end',
+        'b:start',
+        'b:end',
+        'c:start',
+        'c:end',
       ]);
     });
 

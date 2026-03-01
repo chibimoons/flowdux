@@ -17,11 +17,7 @@ class StoreProvider<S, A extends Action> extends InheritedWidget {
   final Store<S, A> store;
 
   /// Creates a [StoreProvider] with the given [store].
-  const StoreProvider({
-    super.key,
-    required this.store,
-    required super.child,
-  });
+  const StoreProvider({super.key, required this.store, required super.child});
 
   /// Retrieves the [Store] from the nearest [StoreProvider] ancestor.
   ///
@@ -33,8 +29,8 @@ class StoreProvider<S, A extends Action> extends InheritedWidget {
   /// store.dispatch(IncrementAction());
   /// ```
   static Store<S, A> of<S, A extends Action>(BuildContext context) {
-    final provider =
-        context.dependOnInheritedWidgetOfExactType<StoreProvider<S, A>>();
+    final provider = context
+        .dependOnInheritedWidgetOfExactType<StoreProvider<S, A>>();
 
     if (provider == null) {
       throw FlutterError(
@@ -63,8 +59,8 @@ class StoreProvider<S, A extends Action> extends InheritedWidget {
   /// }
   /// ```
   static Store<S, A>? maybeOf<S, A extends Action>(BuildContext context) {
-    final provider =
-        context.dependOnInheritedWidgetOfExactType<StoreProvider<S, A>>();
+    final provider = context
+        .dependOnInheritedWidgetOfExactType<StoreProvider<S, A>>();
     return provider?.store;
   }
 

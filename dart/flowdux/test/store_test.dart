@@ -33,7 +33,10 @@ class BatchAction with FlowHolderAction {
 class AsyncBatchAction with FlowHolderAction {
   final List<Action> actions;
   final Duration delay;
-  AsyncBatchAction(this.actions, {this.delay = const Duration(milliseconds: 10)});
+  AsyncBatchAction(
+    this.actions, {
+    this.delay = const Duration(milliseconds: 10),
+  });
 
   @override
   Stream<Action> toStreamAction() async* {
@@ -69,7 +72,9 @@ class CounterState {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is CounterState && runtimeType == other.runtimeType && count == other.count;
+      other is CounterState &&
+          runtimeType == other.runtimeType &&
+          count == other.count;
 
   @override
   int get hashCode => count.hashCode;
@@ -210,11 +215,13 @@ void main() {
           reducer: reducer,
         );
 
-        store.dispatch(BatchAction([
-          IncrementAction(),
-          IncrementAction(),
-          IncrementAction(),
-        ]));
+        store.dispatch(
+          BatchAction([
+            IncrementAction(),
+            IncrementAction(),
+            IncrementAction(),
+          ]),
+        );
 
         await Future.delayed(Duration(milliseconds: 50));
 
@@ -229,10 +236,12 @@ void main() {
           reducer: reducer,
         );
 
-        store.dispatch(AsyncBatchAction(
-          [IncrementAction(), IncrementAction()],
-          delay: Duration(milliseconds: 10),
-        ));
+        store.dispatch(
+          AsyncBatchAction([
+            IncrementAction(),
+            IncrementAction(),
+          ], delay: Duration(milliseconds: 10)),
+        );
 
         // Before delay completes
         await Future.delayed(Duration(milliseconds: 5));
@@ -301,10 +310,7 @@ void main() {
         store.dispatch(IncrementAction());
 
         expect(store.currentState, CounterState(0));
-        expect(
-          logger.logs,
-          contains('dispatchAfterClose:IncrementAction'),
-        );
+        expect(logger.logs, contains('dispatchAfterClose:IncrementAction'));
       });
 
       test('close() is idempotent', () async {
@@ -350,7 +356,9 @@ void main() {
 
         expect(
           logger.logs,
-          contains('reduced:IncrementAction:CounterState(count: 0)->CounterState(count: 1)'),
+          contains(
+            'reduced:IncrementAction:CounterState(count: 0)->CounterState(count: 1)',
+          ),
         );
 
         await store.close();

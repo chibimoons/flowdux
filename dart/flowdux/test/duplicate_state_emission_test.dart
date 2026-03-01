@@ -103,41 +103,43 @@ void main() {
       await store.close();
     });
 
-    test('store does not emit when reducer returns same state reference',
-        () async {
-      final emissions = <int>[];
+    test(
+      'store does not emit when reducer returns same state reference',
+      () async {
+        final emissions = <int>[];
 
-      final store = createStore<CounterState, CounterAction>(
-        initialState: const CounterState(count: 0),
-        reducer: CounterReducer().reducer,
-      );
+        final store = createStore<CounterState, CounterAction>(
+          initialState: const CounterState(count: 0),
+          reducer: CounterReducer().reducer,
+        );
 
-      final subscription = store.state.listen((state) {
-        emissions.add(state.count);
-      });
+        final subscription = store.state.listen((state) {
+          emissions.add(state.count);
+        });
 
-      // Wait for initial state emission
-      await Future.delayed(const Duration(milliseconds: 50));
-      expect(emissions, [0]);
+        // Wait for initial state emission
+        await Future.delayed(const Duration(milliseconds: 50));
+        expect(emissions, [0]);
 
-      // FetchData returns state unchanged
-      store.dispatch(FetchDataAction('test'));
-      await Future.delayed(const Duration(milliseconds: 50));
-      expect(emissions, [0], reason: 'Should not emit when state unchanged');
+        // FetchData returns state unchanged
+        store.dispatch(FetchDataAction('test'));
+        await Future.delayed(const Duration(milliseconds: 50));
+        expect(emissions, [0], reason: 'Should not emit when state unchanged');
 
-      // NoOpAction also returns state unchanged
-      store.dispatch(NoOpAction());
-      await Future.delayed(const Duration(milliseconds: 50));
-      expect(emissions, [0], reason: 'Should not emit when state unchanged');
+        // NoOpAction also returns state unchanged
+        store.dispatch(NoOpAction());
+        await Future.delayed(const Duration(milliseconds: 50));
+        expect(emissions, [0], reason: 'Should not emit when state unchanged');
 
-      // Actual state change should emit
-      store.dispatch(IncrementAction());
-      await Future.delayed(const Duration(milliseconds: 50));
-      expect(emissions, [0, 1]);
+        // Actual state change should emit
+        store.dispatch(IncrementAction());
+        await Future.delayed(const Duration(milliseconds: 50));
+        expect(emissions, [0, 1]);
 
-      await subscription.cancel();
-      await store.close();
-    });
+        await subscription.cancel();
+        await store.close();
+      },
+    );
 
     test('consecutive identical state updates are deduplicated', () async {
       final emissions = <int>[];
@@ -169,8 +171,11 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 50));
 
       // Only initial, first change, and final change should be recorded
-      expect(emissions, [0, 10, 20],
-          reason: 'Consecutive identical states should be deduplicated');
+      expect(emissions, [
+        0,
+        10,
+        20,
+      ], reason: 'Consecutive identical states should be deduplicated');
 
       await subscription.cancel();
       await store.close();

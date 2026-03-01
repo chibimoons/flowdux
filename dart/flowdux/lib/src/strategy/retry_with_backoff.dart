@@ -81,12 +81,15 @@ class RetryWithBackoffStrategy implements ExecutionStrategy {
     this.jitter = 0.0,
     bool Function(Object error)? retryIf,
     Random? random,
-  })  : assert(maxAttempts >= 1, 'maxAttempts must be >= 1'),
-        assert(factor >= 1.0, 'factor must be >= 1.0'),
-        assert(jitter >= 0.0 && jitter <= 1.0, 'jitter must be between 0.0 and 1.0'),
-        maxDelay = maxDelay ?? const Duration(days: 365 * 100),
-        retryIf = retryIf ?? ((_) => true),
-        _random = random ?? Random();
+  }) : assert(maxAttempts >= 1, 'maxAttempts must be >= 1'),
+       assert(factor >= 1.0, 'factor must be >= 1.0'),
+       assert(
+         jitter >= 0.0 && jitter <= 1.0,
+         'jitter must be between 0.0 and 1.0',
+       ),
+       maxDelay = maxDelay ?? const Duration(days: 365 * 100),
+       retryIf = retryIf ?? ((_) => true),
+       _random = random ?? Random();
 
   @override
   StrategyCategory get category => StrategyCategory.resilience;
@@ -112,13 +115,15 @@ class RetryWithBackoffStrategy implements ExecutionStrategy {
 
   Duration _calculateDelay(int attemptNumber) {
     // baseDelay = initialDelay * (factor ^ attempt)
-    final baseDelayMs = initialDelay.inMicroseconds * pow(factor, attemptNumber);
+    final baseDelayMs =
+        initialDelay.inMicroseconds * pow(factor, attemptNumber);
 
     // cappedDelay = min(baseDelay, maxDelay)
     final cappedDelayMs = min(baseDelayMs, maxDelay.inMicroseconds.toDouble());
 
     // jitterAmount = cappedDelay * jitter * random(-1, 1)
-    final jitterAmount = cappedDelayMs * jitter * (_random.nextDouble() * 2 - 1);
+    final jitterAmount =
+        cappedDelayMs * jitter * (_random.nextDouble() * 2 - 1);
 
     // finalDelay = max(cappedDelay + jitterAmount, 0)
     final finalDelayMs = max(cappedDelayMs + jitterAmount, 0);
@@ -222,12 +227,11 @@ ExecutionStrategy retryWithBackoff(
   double factor = 2.0,
   double jitter = 0.0,
   bool Function(Object error)? retryIf,
-}) =>
-    RetryWithBackoffStrategy(
-      maxAttempts: maxAttempts,
-      initialDelay: initialDelay,
-      maxDelay: maxDelay,
-      factor: factor,
-      jitter: jitter,
-      retryIf: retryIf,
-    );
+}) => RetryWithBackoffStrategy(
+  maxAttempts: maxAttempts,
+  initialDelay: initialDelay,
+  maxDelay: maxDelay,
+  factor: factor,
+  jitter: jitter,
+  retryIf: retryIf,
+);

@@ -26,7 +26,10 @@ class AsyncBatchIncrementAction with FlowHolderAction {
   final int count;
   final Duration delay;
 
-  AsyncBatchIncrementAction(this.count, {this.delay = const Duration(milliseconds: 200)});
+  AsyncBatchIncrementAction(
+    this.count, {
+    this.delay = const Duration(milliseconds: 200),
+  });
 
   @override
   ExecutionStrategy get strategy => concurrent(); // Batch actions should complete fully

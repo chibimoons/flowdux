@@ -24,8 +24,10 @@ class CounterState {
 
   CounterState({this.count = 0, this.message});
 
-  CounterState copyWith({int? count, String? message}) =>
-      CounterState(count: count ?? this.count, message: message ?? this.message);
+  CounterState copyWith({int? count, String? message}) => CounterState(
+    count: count ?? this.count,
+    message: message ?? this.message,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -46,7 +48,8 @@ class CounterReducer extends ReducerBase<CounterState, Action> {
     on<DecrementAction>((state, _) => state.copyWith(count: state.count - 1));
     on<SetValueAction>((state, action) => state.copyWith(count: action.value));
     on<SetMessageAction>(
-        (state, action) => state.copyWith(message: action.message));
+      (state, action) => state.copyWith(message: action.message),
+    );
   }
 }
 
@@ -75,8 +78,9 @@ void main() {
             store: store,
             child: Builder(
               builder: (context) {
-                final providedStore =
-                    StoreProvider.of<CounterState, Action>(context);
+                final providedStore = StoreProvider.of<CounterState, Action>(
+                  context,
+                );
                 return Text('Store: ${providedStore.currentState.count}');
               },
             ),
@@ -110,8 +114,7 @@ void main() {
         MaterialApp(
           home: Builder(
             builder: (context) {
-              foundStore =
-                  StoreProvider.maybeOf<CounterState, Action>(context);
+              foundStore = StoreProvider.maybeOf<CounterState, Action>(context);
               return const Text('Test');
             },
           ),
@@ -272,7 +275,9 @@ void main() {
   });
 
   group('StoreSelector optimization', () {
-    testWidgets('does not rebuild when unrelated state changes', (tester) async {
+    testWidgets('does not rebuild when unrelated state changes', (
+      tester,
+    ) async {
       var buildCount = 0;
 
       await tester.pumpWidget(
