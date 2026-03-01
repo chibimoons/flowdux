@@ -9,7 +9,6 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.coroutineScope
@@ -34,9 +33,10 @@ import kotlin.concurrent.Volatile
  *
  * ## Single-use lifecycle
  *
- * Each instance supports a single connect/disconnect cycle. After [disconnect] is called,
- * the internal channels are closed and cannot be reopened, so calling [connect] again on
- * the same instance throws [IllegalStateException]. Create a new instance to reconnect:
+ * Each instance supports a single connection lifecycle. Once the connection terminates —
+ * whether by calling [disconnect], a server-initiated close, or a connection failure —
+ * the internal channels are closed and cannot be reopened. Calling [connect] again on the
+ * same instance throws [IllegalStateException]. Create a new instance to reconnect:
  *
  * ```kotlin
  * val conn1 = KtorWebSocketClientConnection(url)
@@ -90,6 +90,9 @@ class KtorWebSocketClientConnection(
 
     @Volatile
     private var session: WebSocketSession? = null
+
+    @Volatile
+    private var terminated = false
     private val connectMutex = Mutex()
 
     override suspend fun send(message: String) {
@@ -103,13 +106,12 @@ class KtorWebSocketClientConnection(
         }
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     override suspend fun connect() {
         connectMutex.withLock {
             if (_connectionState.value != ConnectionState.DISCONNECTED) return
-            if (outgoingChannel.isClosedForSend) {
+            if (terminated) {
                 throw IllegalStateException(
-                    "Cannot reconnect: this instance has already been disconnected. " +
+                    "Cannot reconnect: this instance has already been used. " +
                         "Create a new KtorWebSocketClientConnection instance to reconnect.",
                 )
             }
@@ -153,11 +155,13 @@ class KtorWebSocketClientConnection(
                 }
             }
         } finally {
+            terminated = true
             _connectionState.value = ConnectionState.DISCONNECTED
         }
     }
 
     override suspend fun disconnect() {
+        terminated = true
         _connectionState.value = ConnectionState.DISCONNECTED
         session?.close()
         session = null
