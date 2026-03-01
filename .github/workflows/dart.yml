@@ -5,9 +5,11 @@ on:
     branches: [main]
     paths:
       - 'dart/**'
+      - '.github/workflows/dart.yml'
   pull_request:
     paths:
       - 'dart/**'
+      - '.github/workflows/dart.yml'
 
 permissions:
   contents: read
@@ -44,7 +46,7 @@ jobs:
       - name: Convert coverage to LCOV
         working-directory: dart/flowdux
         run: |
-          dart pub global activate coverage
+          dart pub global activate coverage 1.7.2
           dart pub global run coverage:format_coverage \
             --lcov \
             --in=coverage \
