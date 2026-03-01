@@ -365,7 +365,7 @@ class KtorWebSocketClientConnectionTest {
     }
 
     @Test
-    fun `incoming backpressure delivers all messages when consumer is slow`() = runBlocking {
+    fun `incoming burst beyond buffer size delivers all messages without loss`() = runBlocking {
         val messageCount = 100
         val server = embeddedServer(CIO, port = 0) {
             install(WebSockets)
@@ -390,7 +390,9 @@ class KtorWebSocketClientConnectionTest {
                 connection.connectionState.first { it == ConnectionState.CONNECTED }
             }
 
-            // Consume all messages (slow consumer — backpressure should suspend the server)
+            // Collect all messages at once. The server sends 100 messages which exceeds
+            // the buffer capacity (64). SUSPEND overflow policy ensures no messages are
+            // dropped — the server's send() suspends until buffer space is available.
             val received = withTimeout(10_000) {
                 connection.incoming.take(messageCount).toList()
             }
@@ -407,7 +409,7 @@ class KtorWebSocketClientConnectionTest {
     }
 
     @Test
-    fun `outgoing backpressure suspends send when buffer overflows`() = runBlocking {
+    fun `outgoing backpressure suspends send when server is slow`() = runBlocking {
         val messageCount = 100
         val serverReceived = AtomicInteger(0)
 
@@ -418,6 +420,9 @@ class KtorWebSocketClientConnectionTest {
                     for (frame in incoming) {
                         if (frame is Frame.Text) {
                             serverReceived.incrementAndGet()
+                            // Slow server: delays reading to let the outgoing buffer fill up.
+                            // This forces the client's send() to suspend when the buffer (64) is full.
+                            delay(10)
                         }
                     }
                 }
@@ -434,15 +439,16 @@ class KtorWebSocketClientConnectionTest {
             }
 
             // Send more messages than the buffer can hold (64).
-            // send() should suspend when full, not drop messages.
-            withTimeout(10_000) {
+            // With the slow server, the outgoing buffer fills up and send() suspends
+            // until the server drains messages. No messages should be dropped.
+            withTimeout(30_000) {
                 for (i in 0 until messageCount) {
                     connection.send("msg-$i")
                 }
             }
 
-            // Allow server time to process remaining messages
-            withTimeout(5_000) {
+            // Wait for server to finish processing all messages
+            withTimeout(10_000) {
                 while (serverReceived.get() < messageCount) {
                     delay(50)
                 }
