@@ -21,7 +21,7 @@ import kotlinx.serialization.serializer
  * [DefaultJson] enables `ignoreUnknownKeys`, so actions serialized by a newer
  * schema version (with additional fields) can still be decoded by an older version.
  * Unknown type discriminators (entirely new action subclasses) will still throw
- * [kotlinx.serialization.SerializationException] — use [decodeOrNull] or the
+ * [kotlinx.serialization.SerializationException] — use [io.flowdux.remote.decodeOrNull] or the
  * `onDecodeError` callback on typed connections to handle those gracefully.
  *
  * Usage:
