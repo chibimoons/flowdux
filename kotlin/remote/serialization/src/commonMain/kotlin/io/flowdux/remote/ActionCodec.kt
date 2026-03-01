@@ -41,19 +41,19 @@ import kotlinx.coroutines.CancellationException
 interface ActionCodec<A : Action> {
     fun encode(action: A): String
     fun decode(json: String): A
+}
 
-    /**
-     * Decodes the given JSON string, returning `null` if decoding fails.
-     *
-     * This is useful for graceful handling of action type version mismatches
-     * during rolling updates — unknown or incompatible action types return `null`
-     * instead of throwing an exception.
-     */
-    fun decodeOrNull(json: String): A? = try {
-        decode(json)
-    } catch (e: CancellationException) {
-        throw e
-    } catch (_: Exception) {
-        null
-    }
+/**
+ * Decodes the given JSON string, returning `null` if decoding fails.
+ *
+ * This is useful for graceful handling of action type version mismatches
+ * during rolling updates — unknown or incompatible action types return `null`
+ * instead of throwing an exception.
+ */
+fun <A : Action> ActionCodec<A>.decodeOrNull(json: String): A? = try {
+    decode(json)
+} catch (e: CancellationException) {
+    throw e
+} catch (_: Exception) {
+    null
 }

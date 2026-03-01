@@ -1,6 +1,7 @@
 package io.flowdux.remote.serialization
 
 import io.flowdux.Action
+import io.flowdux.remote.decodeOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlin.test.Test
