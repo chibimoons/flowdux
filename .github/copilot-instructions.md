@@ -235,12 +235,33 @@ class FetchDataAction with FlowHolderAction {
 3. **Race conditions**: Multiple concurrent operations modifying shared state
 4. **Wrong strategy**: FlowHolderAction using wrong execution strategy for its use case
 
+### Concurrency & Thread Safety (Frequently Caught in Past PRs)
+
+1. **CancellationException swallowed in `catch (e: Exception)`**: Must rethrow `CancellationException` before handling other exceptions. This breaks structured concurrency.
+   ```kotlin
+   // Bad
+   try { ... } catch (e: Exception) { handleError(e) }
+   // Good
+   try { ... } catch (e: CancellationException) { throw e } catch (e: Exception) { handleError(e) }
+   ```
+2. **Missing thread-safety for mutable properties accessed from multiple threads**: Any `var` that may be read/written from different threads (for example via `Dispatchers.Default`, `Dispatchers.IO`, or custom threads) requires proper synchronization. Use `@Volatile` only for simple visibility of independent reads/writes; for read-modify-write operations (like increment, check-and-act, etc.) use `Atomic*` or other synchronization primitives instead.
+3. **Closing shared `Channel` breaks reconnect**: A `val channel = Channel<T>()` created once cannot be reused after `close()`. For reconnectable components, use per-connect channel creation or cancel the consumer Job instead.
+4. **`trySend()` result ignored**: When `trySend()` fails (buffer full), the message is silently dropped. Check the result and report via logging or event callback.
+5. **TOCTOU race with `isClosed` / boolean flags**: `if (!closed) { doSomething() }` has a race window. Use `AtomicBoolean.compareAndSet()` for check-and-act patterns.
+6. **`Channel.UNLIMITED` memory risk**: Unbounded channels can cause OOM under load. Prefer `Channel.BUFFERED` and document backpressure behavior in KDoc.
+
 ### Performance Issues
 
 1. **Unnecessary state updates**: Emitting same state repeatedly
 2. **Missing execution strategy**: Search/autocomplete without `takeLatest()`
 3. **Blocking operations**: Synchronous I/O in stream handlers
 4. **Excessive middleware chain**: Too many middlewares processing every action
+
+### API Compatibility (Frequently Caught in Past PRs)
+
+1. **Removing public/protected methods without `@Deprecated`**: Always add `@Deprecated(message = "Scheduled for removal in a future release", level = DeprecationLevel.WARNING)` wrapper before removing. Direct deletion is a breaking change for external consumers.
+2. **Adding methods to interface without default implementation**: External implementors will fail to compile. Always provide a default.
+3. **`println` in commonMain library code**: Library code must not use `println`. Use injectable `onEvent` callback or sealed event class.
 
 ### Code Quality Issues
 
@@ -264,6 +285,56 @@ class FetchDataAction with FlowHolderAction {
 - [ ] Store tests: Full flow from dispatch to state update
 - [ ] FlowHolderAction tests: Stream completion and cancellation
 - [ ] Error handling tests: Error processor behavior
+
+### Test Quality (Frequently Caught in Past PRs)
+
+1. **Resource leak in tests**: Connection, HttpClient, and other resources must be cleaned up in `finally` blocks — even if the test fails or the connection attempt itself fails.
+   ```kotlin
+   // Bad
+   @Test fun `test something`() = runTest {
+       val connection = KtorWebSocketClientConnection(...)
+       connection.connect()
+       // ... assertions — if test fails, connection leaks
+   }
+
+   // Good
+   @Test fun `test something`() = runTest {
+       val connection = KtorWebSocketClientConnection(...)
+       try {
+           connection.connect()
+           // ... assertions
+       } finally {
+           connection.disconnect()
+       }
+   }
+   ```
+
+2. **`runTest` used for race-condition tests**: `runTest` uses a test scheduler that does not provide real multi-threaded parallelism by default, making it unsuitable for reproducing race conditions. For tests that require actual concurrent thread execution, use `runBlocking` + `Dispatchers.Default` instead.
+   ```kotlin
+   // Bad: Single-threaded, no real concurrency
+   @Test fun `concurrent close is safe`() = runTest {
+       repeat(100) { launch { store.close() } }
+   }
+
+   // Good: Real multi-threaded execution
+   @Test fun `concurrent close is safe`() = runBlocking {
+       repeat(100) { launch(Dispatchers.Default) { store.close() } }
+   }
+   ```
+
+3. **Fixed `delay()` for timing**: Tests using `delay(500)` to wait for async results are flaky on slow CI. Use condition-based polling with timeout.
+   ```kotlin
+   // Bad
+   delay(500)
+   assertTrue(serverClosed.get())
+
+   // Good
+   withTimeout(5_000) { while (!serverClosed.get()) { delay(10) } }
+   ```
+
+4. **Test name does not match assertion**: If a test is named `factoryCreateBuildsCorrectWsUrl` but only asserts `connectionState == DISCONNECTED`, the name is misleading. Test names must accurately describe what is verified.
+
+5. **Missing test coverage for code changes**: Every behavioral change (race condition fix, new parameter, error handling path) should have a corresponding test that exercises the specific path.
 
 ### Test Patterns
 
@@ -290,6 +361,14 @@ fun `middleware emits correct actions`() = runTest {
 
 ---
 
+## Documentation Consistency (Frequently Caught in Past PRs)
+
+1. **KDoc code examples must compile**: After adding/removing parameters, verify that all KDoc `@sample` and inline code examples use the correct signatures.
+2. **Version references in docs/**: When bumping version in `gradle.properties`, also update version strings in `docs/` guides, `README.md`, and sample `build.gradle.kts` files.
+3. **Consistent terminology within a document**: Do not mix `-X POST` and `--method POST`, or "may not appear" and "does not appear" in the same document.
+
+---
+
 ## PR Review Focus Areas
 
 1. **Architecture Compliance**: Does the code follow unidirectional data flow?
@@ -298,6 +377,9 @@ fun `middleware emits correct actions`() = runTest {
 4. **Resource Management**: Are streams/subscriptions properly cleaned up?
 5. **Test Coverage**: Are new features adequately tested?
 6. **Cross-Platform Consistency**: Do Kotlin and Dart implementations match in behavior?
+7. **Concurrency Safety**: Are shared mutable fields protected with `@Volatile`/`Atomic*`? Is `CancellationException` handled correctly?
+8. **Test Reliability**: Are tests using `runBlocking`+`Dispatchers.Default` for concurrency? No fixed `delay()` for timing?
+9. **API Compatibility**: Are public method removals preceded by `@Deprecated`? Do new interface methods have defaults?
 
 ---
 
