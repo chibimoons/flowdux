@@ -426,6 +426,119 @@ class CentralNodeManagerTest {
     }
 
     @Test
+    fun reconnectingNodePreservesRoomAssignments() = runTest {
+        val registry = InMemoryRoomRegistry()
+        val events = mutableListOf<NodeMediatorEvent>()
+        val manager = CentralNodeManager<TestAction>(
+            roomRegistry = registry,
+            onUpstreamAction = { _, _, _ -> },
+            onEvent = { events.add(it) },
+        )
+
+        val conn1 = FakeTypedServerConnection()
+        val handleJob1 = launch { manager.handleNode("node-1", conn1) }
+        yield()
+
+        // Assign rooms to node-1
+        registry.assignRoom("room-1", "node-1")
+        registry.assignRoom("room-2", "node-1")
+
+        // Node reconnects with the same ID (simulates partition recovery)
+        val conn2 = FakeTypedServerConnection()
+        val handleJob2 = launch { manager.handleNode("node-1", conn2) }
+        yield()
+
+        // Old connection finishes — its cleanup must NOT unassign rooms
+        handleJob1.cancel()
+        handleJob1.join()
+
+        // Room assignments must still exist
+        assertEquals("node-1", registry.getNodeForRoom("room-1"))
+        assertEquals("node-1", registry.getNodeForRoom("room-2"))
+
+        // NodeReconnected event should have been emitted
+        assertTrue(
+            events.any { it is NodeMediatorEvent.NodeReconnected && it.nodeId == "node-1" },
+            "Expected NodeReconnected event",
+        )
+
+        // New connection should still be able to receive actions
+        manager.sendToRoom("room-1", TestAction.Message("after-reconnect"))
+        assertEquals(1, conn2.sentActions.size)
+        assertEquals(
+            NodeAction<TestAction>("room-1", TestAction.Message("after-reconnect")),
+            conn2.sentActions[0],
+        )
+
+        handleJob2.cancel()
+        handleJob2.join()
+        manager.close()
+    }
+
+    @Test
+    fun normalDisconnectStillCleansUpRooms() = runTest {
+        val registry = InMemoryRoomRegistry()
+        val manager = CentralNodeManager<TestAction>(
+            roomRegistry = registry,
+            onUpstreamAction = { _, _, _ -> },
+        )
+
+        val conn = FakeTypedServerConnection()
+        val handleJob = launch { manager.handleNode("node-1", conn) }
+        yield()
+
+        registry.assignRoom("room-1", "node-1")
+        registry.assignRoom("room-2", "node-1")
+
+        // Normal disconnect (no replacement) — rooms should be cleaned up
+        handleJob.cancel()
+        handleJob.join()
+
+        assertEquals(null, registry.getNodeForRoom("room-1"))
+        assertEquals(null, registry.getNodeForRoom("room-2"))
+
+        manager.close()
+    }
+
+    @Test
+    fun reconnectEmitsReconnectedNotConnected() = runTest {
+        val events = mutableListOf<NodeMediatorEvent>()
+        val manager = CentralNodeManager<TestAction>(
+            onUpstreamAction = { _, _, _ -> },
+            onEvent = { events.add(it) },
+        )
+
+        val conn1 = FakeTypedServerConnection()
+        val handleJob1 = launch { manager.handleNode("node-1", conn1) }
+        yield()
+
+        // First connection should emit NodeConnected
+        assertTrue(events.any { it is NodeMediatorEvent.NodeConnected && it.nodeId == "node-1" })
+        events.clear()
+
+        // Reconnect with same nodeId
+        val conn2 = FakeTypedServerConnection()
+        val handleJob2 = launch { manager.handleNode("node-1", conn2) }
+        yield()
+
+        // Should emit NodeReconnected, NOT NodeConnected
+        assertTrue(
+            events.any { it is NodeMediatorEvent.NodeReconnected && it.nodeId == "node-1" },
+            "Expected NodeReconnected event",
+        )
+        assertFalse(
+            events.any { it is NodeMediatorEvent.NodeConnected },
+            "Should not emit NodeConnected on reconnect",
+        )
+
+        handleJob1.cancel()
+        handleJob2.cancel()
+        handleJob1.join()
+        handleJob2.join()
+        manager.close()
+    }
+
+    @Test
     fun duplicateNodeIdReplacesConnection() = runTest {
         val manager = CentralNodeManager<TestAction>(
 

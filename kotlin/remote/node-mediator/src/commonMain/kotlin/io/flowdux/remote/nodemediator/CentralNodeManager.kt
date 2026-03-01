@@ -18,6 +18,14 @@ import kotlinx.coroutines.withContext
  * Runs alongside the Central Store and routes actions to/from connected nodes.
  * Each node connects via a single [TypedServerConnection] carrying [NodeAction] messages.
  *
+ * ## Reconnection and split-brain prevention
+ *
+ * When a node reconnects with the same `nodeId` while its previous connection is still
+ * registered, the new connection replaces the old one. Room assignments in the [RoomRegistry]
+ * are preserved across reconnection — the old connection's cleanup does **not** unassign
+ * rooms that now belong to the replacement. A [NodeMediatorEvent.NodeReconnected] event
+ * is emitted to distinguish reconnections from fresh connections.
+ *
  * Usage:
  * ```kotlin
  * val roomRegistry = InMemoryRoomRegistry()
@@ -82,10 +90,16 @@ class CentralNodeManager<A : Action>(
         var cause: Exception? = null
 
         try {
-            safeOnEvent(NodeMediatorEvent.NodeConnected(nodeId))
-
-            mutex.withLock {
+            val isReconnect = mutex.withLock {
+                val previous = nodes[nodeId]
                 nodes[nodeId] = entry
+                previous != null
+            }
+
+            if (isReconnect) {
+                safeOnEvent(NodeMediatorEvent.NodeReconnected(nodeId))
+            } else {
+                safeOnEvent(NodeMediatorEvent.NodeConnected(nodeId))
             }
 
             connection.incoming.collect { nodeAction ->
@@ -103,16 +117,23 @@ class CentralNodeManager<A : Action>(
             cause = e
         } finally {
             withContext(NonCancellable) {
-                mutex.withLock {
+                val wasReplaced = mutex.withLock {
                     // Only remove if this entry is still the current one (not replaced by a newer connection)
                     if (nodes[nodeId] === entry) {
                         nodes.remove(nodeId)
+                        false
+                    } else {
+                        true
                     }
                 }
-                // Remove room assignments for disconnected node
-                val rooms = roomRegistry.getRoomsForNode(nodeId)
-                for (roomId in rooms) {
-                    roomRegistry.unassignRoom(roomId)
+                // Only unassign rooms if this connection was NOT replaced by a newer one.
+                // When a node reconnects, the new connection takes over room ownership,
+                // and the old connection's cleanup must not revoke those assignments.
+                if (!wasReplaced) {
+                    val rooms = roomRegistry.getRoomsForNode(nodeId)
+                    for (roomId in rooms) {
+                        roomRegistry.unassignRoom(roomId)
+                    }
                 }
             }
             safeOnEvent(NodeMediatorEvent.NodeDisconnected(nodeId, cause))
