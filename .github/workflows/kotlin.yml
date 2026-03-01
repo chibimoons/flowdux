@@ -9,6 +9,9 @@ on:
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
       - 'gradle.properties'
+      - 'detekt.yml'
+      - 'detekt-baseline.xml'
+      - '.editorconfig'
   pull_request:
     paths:
       - 'kotlin/**'
@@ -16,13 +19,41 @@ on:
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
       - 'gradle.properties'
+      - 'detekt.yml'
+      - 'detekt-baseline.xml'
+      - '.editorconfig'
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run spotlessCheck
+        run: ./gradlew spotlessCheck
+
+      - name: Run detekt
+        run: ./gradlew detekt
+
   test:
+    needs: lint
     runs-on: ubuntu-latest
 
     steps:
@@ -93,6 +124,7 @@ jobs:
   # iOS/Native compilation check — catches issues like missing imports
   # that only surface on non-JVM targets (e.g. kotlin.concurrent.Volatile)
   compile-native:
+    needs: lint
     runs-on: macos-latest
 
     steps:

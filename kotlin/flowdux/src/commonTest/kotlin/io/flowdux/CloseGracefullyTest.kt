@@ -12,16 +12,16 @@ import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CloseGracefullyTest {
-
     @Test
     fun `closeGracefully processes beforeClose actions before closing`() = runTest {
         val storeScope = CoroutineScope(coroutineContext + Job())
-        val store = createStore(
-            initialState = CounterState(),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            scope = storeScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
         advanceUntilIdle()
 
         store.closeGracefully { dispatch ->
@@ -37,12 +37,13 @@ class CloseGracefullyTest {
     @Test
     fun `closeGracefully without beforeClose drains pending actions`() = runTest {
         val storeScope = CoroutineScope(coroutineContext + Job())
-        val store = createStore(
-            initialState = CounterState(),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            scope = storeScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
         advanceUntilIdle()
 
         store.dispatch(CounterAction.Add(5))
@@ -56,12 +57,13 @@ class CloseGracefullyTest {
     @Test
     fun `closeGracefully on already-closed store is no-op`() = runTest {
         val storeScope = CoroutineScope(coroutineContext + Job())
-        val store = createStore(
-            initialState = CounterState(),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            scope = storeScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
         advanceUntilIdle()
 
         store.close()
@@ -80,12 +82,13 @@ class CloseGracefullyTest {
     @Test
     fun `closeGracefully with timeout closes even if drain takes too long`() = runTest {
         val storeScope = CoroutineScope(coroutineContext + Job())
-        val store = createStore(
-            initialState = CounterState(),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            scope = storeScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
         advanceUntilIdle()
 
         // Use a very short timeout — the drain sentinel will complete fast
@@ -99,27 +102,34 @@ class CloseGracefullyTest {
     @Test
     fun `closeGracefully sentinel passes through middleware pipeline`() = runTest {
         val processedActions = mutableListOf<Action>()
-        val trackingMiddleware = object : Middleware<CounterState, CounterAction> {
-            override val name: String = "tracking"
-            override val processors = emptyMap<kotlin.reflect.KClass<*>, suspend kotlinx.coroutines.flow.FlowCollector<CounterAction>.(CounterState, CounterAction) -> Unit>()
+        val trackingMiddleware =
+            object : Middleware<CounterState, CounterAction> {
+                override val name: String = "tracking"
+                override val processors =
+                    emptyMap<
+                        kotlin.reflect.KClass<*>,
+                        suspend kotlinx.coroutines.flow.FlowCollector<CounterAction>.(
+                            CounterState,
+                            CounterAction,
+                        ) -> Unit,
+                        >()
 
-            override fun process(
-                getState: () -> CounterState,
-                action: CounterAction,
-            ) = kotlinx.coroutines.flow.flow {
-                processedActions.add(action)
-                emit(action)
+                override fun process(getState: () -> CounterState, action: CounterAction) =
+                    kotlinx.coroutines.flow.flow {
+                        processedActions.add(action)
+                        emit(action)
+                    }
             }
-        }
 
         val storeScope = CoroutineScope(coroutineContext + Job())
-        val store = createStore(
-            initialState = CounterState(),
-            middlewares = listOf(trackingMiddleware),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            scope = storeScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                middlewares = listOf(trackingMiddleware),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
         advanceUntilIdle()
 
         store.closeGracefully { dispatch ->

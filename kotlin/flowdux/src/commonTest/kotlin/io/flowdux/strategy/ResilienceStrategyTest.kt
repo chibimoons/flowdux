@@ -23,15 +23,14 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import kotlin.test.Test
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ResilienceStrategyTest {
-
     @Test
     fun `retry has correct category`() {
         assertEquals(StrategyCategory.RESILIENCE, retry(3).category)
@@ -43,22 +42,25 @@ class ResilienceStrategyTest {
         val attemptCount = mutableListOf<Int>()
         var attempt = 0
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                on<TestAction.Fetch>(retry(3)) { _, action ->
-                    attemptCount.add(++attempt)
-                    emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                }
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        on<TestAction.Fetch>(retry(3)) { _, action ->
+                            attemptCount.add(++attempt)
+                            emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                        }
+                    }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -78,25 +80,28 @@ class ResilienceStrategyTest {
         val attemptCount = mutableListOf<Int>()
         var attempt = 0
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                on<TestAction.Fetch>(retry(3)) { _, action ->
-                    attemptCount.add(++attempt)
-                    if (attempt < 3) {
-                        throw RuntimeException("Simulated failure $attempt")
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        on<TestAction.Fetch>(retry(3)) { _, action ->
+                            attemptCount.add(++attempt)
+                            if (attempt < 3) {
+                                throw RuntimeException("Simulated failure $attempt")
+                            }
+                            emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                        }
                     }
-                    emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -117,29 +122,33 @@ class ResilienceStrategyTest {
         var attempt = 0
         var caughtException: Throwable? = null
 
-        val errorProcessor = object : ErrorProcessor<TestAction> {
-            override fun process(throwable: Throwable): Flow<TestAction> {
-                caughtException = throwable
-                return emptyFlow()
-            }
-        }
-
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                on<TestAction.Fetch>(retry(3)) { _, _ ->
-                    attemptCount.add(++attempt)
-                    throw RuntimeException("Always fails")
+        val errorProcessor =
+            object : ErrorProcessor<TestAction> {
+                override fun process(throwable: Throwable): Flow<TestAction> {
+                    caughtException = throwable
+                    return emptyFlow()
                 }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = errorProcessor,
-            scope = backgroundScope,
-        )
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        on<TestAction.Fetch>(retry(3)) { _, _ ->
+                            attemptCount.add(++attempt)
+                            throw RuntimeException("Always fails")
+                        }
+                    }
+            }
+
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = errorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -161,30 +170,34 @@ class ResilienceStrategyTest {
         var attempt = 0
         var caughtException: Throwable? = null
 
-        val errorProcessor = object : ErrorProcessor<TestAction> {
-            override fun process(throwable: Throwable): Flow<TestAction> {
-                caughtException = throwable
-                return emptyFlow()
-            }
-        }
-
-        // Only retry on IllegalStateException, not on IllegalArgumentException
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                on<TestAction.Fetch>(retry(3) { it is IllegalStateException }) { _, _ ->
-                    attemptCount.add(++attempt)
-                    throw IllegalArgumentException("Non-retryable")
+        val errorProcessor =
+            object : ErrorProcessor<TestAction> {
+                override fun process(throwable: Throwable): Flow<TestAction> {
+                    caughtException = throwable
+                    return emptyFlow()
                 }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = errorProcessor,
-            scope = backgroundScope,
-        )
+        // Only retry on IllegalStateException, not on IllegalArgumentException
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        on<TestAction.Fetch>(retry(3) { it is IllegalStateException }) { _, _ ->
+                            attemptCount.add(++attempt)
+                            throw IllegalArgumentException("Non-retryable")
+                        }
+                    }
+            }
+
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = errorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -205,30 +218,35 @@ class ResilienceStrategyTest {
         var attempt = 0
         val startTime = testScheduler.currentTime
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                on<TestAction.Fetch>(retryWithBackoff(
-                    maxAttempts = 4,
-                    initialDelay = 100.milliseconds,
-                    factor = 2.0
-                )) { _, action ->
-                    attemptTimes.add(testScheduler.currentTime - startTime)
-                    attempt++
-                    if (attempt < 4) {
-                        throw RuntimeException("Simulated failure $attempt")
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        on<TestAction.Fetch>(
+                            retryWithBackoff(
+                                maxAttempts = 4,
+                                initialDelay = 100.milliseconds,
+                                factor = 2.0,
+                            ),
+                        ) { _, action ->
+                            attemptTimes.add(testScheduler.currentTime - startTime)
+                            attempt++
+                            if (attempt < 4) {
+                                throw RuntimeException("Simulated failure $attempt")
+                            }
+                            emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                        }
                     }
-                    emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -259,23 +277,26 @@ class ResilienceStrategyTest {
         val attemptCount = mutableListOf<Int>()
         var attempt = 0
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                on<TestAction.Fetch>(retry(3)) { _, action ->
-                    attemptCount.add(++attempt)
-                    delay(100) // This will be cancelled
-                    emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                }
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        on<TestAction.Fetch>(retry(3)) { _, action ->
+                            attemptCount.add(++attempt)
+                            delay(100) // This will be cancelled
+                            emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                        }
+                    }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -301,31 +322,36 @@ class ResilienceStrategyTest {
         var attempt = 0
         val startTime = testScheduler.currentTime
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                on<TestAction.Fetch>(retryWithBackoff(
-                    maxAttempts = 5,
-                    initialDelay = 100.milliseconds,
-                    maxDelay = 150.milliseconds, // Cap at 150ms
-                    factor = 2.0
-                )) { _, action ->
-                    attemptTimes.add(testScheduler.currentTime - startTime)
-                    attempt++
-                    if (attempt < 5) {
-                        throw RuntimeException("Simulated failure $attempt")
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        on<TestAction.Fetch>(
+                            retryWithBackoff(
+                                maxAttempts = 5,
+                                initialDelay = 100.milliseconds,
+                                maxDelay = 150.milliseconds, // Cap at 150ms
+                                factor = 2.0,
+                            ),
+                        ) { _, action ->
+                            attemptTimes.add(testScheduler.currentTime - startTime)
+                            attempt++
+                            if (attempt < 5) {
+                                throw RuntimeException("Simulated failure $attempt")
+                            }
+                            emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                        }
                     }
-                    emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -364,9 +390,10 @@ class ResilienceStrategyTest {
 
     @Test
     fun `chaining two resilience strategies throws exception`() {
-        val exception = assertFailsWith<IllegalArgumentException> {
-            retry(3) then retryWithBackoff(3, 100.milliseconds)
-        }
+        val exception =
+            assertFailsWith<IllegalArgumentException> {
+                retry(3) then retryWithBackoff(3, 100.milliseconds)
+            }
         assertTrue(exception.message!!.contains("RESILIENCE"))
     }
 
@@ -375,33 +402,40 @@ class ResilienceStrategyTest {
         // Large timing margins are needed for CI (especially iosSimulatorArm64).
         val attemptTimes = mutableListOf<Long>()
         var attempt = 0
-        val startMark = kotlin.time.TimeSource.Monotonic.markNow()
+        val startMark =
+            kotlin.time.TimeSource.Monotonic
+                .markNow()
         val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                on<TestAction.Fetch>(retryWithBackoff(
-                    maxAttempts = 3,
-                    initialDelay = 200.milliseconds,
-                    factor = 2.0
-                )) { _, action ->
-                    attemptTimes.add(startMark.elapsedNow().inWholeMilliseconds)
-                    attempt++
-                    if (attempt < 3) {
-                        throw RuntimeException("Simulated failure $attempt")
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        on<TestAction.Fetch>(
+                            retryWithBackoff(
+                                maxAttempts = 3,
+                                initialDelay = 200.milliseconds,
+                                factor = 2.0,
+                            ),
+                        ) { _, action ->
+                            attemptTimes.add(startMark.elapsedNow().inWholeMilliseconds)
+                            attempt++
+                            if (attempt < 3) {
+                                throw RuntimeException("Simulated failure $attempt")
+                            }
+                            emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                        }
                     }
-                    emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = storeScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = storeScope,
+            )
 
         try {
             store.state.test {
@@ -441,31 +475,36 @@ class ResilienceStrategyTest {
         var attempt = 0
         val startTime = testScheduler.currentTime
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                on<TestAction.Fetch>(retryWithBackoff(
-                    maxAttempts = 4,
-                    initialDelay = 100.milliseconds,
-                    factor = 2.0,
-                    jitter = 0.5 // 50% jitter
-                )) { _, action ->
-                    attemptTimes.add(testScheduler.currentTime - startTime)
-                    attempt++
-                    if (attempt < 4) {
-                        throw RuntimeException("Simulated failure $attempt")
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        on<TestAction.Fetch>(
+                            retryWithBackoff(
+                                maxAttempts = 4,
+                                initialDelay = 100.milliseconds,
+                                factor = 2.0,
+                                jitter = 0.5, // 50% jitter
+                            ),
+                        ) { _, action ->
+                            attemptTimes.add(testScheduler.currentTime - startTime)
+                            attempt++
+                            if (attempt < 4) {
+                                throw RuntimeException("Simulated failure $attempt")
+                            }
+                            emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                        }
                     }
-                    emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)
@@ -520,31 +559,36 @@ class ResilienceStrategyTest {
             var attempt = 0
             val startTime = testScheduler.currentTime
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Fetch>(retryWithBackoff(
-                        maxAttempts = 2,
-                        initialDelay = 100.milliseconds,
-                        factor = 2.0,
-                        jitter = 1.0 // 100% jitter for maximum variation
-                    )) { _, action ->
-                        attemptTimes.add(testScheduler.currentTime - startTime)
-                        attempt++
-                        if (attempt < 2) {
-                            throw RuntimeException("Simulated failure $attempt")
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Fetch>(
+                                retryWithBackoff(
+                                    maxAttempts = 2,
+                                    initialDelay = 100.milliseconds,
+                                    factor = 2.0,
+                                    jitter = 1.0, // 100% jitter for maximum variation
+                                ),
+                            ) { _, action ->
+                                attemptTimes.add(testScheduler.currentTime - startTime)
+                                attempt++
+                                if (attempt < 2) {
+                                    throw RuntimeException("Simulated failure $attempt")
+                                }
+                                emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                            }
                         }
-                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                    }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = backgroundScope,
+                )
 
             store.state.test {
                 assertEquals(emptyList<String>(), awaitItem().values)
@@ -580,8 +624,10 @@ class ResilienceStrategyTest {
         // Check that we got some variation (not all delays are identical)
         // With 100% jitter over 10 runs, we expect variation (at least 2 unique values)
         val uniqueDelays = allDelays.distinct()
-        assertTrue(uniqueDelays.size >= 2,
-            "Expected at least 2 unique delays with jitter, but got ${uniqueDelays.size}: $uniqueDelays")
+        assertTrue(
+            uniqueDelays.size >= 2,
+            "Expected at least 2 unique delays with jitter, but got ${uniqueDelays.size}: $uniqueDelays",
+        )
     }
 
     @Test
@@ -590,31 +636,36 @@ class ResilienceStrategyTest {
         var attempt = 0
         val startTime = testScheduler.currentTime
 
-        val middleware = object : Middleware<TestState, TestAction> {
-            override val processors = buildProcessors {
-                on<TestAction.Fetch>(retryWithBackoff(
-                    maxAttempts = 3,
-                    initialDelay = 100.milliseconds,
-                    factor = 2.0,
-                    jitter = 0.0 // No jitter
-                )) { _, action ->
-                    attemptTimes.add(testScheduler.currentTime - startTime)
-                    attempt++
-                    if (attempt < 3) {
-                        throw RuntimeException("Simulated failure $attempt")
+        val middleware =
+            object : Middleware<TestState, TestAction> {
+                override val processors =
+                    buildProcessors {
+                        on<TestAction.Fetch>(
+                            retryWithBackoff(
+                                maxAttempts = 3,
+                                initialDelay = 100.milliseconds,
+                                factor = 2.0,
+                                jitter = 0.0, // No jitter
+                            ),
+                        ) { _, action ->
+                            attemptTimes.add(testScheduler.currentTime - startTime)
+                            attempt++
+                            if (attempt < 3) {
+                                throw RuntimeException("Simulated failure $attempt")
+                            }
+                            emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                        }
                     }
-                    emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                }
             }
-        }
 
-        val store = createStore(
-            initialState = TestState(),
-            reducer = testReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = TestState(),
+                reducer = testReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(emptyList<String>(), awaitItem().values)

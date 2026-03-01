@@ -32,10 +32,13 @@ interface ClientConnection {
 enum class ConnectionState {
     /** Not connected to the server. */
     DISCONNECTED,
+
     /** Connection attempt in progress. */
     CONNECTING,
+
     /** Actively connected and ready to send/receive. */
     CONNECTED,
+
     /**
      * Attempting to re-establish a lost connection.
      *

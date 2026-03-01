@@ -4,7 +4,6 @@ import io.flowdux.*
 import io.flowdux.timetravel.createTimeTravelStore
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlin.time.Duration.Companion.milliseconds
@@ -14,15 +13,15 @@ data class CounterState(
     val count: Int = 0,
     val source: String = "",
     val searchResults: List<String> = emptyList(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
 ) : State
 
 // Simulated Repository that emits cached data first, then fresh API data
 object CounterRepository {
     fun getCount(): Flow<Pair<Int, String>> = flow {
-        emit(10 to "cache")   // First: cached data
-        delay(500)            // Simulate network delay
-        emit(42 to "api")     // Then: fresh API response
+        emit(10 to "cache") // First: cached data
+        delay(500) // Simulate network delay
+        emit(42 to "api") // Then: fresh API response
     }
 }
 
@@ -36,11 +35,10 @@ sealed interface CounterAction : Action {
 
     // FlowHolderAction: holds and converts existing Flow to Flow<Action>
     // No side effects - just wraps the flow from Repository/Socket
-    data class ObserveCount(
-        private val countFlow: Flow<Pair<Int, String>>
-    ) : CounterAction, FlowHolderAction {
-        override fun toFlowAction(): Flow<Action> =
-            countFlow.map { (value, source) -> SetCount(value, source) }
+    data class ObserveCount(private val countFlow: Flow<Pair<Int, String>>) :
+        CounterAction,
+        FlowHolderAction {
+        override fun toFlowAction(): Flow<Action> = countFlow.map { (value, source) -> SetCount(value, source) }
     }
 
     // Execution Strategy Examples
@@ -150,7 +148,7 @@ fun main() {
         initialState = CounterState(),
         reducer = counterReducer,
         middlewares = listOf(ExecutionStrategyMiddleware()),
-        scope = scope
+        scope = scope,
     )
 
     // Collect state changes in background
@@ -248,7 +246,7 @@ fun main() {
         val timeTravelStore = createTimeTravelStore(
             initialState = CounterState(),
             reducer = counterReducer,
-            scope = timeTravelScope
+            scope = timeTravelScope,
         )
 
         // Collect state changes
@@ -273,7 +271,9 @@ fun main() {
         println("\n> Undo (go back one step)")
         timeTravelStore.undo()
         delay(50)
-        println("  Now at index ${timeTravelStore.currentIndex}, canUndo=${timeTravelStore.canUndo}, canRedo=${timeTravelStore.canRedo}")
+        println(
+            "  Now at index ${timeTravelStore.currentIndex}, canUndo=${timeTravelStore.canUndo}, canRedo=${timeTravelStore.canRedo}",
+        )
 
         println("\n> Undo again")
         timeTravelStore.undo()

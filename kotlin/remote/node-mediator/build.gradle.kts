@@ -5,7 +5,11 @@ plugins {
 }
 
 mavenPublishing {
-    coordinates("io.github.chibimoons", "flowdux-remote-node-mediator", providers.gradleProperty("flowdux.version").get())
+    coordinates(
+        "io.github.chibimoons",
+        "flowdux-remote-node-mediator",
+        providers.gradleProperty("flowdux.version").get(),
+    )
     pom {
         name.set("Flowdux Remote Node Mediator")
         description.set("Node mediator for horizontal scaling across multiple server nodes")

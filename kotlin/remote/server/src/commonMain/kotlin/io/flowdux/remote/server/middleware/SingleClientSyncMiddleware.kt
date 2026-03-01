@@ -49,10 +49,8 @@ internal class InternalStartListening : Action
  *
  * @param connection The [TypedServerConnection] for communicating with the client.
  */
-open class SingleClientSyncMiddleware<S : State, A : Action>(
-    private val connection: TypedServerConnection<A>,
-) : Middleware<S, A> {
-
+open class SingleClientSyncMiddleware<S : State, A : Action>(private val connection: TypedServerConnection<A>) :
+    Middleware<S, A> {
     override val processors: ActionProcessorMap<S, A> = emptyMap()
 
     @Suppress("UNCHECKED_CAST")

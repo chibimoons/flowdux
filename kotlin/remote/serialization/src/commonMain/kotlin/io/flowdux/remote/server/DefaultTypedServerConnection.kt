@@ -19,20 +19,20 @@ internal class DefaultTypedServerConnection<A : Action>(
     private val messageCodec: MessageCodec,
     private val onDecodeError: ((Exception) -> Unit)? = null,
 ) : TypedServerConnection<A> {
-
     override val isActive: Boolean get() = connection.isActive
 
-    override val incoming: Flow<A> = connection.incoming.mapNotNull { raw ->
-        try {
-            val actionJson = messageCodec.decodeActionFromClient(raw)
-            actionCodec.decode(actionJson)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            onDecodeError?.invoke(e)
-            null
+    override val incoming: Flow<A> =
+        connection.incoming.mapNotNull { raw ->
+            try {
+                val actionJson = messageCodec.decodeActionFromClient(raw)
+                actionCodec.decode(actionJson)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                onDecodeError?.invoke(e)
+                null
+            }
         }
-    }
 
     override suspend fun send(action: A) {
         val actionJson = actionCodec.encode(action)

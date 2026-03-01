@@ -5,7 +5,11 @@ plugins {
 }
 
 mavenPublishing {
-    coordinates("io.github.chibimoons", "flowdux-remote-serialization", providers.gradleProperty("flowdux.version").get())
+    coordinates(
+        "io.github.chibimoons",
+        "flowdux-remote-serialization",
+        providers.gradleProperty("flowdux.version").get(),
+    )
     pom {
         name.set("Flowdux Remote Serialization")
         description.set("kotlinx.serialization-based ActionCodec for Flowdux remote state management")

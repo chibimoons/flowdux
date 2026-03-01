@@ -22,17 +22,25 @@ interface ChatAction : Action
 sealed interface SharedChatAction : ChatAction {
     // Client → Server
     @Serializable
-    data class SendMessage(val user: String, val text: String) : SharedChatAction, ServerSharedAction
+    data class SendMessage(val user: String, val text: String) :
+        SharedChatAction,
+        ServerSharedAction
 
     @Serializable
-    data class JoinRoom(val user: String) : SharedChatAction, ServerSharedAction
+    data class JoinRoom(val user: String) :
+        SharedChatAction,
+        ServerSharedAction
 
     @Serializable
-    data class LeaveRoom(val user: String) : SharedChatAction, ServerSharedAction
+    data class LeaveRoom(val user: String) :
+        SharedChatAction,
+        ServerSharedAction
 
     // Server → Client
     @Serializable
-    data class SyncState(val state: RoomState) : SharedChatAction, ClientSharedAction
+    data class SyncState(val state: RoomState) :
+        SharedChatAction,
+        ClientSharedAction
 }
 
 /**
@@ -47,10 +55,7 @@ data class RoomState(
 ) : State
 
 @Serializable
-data class ChatMessage(
-    val user: String,
-    val text: String,
-)
+data class ChatMessage(val user: String, val text: String)
 
 @Serializable
 sealed interface ChatEvent {

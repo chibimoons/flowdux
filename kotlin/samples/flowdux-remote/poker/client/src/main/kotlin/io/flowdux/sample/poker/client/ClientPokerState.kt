@@ -16,7 +16,6 @@ import io.flowdux.sample.poker.TableEvent
 data class ClientPokerState(
     // Client-local
     val playerId: String = "",
-
     // Public state (synced from Room Store)
     val players: List<PlayerInfo> = emptyList(),
     val communityCards: List<Card> = emptyList(),
@@ -25,7 +24,6 @@ data class ClientPokerState(
     val phase: GamePhase = GamePhase.WAITING,
     val minimumBet: Int = 0,
     val lastEvent: TableEvent? = null,
-
     // Private state (synced from Per-Client Store)
     val myHand: List<Card> = emptyList(),
 ) : State {

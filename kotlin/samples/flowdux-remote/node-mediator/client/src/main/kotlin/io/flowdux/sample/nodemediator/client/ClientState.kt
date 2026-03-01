@@ -23,24 +23,27 @@ data class ClientChatState(
  */
 sealed interface ClientChatAction : ChatAction {
     data object Connect : ClientChatAction
+
     data object Disconnect : ClientChatAction
+
     data class SetCurrentUser(val user: String) : ClientChatAction
 }
 
 /**
  * Client-side reducer.
  */
-val clientChatReducer = buildReducer<ClientChatState, ChatAction> {
-    on<SharedChatAction.SyncState> { state, action ->
-        state.copy(
-            messages = action.state.messages,
-            users = action.state.users,
-            lastEvent = action.state.lastEvent,
-            currentRoom = action.state.roomId,
-        )
-    }
+val clientChatReducer =
+    buildReducer<ClientChatState, ChatAction> {
+        on<SharedChatAction.SyncState> { state, action ->
+            state.copy(
+                messages = action.state.messages,
+                users = action.state.users,
+                lastEvent = action.state.lastEvent,
+                currentRoom = action.state.roomId,
+            )
+        }
 
-    on<ClientChatAction.SetCurrentUser> { state, action ->
-        state.copy(currentUser = action.user)
+        on<ClientChatAction.SetCurrentUser> { state, action ->
+            state.copy(currentUser = action.user)
+        }
     }
-}

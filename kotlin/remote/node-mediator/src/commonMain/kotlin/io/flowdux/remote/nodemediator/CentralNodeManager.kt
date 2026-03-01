@@ -63,10 +63,7 @@ class CentralNodeManager<A : Action>(
     private val nodes = mutableMapOf<String, NodeEntry>()
     private var closed = false
 
-    private inner class NodeEntry(
-        val connection: TypedServerConnection<NodeAction<A>>,
-        val job: Job,
-    )
+    private inner class NodeEntry(val connection: TypedServerConnection<NodeAction<A>>, val job: Job)
 
     /**
      * Handles a node connection.
@@ -79,10 +76,7 @@ class CentralNodeManager<A : Action>(
      * @param nodeId Unique identifier for the connecting node
      * @param connection The typed connection from the node
      */
-    suspend fun handleNode(
-        nodeId: String,
-        connection: TypedServerConnection<NodeAction<A>>,
-    ) {
+    suspend fun handleNode(nodeId: String, connection: TypedServerConnection<NodeAction<A>>) {
         check(!closed) { "CentralNodeManager is closed" }
 
         val callerJob = currentCoroutineContext()[Job]!!
@@ -237,12 +231,13 @@ class CentralNodeManager<A : Action>(
      * After closing, no new nodes can connect.
      */
     suspend fun close() {
-        val entries = mutex.withLock {
-            closed = true
-            val current = nodes.values.toList()
-            nodes.clear()
-            current
-        }
+        val entries =
+            mutex.withLock {
+                closed = true
+                val current = nodes.values.toList()
+                nodes.clear()
+                current
+            }
         for (entry in entries) {
             entry.job.cancel()
         }

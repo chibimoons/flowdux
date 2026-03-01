@@ -8,7 +8,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class AuthProtocolTest {
-
     @Test
     fun encodeAuthRequest_producesValidJson() {
         val encoded = AuthProtocol.encodeAuthRequest("my-token-123")

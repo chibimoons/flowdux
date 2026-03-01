@@ -4,7 +4,6 @@ import io.flowdux.Store
 import io.flowdux.remote.createClientStore
 import io.flowdux.remote.ktor.KtorWebSocketClientConnection
 import io.flowdux.remote.serialization.typedJsonAs
-import io.flowdux.sample.poker.GamePhase
 import io.flowdux.sample.poker.PokerAction
 import io.flowdux.sample.poker.SharedPokerAction
 import io.flowdux.sample.poker.TableEvent
@@ -35,33 +34,34 @@ fun main(args: Array<String>) = runBlocking {
     val store = createPokerStore(playerId)
 
     // Observe state changes
-    val collectorJob = launch {
-        var lastHandSize = 0
-        store.state.collect { state ->
-            // Display private hand when received/changed
-            if (state.myHand.size != lastHandSize && state.myHand.isNotEmpty()) {
-                lastHandSize = state.myHand.size
-                println()
-                println("  YOUR PRIVATE HAND: ${state.myHand.joinToString(" ")}")
-                println("  (Only you can see these cards!)")
-                println()
-            }
+    val collectorJob =
+        launch {
+            var lastHandSize = 0
+            store.state.collect { state ->
+                // Display private hand when received/changed
+                if (state.myHand.size != lastHandSize && state.myHand.isNotEmpty()) {
+                    lastHandSize = state.myHand.size
+                    println()
+                    println("  YOUR PRIVATE HAND: ${state.myHand.joinToString(" ")}")
+                    println("  (Only you can see these cards!)")
+                    println()
+                }
 
-            // Display public events
-            when (val event = state.lastEvent) {
-                is TableEvent.PlayerJoined -> println("  [+] ${event.name} joined the table")
-                is TableEvent.PlayerLeft -> println("  [-] ${event.playerId} left the table")
-                is TableEvent.PlayerBet -> println("  [$] ${event.playerId} bet ${event.amount}")
-                is TableEvent.PlayerFolded -> println("  [X] ${event.playerId} folded")
-                is TableEvent.PlayerChecked -> println("  [.] ${event.playerId} checked")
-                is TableEvent.PlayerCalled -> println("  [=] ${event.playerId} called ${event.amount}")
-                is TableEvent.PhaseChanged -> println("  [>] Phase: ${event.phase}")
-                is TableEvent.GameStarted -> println("  [!] ${event.message}")
-                is TableEvent.GameEnded -> println("  [*] ${event.winnerName} wins ${event.pot} chips!")
-                null -> {}
+                // Display public events
+                when (val event = state.lastEvent) {
+                    is TableEvent.PlayerJoined -> println("  [+] ${event.name} joined the table")
+                    is TableEvent.PlayerLeft -> println("  [-] ${event.playerId} left the table")
+                    is TableEvent.PlayerBet -> println("  [$] ${event.playerId} bet ${event.amount}")
+                    is TableEvent.PlayerFolded -> println("  [X] ${event.playerId} folded")
+                    is TableEvent.PlayerChecked -> println("  [.] ${event.playerId} checked")
+                    is TableEvent.PlayerCalled -> println("  [=] ${event.playerId} called ${event.amount}")
+                    is TableEvent.PhaseChanged -> println("  [>] Phase: ${event.phase}")
+                    is TableEvent.GameStarted -> println("  [!] ${event.message}")
+                    is TableEvent.GameEnded -> println("  [*] ${event.winnerName} wins ${event.pot} chips!")
+                    null -> {}
+                }
             }
         }
-    }
 
     // Connect and join
     store.dispatch(ClientPokerAction.Connect)
@@ -140,11 +140,12 @@ private fun printStatus(store: Store<ClientPokerState, PokerAction>) {
     for (player in state.players) {
         val turnMarker = if (player.id == state.currentTurnPlayerId) " <-- YOUR TURN" else ""
         val youMarker = if (player.id == state.playerId) " (you)" else ""
-        val status = when {
-            player.folded -> " [FOLDED]"
-            player.isAllIn -> " [ALL-IN]"
-            else -> ""
-        }
+        val status =
+            when {
+                player.folded -> " [FOLDED]"
+                player.isAllIn -> " [ALL-IN]"
+                else -> ""
+            }
         println("    ${player.name}$youMarker: ${player.chips} chips, bet ${player.currentBet}$status$turnMarker")
     }
     if (state.myHand.isNotEmpty()) {
@@ -155,11 +156,13 @@ private fun printStatus(store: Store<ClientPokerState, PokerAction>) {
 }
 
 private fun createPokerStore(playerId: String): Store<ClientPokerState, PokerAction> {
-    val connection = KtorWebSocketClientConnection.create(
-        host = "localhost",
-        port = 8080,
-        path = "/poker/$playerId",
-    ).typedJsonAs<SharedPokerAction, PokerAction>()
+    val connection =
+        KtorWebSocketClientConnection
+            .create(
+                host = "localhost",
+                port = 8080,
+                path = "/poker/$playerId",
+            ).typedJsonAs<SharedPokerAction, PokerAction>()
 
     return createClientStore(
         initialState = ClientPokerState(playerId = playerId),

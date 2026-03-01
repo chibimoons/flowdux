@@ -42,6 +42,7 @@ import kotlinx.coroutines.CancellationException
  */
 interface ActionCodec<A : Action> {
     fun encode(action: A): String
+
     fun decode(json: String): A
 }
 

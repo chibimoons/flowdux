@@ -7,10 +7,8 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class InMemoryRoomRegistryTest {
-
     @Test
     fun assignAndGetNodeForRoom() = runTest {
         val registry = InMemoryRoomRegistry()
@@ -114,11 +112,12 @@ class InMemoryRoomRegistryTest {
     @Test
     fun concurrentAssignments() = runTest {
         val registry = InMemoryRoomRegistry()
-        val deferreds = (1..100).map { i ->
-            async {
-                registry.assignRoom("room-$i", "node-${i % 3}")
+        val deferreds =
+            (1..100).map { i ->
+                async {
+                    registry.assignRoom("room-$i", "node-${i % 3}")
+                }
             }
-        }
         deferreds.awaitAll()
 
         val all = registry.getAllAssignments()
@@ -130,9 +129,10 @@ class InMemoryRoomRegistryTest {
         val registry = InMemoryRoomRegistry()
 
         // Assign 50 rooms
-        (1..50).map { i ->
-            async { registry.assignRoom("room-$i", "node-A") }
-        }.awaitAll()
+        (1..50)
+            .map { i ->
+                async { registry.assignRoom("room-$i", "node-A") }
+            }.awaitAll()
 
         // Concurrently unassign odd rooms and reassign even rooms
         val ops = mutableListOf<kotlinx.coroutines.Deferred<Unit>>()

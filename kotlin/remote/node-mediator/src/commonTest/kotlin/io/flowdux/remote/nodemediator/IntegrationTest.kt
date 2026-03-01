@@ -2,9 +2,9 @@ package io.flowdux.remote.nodemediator
 
 import io.flowdux.Action
 import io.flowdux.remote.ConnectionState
+import io.flowdux.remote.TypedClientConnection
 import io.flowdux.remote.nodemediator.registry.InMemoryRoomRegistry
 import io.flowdux.remote.nodemediator.transport.WebSocketNodeTransport
-import io.flowdux.remote.TypedClientConnection
 import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -26,10 +26,10 @@ import kotlin.test.assertTrue
  * via linked fake connections.
  */
 class IntegrationTest {
-
     @Serializable
     sealed interface TestAction : Action {
         @Serializable data class Message(val text: String) : TestAction
+
         @Serializable data class Broadcast(val text: String) : TestAction
     }
 
@@ -46,32 +46,34 @@ class IntegrationTest {
         // server → client channel
         private val serverToClient = MutableSharedFlow<NodeAction<TestAction>>(extraBufferCapacity = 64)
 
-        val clientSide = object : TypedClientConnection<NodeAction<TestAction>> {
-            private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
-            override val connectionState: StateFlow<ConnectionState> = _connectionState
-            override val incoming: Flow<NodeAction<TestAction>> = serverToClient
+        val clientSide =
+            object : TypedClientConnection<NodeAction<TestAction>> {
+                private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
+                override val connectionState: StateFlow<ConnectionState> = _connectionState
+                override val incoming: Flow<NodeAction<TestAction>> = serverToClient
 
-            override suspend fun send(action: NodeAction<TestAction>) {
-                clientToServer.emit(action)
+                override suspend fun send(action: NodeAction<TestAction>) {
+                    clientToServer.emit(action)
+                }
+
+                override suspend fun connect() {
+                    _connectionState.value = ConnectionState.CONNECTED
+                }
+
+                override suspend fun disconnect() {
+                    _connectionState.value = ConnectionState.DISCONNECTED
+                }
             }
 
-            override suspend fun connect() {
-                _connectionState.value = ConnectionState.CONNECTED
-            }
+        val serverSide =
+            object : TypedServerConnection<NodeAction<TestAction>> {
+                override val isActive: Boolean = true
+                override val incoming: Flow<NodeAction<TestAction>> = clientToServer
 
-            override suspend fun disconnect() {
-                _connectionState.value = ConnectionState.DISCONNECTED
+                override suspend fun send(action: NodeAction<TestAction>) {
+                    serverToClient.emit(action)
+                }
             }
-        }
-
-        val serverSide = object : TypedServerConnection<NodeAction<TestAction>> {
-            override val isActive: Boolean = true
-            override val incoming: Flow<NodeAction<TestAction>> = clientToServer
-
-            override suspend fun send(action: NodeAction<TestAction>) {
-                serverToClient.emit(action)
-            }
-        }
     }
 
     @Test
@@ -80,16 +82,18 @@ class IntegrationTest {
         val link = LinkedConnection()
         val receivedActions = mutableListOf<TestAction>()
 
-        val manager = CentralNodeManager<TestAction>(
-            roomRegistry = registry,
-            onUpstreamAction = { _, _, _ -> },
-        )
+        val manager =
+            CentralNodeManager<TestAction>(
+                roomRegistry = registry,
+                onUpstreamAction = { _, _, _ -> },
+            )
 
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = WebSocketNodeTransport(link.clientSide),
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = WebSocketNodeTransport(link.clientSide),
+                scope = this,
+            )
 
         // Start node handling on central
         val handleJob = launch { manager.handleNode("node-1", link.serverSide) }
@@ -122,17 +126,19 @@ class IntegrationTest {
         val link = LinkedConnection()
         val upstreamReceived = mutableListOf<Triple<String, String, TestAction>>()
 
-        val manager = CentralNodeManager<TestAction>(
-            onUpstreamAction = { nodeId, roomId, action ->
-                upstreamReceived.add(Triple(nodeId, roomId, action))
-            },
-        )
+        val manager =
+            CentralNodeManager<TestAction>(
+                onUpstreamAction = { nodeId, roomId, action ->
+                    upstreamReceived.add(Triple(nodeId, roomId, action))
+                },
+            )
 
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = WebSocketNodeTransport(link.clientSide),
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = WebSocketNodeTransport(link.clientSide),
+                scope = this,
+            )
 
         val handleJob = launch { manager.handleNode("node-1", link.serverSide) }
         yield()
@@ -167,24 +173,27 @@ class IntegrationTest {
         val nodeBActions = mutableListOf<TestAction>()
 
         lateinit var manager: CentralNodeManager<TestAction>
-        manager = CentralNodeManager<TestAction>(
-            roomRegistry = registry,
-            onUpstreamAction = { _, roomId, action ->
-                // Central relays upstream action to the target room's node
-                manager.sendToRoom(roomId, action)
-            },
-        )
+        manager =
+            CentralNodeManager<TestAction>(
+                roomRegistry = registry,
+                onUpstreamAction = { _, roomId, action ->
+                    // Central relays upstream action to the target room's node
+                    manager.sendToRoom(roomId, action)
+                },
+            )
 
-        val mediatorA = NodeMediator<TestAction>(
-            nodeId = "node-A",
-            transport = WebSocketNodeTransport(linkA.clientSide),
-            scope = this,
-        )
-        val mediatorB = NodeMediator<TestAction>(
-            nodeId = "node-B",
-            transport = WebSocketNodeTransport(linkB.clientSide),
-            scope = this,
-        )
+        val mediatorA =
+            NodeMediator<TestAction>(
+                nodeId = "node-A",
+                transport = WebSocketNodeTransport(linkA.clientSide),
+                scope = this,
+            )
+        val mediatorB =
+            NodeMediator<TestAction>(
+                nodeId = "node-B",
+                transport = WebSocketNodeTransport(linkB.clientSide),
+                scope = this,
+            )
 
         val handleJobA = launch { manager.handleNode("node-A", linkA.serverSide) }
         val handleJobB = launch { manager.handleNode("node-B", linkB.serverSide) }
@@ -222,11 +231,12 @@ class IntegrationTest {
         val registry = InMemoryRoomRegistry()
         val events = mutableListOf<NodeMediatorEvent>()
 
-        val manager = CentralNodeManager<TestAction>(
-            roomRegistry = registry,
-            onUpstreamAction = { _, _, _ -> },
-            onEvent = { events.add(it) },
-        )
+        val manager =
+            CentralNodeManager<TestAction>(
+                roomRegistry = registry,
+                onUpstreamAction = { _, _, _ -> },
+                onEvent = { events.add(it) },
+            )
 
         // First connection
         val link1 = LinkedConnection()
@@ -248,11 +258,12 @@ class IntegrationTest {
         val link2 = LinkedConnection()
         val receivedActions = mutableListOf<TestAction>()
 
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = WebSocketNodeTransport(link2.clientSide),
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = WebSocketNodeTransport(link2.clientSide),
+                scope = this,
+            )
 
         val handleJob2 = launch { manager.handleNode("node-1", link2.serverSide) }
         yield()
@@ -289,21 +300,24 @@ class IntegrationTest {
         val nodeARoom2 = mutableListOf<TestAction>()
         val nodeBRoom3 = mutableListOf<TestAction>()
 
-        val manager = CentralNodeManager<TestAction>(
-            roomRegistry = registry,
-            onUpstreamAction = { _, _, _ -> },
-        )
+        val manager =
+            CentralNodeManager<TestAction>(
+                roomRegistry = registry,
+                onUpstreamAction = { _, _, _ -> },
+            )
 
-        val mediatorA = NodeMediator<TestAction>(
-            nodeId = "node-A",
-            transport = WebSocketNodeTransport(linkA.clientSide),
-            scope = this,
-        )
-        val mediatorB = NodeMediator<TestAction>(
-            nodeId = "node-B",
-            transport = WebSocketNodeTransport(linkB.clientSide),
-            scope = this,
-        )
+        val mediatorA =
+            NodeMediator<TestAction>(
+                nodeId = "node-A",
+                transport = WebSocketNodeTransport(linkA.clientSide),
+                scope = this,
+            )
+        val mediatorB =
+            NodeMediator<TestAction>(
+                nodeId = "node-B",
+                transport = WebSocketNodeTransport(linkB.clientSide),
+                scope = this,
+            )
 
         val handleJobA = launch { manager.handleNode("node-A", linkA.serverSide) }
         val handleJobB = launch { manager.handleNode("node-B", linkB.serverSide) }
@@ -351,18 +365,20 @@ class IntegrationTest {
         val nodeReceived = mutableListOf<TestAction>()
         val centralReceived = mutableListOf<Triple<String, String, TestAction>>()
 
-        val manager = CentralNodeManager<TestAction>(
-            roomRegistry = registry,
-            onUpstreamAction = { nodeId, roomId, action ->
-                centralReceived.add(Triple(nodeId, roomId, action))
-            },
-        )
+        val manager =
+            CentralNodeManager<TestAction>(
+                roomRegistry = registry,
+                onUpstreamAction = { nodeId, roomId, action ->
+                    centralReceived.add(Triple(nodeId, roomId, action))
+                },
+            )
 
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = WebSocketNodeTransport(link.clientSide),
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = WebSocketNodeTransport(link.clientSide),
+                scope = this,
+            )
 
         val handleJob = launch { manager.handleNode("node-1", link.serverSide) }
         yield()
@@ -374,16 +390,18 @@ class IntegrationTest {
         registry.assignRoom("room-1", "node-1")
 
         // Simultaneously send 10 messages each way
-        val centralSending = async {
-            repeat(10) { i ->
-                manager.sendToRoom("room-1", TestAction.Message("central-$i"))
+        val centralSending =
+            async {
+                repeat(10) { i ->
+                    manager.sendToRoom("room-1", TestAction.Message("central-$i"))
+                }
             }
-        }
-        val nodeSending = async {
-            repeat(10) { i ->
-                mediator.forwardToCentral("room-1", TestAction.Message("node-$i"))
+        val nodeSending =
+            async {
+                repeat(10) { i ->
+                    mediator.forwardToCentral("room-1", TestAction.Message("node-$i"))
+                }
             }
-        }
         awaitAll(centralSending, nodeSending)
         yield()
         testScheduler.advanceUntilIdle()
@@ -395,9 +413,10 @@ class IntegrationTest {
 
         // All 10 node→central messages should arrive
         assertEquals(10, centralReceived.size)
-        val expectedCentralMessages = (0 until 10).map {
-            Triple("node-1", "room-1", TestAction.Message("node-$it") as TestAction)
-        }
+        val expectedCentralMessages =
+            (0 until 10).map {
+                Triple("node-1", "room-1", TestAction.Message("node-$it") as TestAction)
+            }
         assertEquals(expectedCentralMessages, centralReceived)
 
         mediator.close()

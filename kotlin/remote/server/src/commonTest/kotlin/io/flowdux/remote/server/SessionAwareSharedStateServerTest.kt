@@ -13,30 +13,33 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SessionAwareSharedStateServerTest {
-
     @Test
     fun `state changes trigger per-session mapping for all connected clients`() = runTest {
         val connAlice = MockTypedServerConnection<PokerAction>()
         val connBob = MockTypedServerConnection<PokerAction>()
 
         // Use a processor that transforms PlayerAction into DealCards
-        val processors = Middleware.ActionProcessorBuilder<PokerState, PokerAction>().apply {
-            on<PokerAction.DealCards> { _, action ->
-                emit(action) // pass through — this action reaches the reducer
-            }
-        }.build()
+        val processors =
+            Middleware
+                .ActionProcessorBuilder<PokerState, PokerAction>()
+                .apply {
+                    on<PokerAction.DealCards> { _, action ->
+                        emit(action) // pass through — this action reaches the reducer
+                    }
+                }.build()
 
-        val server = createSessionAwareSharedStateServer(
-            initialState = PokerState(),
-            reducer = pokerReducer,
-            processors = processors,
-            sessionStateMapper = { state, sessionId ->
-                val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
-                PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
-            },
-            errorProcessor = pokerErrorProcessor,
-            scope = backgroundScope,
-        )
+        val server =
+            createSessionAwareSharedStateServer(
+                initialState = PokerState(),
+                reducer = pokerReducer,
+                processors = processors,
+                sessionStateMapper = { state, sessionId ->
+                    val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
+                    PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
+                },
+                errorProcessor = pokerErrorProcessor,
+                scope = backgroundScope,
+            )
 
         val jobAlice = backgroundScope.launch { server.handleClient("alice", connAlice) }
         val jobBob = backgroundScope.launch { server.handleClient("bob", connBob) }
@@ -46,10 +49,12 @@ class SessionAwareSharedStateServerTest {
         connBob.sentActions.clear()
 
         // Trigger state change via a client sending DealCards (which passes through processor)
-        connAlice.simulateClientAction(PokerAction.DealCards(
-            hands = mapOf("alice" to listOf("A♠", "K♠"), "bob" to listOf("2♣", "3♦")),
-            communityCards = listOf("Q♥", "J♦", "10♠"),
-        ))
+        connAlice.simulateClientAction(
+            PokerAction.DealCards(
+                hands = mapOf("alice" to listOf("A♠", "K♠"), "bob" to listOf("2♣", "3♦")),
+                communityCards = listOf("Q♥", "J♦", "10♠"),
+            ),
+        )
         delay(200)
 
         // State should be updated
@@ -79,16 +84,17 @@ class SessionAwareSharedStateServerTest {
     fun `client connect and disconnect works correctly`() = runTest {
         val connAlice = MockTypedServerConnection<PokerAction>()
 
-        val server = createSessionAwareSharedStateServer(
-            initialState = PokerState(),
-            reducer = pokerReducer,
-            sessionStateMapper = { state, sessionId ->
-                val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
-                PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
-            },
-            errorProcessor = pokerErrorProcessor,
-            scope = backgroundScope,
-        )
+        val server =
+            createSessionAwareSharedStateServer(
+                initialState = PokerState(),
+                reducer = pokerReducer,
+                sessionStateMapper = { state, sessionId ->
+                    val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
+                    PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
+                },
+                errorProcessor = pokerErrorProcessor,
+                scope = backgroundScope,
+            )
 
         assertEquals(0, server.sessionCount())
 
@@ -110,27 +116,33 @@ class SessionAwareSharedStateServerTest {
     fun `processors work with session-aware session`() = runTest {
         val connAlice = MockTypedServerConnection<PokerAction>()
 
-        val processors = Middleware.ActionProcessorBuilder<PokerState, PokerAction>().apply {
-            on<PokerAction.PlayerAction> { _, action ->
-                // Transform PlayerAction into DealCards
-                emit(PokerAction.DealCards(
-                    hands = mapOf(action.playerId to listOf("A♠", "K♠")),
-                    communityCards = listOf("Q♥"),
-                ))
-            }
-        }.build()
+        val processors =
+            Middleware
+                .ActionProcessorBuilder<PokerState, PokerAction>()
+                .apply {
+                    on<PokerAction.PlayerAction> { _, action ->
+                        // Transform PlayerAction into DealCards
+                        emit(
+                            PokerAction.DealCards(
+                                hands = mapOf(action.playerId to listOf("A♠", "K♠")),
+                                communityCards = listOf("Q♥"),
+                            ),
+                        )
+                    }
+                }.build()
 
-        val server = createSessionAwareSharedStateServer(
-            initialState = PokerState(),
-            reducer = pokerReducer,
-            processors = processors,
-            sessionStateMapper = { state, sessionId ->
-                val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
-                PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
-            },
-            errorProcessor = pokerErrorProcessor,
-            scope = backgroundScope,
-        )
+        val server =
+            createSessionAwareSharedStateServer(
+                initialState = PokerState(),
+                reducer = pokerReducer,
+                processors = processors,
+                sessionStateMapper = { state, sessionId ->
+                    val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
+                    PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
+                },
+                errorProcessor = pokerErrorProcessor,
+                scope = backgroundScope,
+            )
 
         val job = backgroundScope.launch { server.handleClient("alice", connAlice) }
         delay(100)
@@ -158,23 +170,27 @@ class SessionAwareSharedStateServerTest {
         val connAlice = MockTypedServerConnection<PokerAction>()
         val connSpectator = MockTypedServerConnection<PokerAction>()
 
-        val processors = Middleware.ActionProcessorBuilder<PokerState, PokerAction>().apply {
-            on<PokerAction.DealCards> { _, action ->
-                emit(action)
-            }
-        }.build()
+        val processors =
+            Middleware
+                .ActionProcessorBuilder<PokerState, PokerAction>()
+                .apply {
+                    on<PokerAction.DealCards> { _, action ->
+                        emit(action)
+                    }
+                }.build()
 
-        val server = createSessionAwareSharedStateServer(
-            initialState = PokerState(),
-            reducer = pokerReducer,
-            processors = processors,
-            sessionStateMapper = { state, sessionId ->
-                val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
-                PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
-            },
-            errorProcessor = pokerErrorProcessor,
-            scope = backgroundScope,
-        )
+        val server =
+            createSessionAwareSharedStateServer(
+                initialState = PokerState(),
+                reducer = pokerReducer,
+                processors = processors,
+                sessionStateMapper = { state, sessionId ->
+                    val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
+                    PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
+                },
+                errorProcessor = pokerErrorProcessor,
+                scope = backgroundScope,
+            )
 
         val jobAlice = backgroundScope.launch { server.handleClient("alice", connAlice) }
         val jobSpectator = backgroundScope.launch { server.handleClient("spectator", connSpectator) }
@@ -184,10 +200,12 @@ class SessionAwareSharedStateServerTest {
         connSpectator.sentActions.clear()
 
         // Deal only to alice — spectator has no hand
-        connAlice.simulateClientAction(PokerAction.DealCards(
-            hands = mapOf("alice" to listOf("A♠", "K♠")),
-            communityCards = listOf("Q♥"),
-        ))
+        connAlice.simulateClientAction(
+            PokerAction.DealCards(
+                hands = mapOf("alice" to listOf("A♠", "K♠")),
+                communityCards = listOf("Q♥"),
+            ),
+        )
         delay(200)
 
         // Alice gets her view
@@ -206,29 +224,33 @@ class SessionAwareSharedStateServerTest {
     @Test
     fun `error in one session does not affect others during per-session send`() = runTest {
         val connAlice = MockTypedServerConnection<PokerAction>()
-        val failingConn = object : TypedServerConnection<PokerAction> {
-            override val isActive: Boolean = true
-            override val incoming = emptyFlow<PokerAction>()
-            override suspend fun send(action: PokerAction) {
-                throw RuntimeException("Connection failed")
+        val failingConn =
+            object : TypedServerConnection<PokerAction> {
+                override val isActive: Boolean = true
+                override val incoming = emptyFlow<PokerAction>()
+
+                override suspend fun send(action: PokerAction): Unit = throw RuntimeException("Connection failed")
             }
-        }
 
-        val processors = Middleware.ActionProcessorBuilder<PokerState, PokerAction>().apply {
-            on<PokerAction.DealCards> { _, action -> emit(action) }
-        }.build()
+        val processors =
+            Middleware
+                .ActionProcessorBuilder<PokerState, PokerAction>()
+                .apply {
+                    on<PokerAction.DealCards> { _, action -> emit(action) }
+                }.build()
 
-        val server = createSessionAwareSharedStateServer(
-            initialState = PokerState(),
-            reducer = pokerReducer,
-            processors = processors,
-            sessionStateMapper = { state, sessionId ->
-                val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
-                PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
-            },
-            errorProcessor = pokerErrorProcessor,
-            scope = backgroundScope,
-        )
+        val server =
+            createSessionAwareSharedStateServer(
+                initialState = PokerState(),
+                reducer = pokerReducer,
+                processors = processors,
+                sessionStateMapper = { state, sessionId ->
+                    val hand = state.hands[sessionId] ?: return@createSessionAwareSharedStateServer null
+                    PokerAction.SyncPlayerView(hand = hand, communityCards = state.communityCards)
+                },
+                errorProcessor = pokerErrorProcessor,
+                scope = backgroundScope,
+            )
 
         val jobFailing = backgroundScope.launch { server.handleClient("failing", failingConn) }
         val jobAlice = backgroundScope.launch { server.handleClient("alice", connAlice) }
@@ -236,10 +258,12 @@ class SessionAwareSharedStateServerTest {
 
         connAlice.sentActions.clear()
 
-        connAlice.simulateClientAction(PokerAction.DealCards(
-            hands = mapOf("failing" to listOf("X♠"), "alice" to listOf("A♠", "K♠")),
-            communityCards = listOf("Q♥"),
-        ))
+        connAlice.simulateClientAction(
+            PokerAction.DealCards(
+                hands = mapOf("failing" to listOf("X♠"), "alice" to listOf("A♠", "K♠")),
+                communityCards = listOf("Q♥"),
+            ),
+        )
         delay(200)
 
         // Alice still receives her view despite failing connection

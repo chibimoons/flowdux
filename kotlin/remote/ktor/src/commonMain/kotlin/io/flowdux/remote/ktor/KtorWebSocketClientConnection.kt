@@ -1,9 +1,8 @@
 package io.flowdux.remote.ktor
 
-import io.flowdux.remote.ConnectionState
 import io.flowdux.remote.ClientConnection
+import io.flowdux.remote.ConnectionState
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.websocket.Frame
 import io.ktor.websocket.WebSocketSession
@@ -62,11 +61,7 @@ import kotlin.concurrent.Volatile
  * @param httpClient Optional pre-configured HttpClient. If not provided, a dedicated HttpClient
  *   is created and closed on [disconnect]. If provided, the caller manages its lifecycle.
  */
-class KtorWebSocketClientConnection(
-    private val url: String,
-    httpClient: HttpClient? = null,
-) : ClientConnection {
-
+class KtorWebSocketClientConnection(private val url: String, httpClient: HttpClient? = null) : ClientConnection {
     private val httpClient: HttpClient
     private val isClientOwned: Boolean
 

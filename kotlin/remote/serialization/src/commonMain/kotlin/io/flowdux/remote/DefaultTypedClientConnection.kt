@@ -16,32 +16,34 @@ internal class DefaultTypedClientConnection<A : Action>(
     private val messageCodec: MessageCodec,
     private val onDecodeError: ((Exception) -> Unit)? = null,
 ) : TypedClientConnection<A> {
-
     override val connectionState: StateFlow<ConnectionState>
         get() = connection.connectionState
 
     @Suppress("UNCHECKED_CAST")
-    override val incoming: Flow<A> = connection.incoming.transform { raw ->
-        val response = try {
-            messageCodec.decodeServerMessage(raw)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            onDecodeError?.invoke(e)
-            return@transform
-        }
-        for (actionJson in response.actions) {
-            val action = try {
-                actionCodec.decode(actionJson)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                onDecodeError?.invoke(e)
-                continue
+    override val incoming: Flow<A> =
+        connection.incoming.transform { raw ->
+            val response =
+                try {
+                    messageCodec.decodeServerMessage(raw)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    onDecodeError?.invoke(e)
+                    return@transform
+                }
+            for (actionJson in response.actions) {
+                val action =
+                    try {
+                        actionCodec.decode(actionJson)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        onDecodeError?.invoke(e)
+                        continue
+                    }
+                emit(action)
             }
-            emit(action)
         }
-    }
 
     override suspend fun send(action: A) {
         val actionJson = actionCodec.encode(action)

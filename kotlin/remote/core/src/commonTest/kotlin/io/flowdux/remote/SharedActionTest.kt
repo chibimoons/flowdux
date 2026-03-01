@@ -2,8 +2,8 @@ package io.flowdux.remote
 
 import io.flowdux.Action
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -11,7 +11,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SharedActionTest {
-
     // -- Test domain actions --
 
     interface ChatAction : Action
@@ -19,16 +18,24 @@ class SharedActionTest {
     @Serializable
     sealed interface SharedChatAction : ChatAction {
         @Serializable
-        data class SendMessage(val text: String) : SharedChatAction, ServerSharedAction
+        data class SendMessage(val text: String) :
+            SharedChatAction,
+            ServerSharedAction
 
         @Serializable
-        data class JoinRoom(val user: String) : SharedChatAction, ServerSharedAction
+        data class JoinRoom(val user: String) :
+            SharedChatAction,
+            ServerSharedAction
 
         @Serializable
-        data class SyncState(val messages: List<String>) : SharedChatAction, ClientSharedAction
+        data class SyncState(val messages: List<String>) :
+            SharedChatAction,
+            ClientSharedAction
 
         @Serializable
-        data class Kicked(val reason: String) : SharedChatAction, ClientSharedAction
+        data class Kicked(val reason: String) :
+            SharedChatAction,
+            ClientSharedAction
     }
 
     data class LocalAction(val value: Int) : ChatAction
@@ -63,12 +70,13 @@ class SharedActionTest {
 
     @Test
     fun filterServerSharedActionsFromMixedList() {
-        val actions: List<Action> = listOf(
-            SharedChatAction.SendMessage("hello"),
-            LocalAction(1),
-            SharedChatAction.SyncState(listOf("msg")),
-            SharedChatAction.JoinRoom("alice"),
-        )
+        val actions: List<Action> =
+            listOf(
+                SharedChatAction.SendMessage("hello"),
+                LocalAction(1),
+                SharedChatAction.SyncState(listOf("msg")),
+                SharedChatAction.JoinRoom("alice"),
+            )
 
         val serverActions = actions.filterIsInstance<ServerSharedAction>()
         assertEquals(2, serverActions.size)
@@ -78,12 +86,13 @@ class SharedActionTest {
 
     @Test
     fun filterClientSharedActionsFromMixedList() {
-        val actions: List<Action> = listOf(
-            SharedChatAction.SendMessage("hello"),
-            SharedChatAction.SyncState(listOf("msg")),
-            LocalAction(1),
-            SharedChatAction.Kicked("spam"),
-        )
+        val actions: List<Action> =
+            listOf(
+                SharedChatAction.SendMessage("hello"),
+                SharedChatAction.SyncState(listOf("msg")),
+                LocalAction(1),
+                SharedChatAction.Kicked("spam"),
+            )
 
         val clientActions = actions.filterIsInstance<ClientSharedAction>()
         assertEquals(2, clientActions.size)
@@ -93,12 +102,13 @@ class SharedActionTest {
 
     @Test
     fun filterSharedActionsExcludesLocalActions() {
-        val actions: List<Action> = listOf(
-            SharedChatAction.SendMessage("hello"),
-            LocalAction(1),
-            LocalAction(2),
-            SharedChatAction.SyncState(listOf("msg")),
-        )
+        val actions: List<Action> =
+            listOf(
+                SharedChatAction.SendMessage("hello"),
+                LocalAction(1),
+                LocalAction(2),
+                SharedChatAction.SyncState(listOf("msg")),
+            )
 
         val sharedActions = actions.filterIsInstance<SharedAction>()
         assertEquals(2, sharedActions.size)
@@ -132,12 +142,13 @@ class SharedActionTest {
 
     @Test
     fun polymorphicSerializationPreservesDirectionMarkers() {
-        val actions = listOf<SharedChatAction>(
-            SharedChatAction.SendMessage("hello"),
-            SharedChatAction.JoinRoom("alice"),
-            SharedChatAction.SyncState(listOf("msg")),
-            SharedChatAction.Kicked("spam"),
-        )
+        val actions =
+            listOf<SharedChatAction>(
+                SharedChatAction.SendMessage("hello"),
+                SharedChatAction.JoinRoom("alice"),
+                SharedChatAction.SyncState(listOf("msg")),
+                SharedChatAction.Kicked("spam"),
+            )
 
         for (action in actions) {
             val encoded = json.encodeToString<SharedChatAction>(action)

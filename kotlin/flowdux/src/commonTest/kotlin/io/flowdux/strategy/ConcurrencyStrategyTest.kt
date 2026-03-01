@@ -3,11 +3,11 @@ package io.flowdux.strategy
 import app.cash.turbine.test
 import io.flowdux.Middleware
 import io.flowdux.createStore
+import io.flowdux.sequential
 import io.flowdux.strategy.ExecutionStrategyTestBase.TestAction
 import io.flowdux.strategy.ExecutionStrategyTestBase.TestState
 import io.flowdux.strategy.ExecutionStrategyTestBase.testErrorProcessor
 import io.flowdux.strategy.ExecutionStrategyTestBase.testReducer
-import io.flowdux.sequential
 import io.flowdux.takeLatest
 import io.flowdux.takeLeading
 import kotlinx.coroutines.CoroutineScope
@@ -19,38 +19,39 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.test.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConcurrencyStrategyTest {
-
     class TakeLatestTests {
-
         @Test
         fun `takeLatest cancels previous execution when new action arrives`() = runTest {
             val executionOrder = mutableListOf<String>()
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Fetch>(takeLatest()) { state, action ->
-                        executionOrder.add("start-${action.id}")
-                        delay(100)
-                        executionOrder.add("end-${action.id}")
-                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                    }
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Fetch>(takeLatest()) { state, action ->
+                                executionOrder.add("start-${action.id}")
+                                delay(100)
+                                executionOrder.add("end-${action.id}")
+                                emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                            }
+                        }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = backgroundScope,
+                )
 
             store.state.test {
                 assertEquals(emptyList<String>(), awaitItem().values)
@@ -83,29 +84,32 @@ class ConcurrencyStrategyTest {
             val completedActionsA = mutableListOf<String>()
             val completedActionsB = mutableListOf<String>()
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    // Use separate takeLatest instances for different key groups
-                    on<TestAction.Fetch>(takeLatest()) { state, action ->
-                        delay(100)
-                        completedActionsA.add(action.id)
-                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                    }
-                    on<TestAction.Search>(takeLatest()) { state, action ->
-                        delay(100)
-                        completedActionsB.add(action.query)
-                        emit(TestAction.SearchResult(action.query, listOf(action.query)))
-                    }
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            // Use separate takeLatest instances for different key groups
+                            on<TestAction.Fetch>(takeLatest()) { state, action ->
+                                delay(100)
+                                completedActionsA.add(action.id)
+                                emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                            }
+                            on<TestAction.Search>(takeLatest()) { state, action ->
+                                delay(100)
+                                completedActionsB.add(action.query)
+                                emit(TestAction.SearchResult(action.query, listOf(action.query)))
+                            }
+                        }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = backgroundScope,
+                )
 
             store.state.test {
                 assertEquals(emptyList<String>(), awaitItem().values)
@@ -134,28 +138,30 @@ class ConcurrencyStrategyTest {
     }
 
     class TakeLeadingTests {
-
         @Test
         fun `takeLeading ignores actions while one is processing`() = runTest {
             val executionCount = mutableListOf<String>()
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Fetch>(takeLeading()) { state, action ->
-                        executionCount.add(action.id)
-                        delay(100)
-                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                    }
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Fetch>(takeLeading()) { state, action ->
+                                executionCount.add(action.id)
+                                delay(100)
+                                emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                            }
+                        }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = backgroundScope,
+                )
 
             store.state.test {
                 assertEquals(emptyList<String>(), awaitItem().values)
@@ -180,23 +186,26 @@ class ConcurrencyStrategyTest {
         fun `takeLeading allows new action after previous completes`() = runTest {
             val executionOrder = mutableListOf<String>()
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Click>(takeLeading()) { state, action ->
-                        executionOrder.add(action.buttonId)
-                        delay(50)
-                        emit(TestAction.ClickProcessed(action.buttonId))
-                    }
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Click>(takeLeading()) { state, action ->
+                                executionOrder.add(action.buttonId)
+                                delay(50)
+                                emit(TestAction.ClickProcessed(action.buttonId))
+                            }
+                        }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = backgroundScope,
+                )
 
             store.state.test {
                 assertEquals(emptyList<String>(), awaitItem().values)
@@ -219,29 +228,31 @@ class ConcurrencyStrategyTest {
     }
 
     class SequentialTests {
-
         @Test
         fun `sequential processes all actions in order`() = runTest {
             val executionOrder = mutableListOf<String>()
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Fetch>(sequential()) { _, action ->
-                        executionOrder.add("start-${action.id}")
-                        delay(50)
-                        executionOrder.add("end-${action.id}")
-                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                    }
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Fetch>(sequential()) { _, action ->
+                                executionOrder.add("start-${action.id}")
+                                delay(50)
+                                executionOrder.add("end-${action.id}")
+                                emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                            }
+                        }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = backgroundScope,
+                )
 
             store.state.test {
                 assertEquals(emptyList<String>(), awaitItem().values)
@@ -262,7 +273,7 @@ class ConcurrencyStrategyTest {
                 // Verify order: each action should start and end before the next starts
                 assertEquals(
                     listOf("start-1", "end-1", "start-2", "end-2", "start-3", "end-3"),
-                    executionOrder
+                    executionOrder,
                 )
 
                 cancelAndIgnoreRemainingEvents()
@@ -274,33 +285,38 @@ class ConcurrencyStrategyTest {
             val sequentialExecutions = mutableListOf<String>()
             val leadingExecutions = mutableListOf<String>()
 
-            val sequentialMiddleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Fetch>(sequential()) { _, action ->
-                        sequentialExecutions.add(action.id)
-                        delay(50)
-                        emit(TestAction.FetchSuccess(action.id, action.id))
-                    }
+            val sequentialMiddleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Fetch>(sequential()) { _, action ->
+                                sequentialExecutions.add(action.id)
+                                delay(50)
+                                emit(TestAction.FetchSuccess(action.id, action.id))
+                            }
+                        }
                 }
-            }
 
-            val leadingMiddleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Search>(takeLeading()) { _, action ->
-                        leadingExecutions.add(action.query)
-                        delay(50)
-                        emit(TestAction.SearchResult(action.query, listOf(action.query)))
-                    }
+            val leadingMiddleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Search>(takeLeading()) { _, action ->
+                                leadingExecutions.add(action.query)
+                                delay(50)
+                                emit(TestAction.SearchResult(action.query, listOf(action.query)))
+                            }
+                        }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(sequentialMiddleware, leadingMiddleware),
-                errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(sequentialMiddleware, leadingMiddleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = backgroundScope,
+                )
 
             store.state.test {
                 assertEquals(emptyList<String>(), awaitItem().values)
@@ -333,32 +349,35 @@ class ConcurrencyStrategyTest {
         fun `sequential with group processes different action types in order`() = runTest {
             val executionOrder = mutableListOf<String>()
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    group(sequential()) {
-                        on<TestAction.Fetch> { _, action ->
-                            executionOrder.add("fetch-start-${action.id}")
-                            delay(50)
-                            executionOrder.add("fetch-end-${action.id}")
-                            emit(TestAction.FetchSuccess(action.id, action.id))
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            group(sequential()) {
+                                on<TestAction.Fetch> { _, action ->
+                                    executionOrder.add("fetch-start-${action.id}")
+                                    delay(50)
+                                    executionOrder.add("fetch-end-${action.id}")
+                                    emit(TestAction.FetchSuccess(action.id, action.id))
+                                }
+                                on<TestAction.Search> { _, action ->
+                                    executionOrder.add("search-start-${action.query}")
+                                    delay(50)
+                                    executionOrder.add("search-end-${action.query}")
+                                    emit(TestAction.SearchResult(action.query, listOf(action.query)))
+                                }
+                            }
                         }
-                        on<TestAction.Search> { _, action ->
-                            executionOrder.add("search-start-${action.query}")
-                            delay(50)
-                            executionOrder.add("search-end-${action.query}")
-                            emit(TestAction.SearchResult(action.query, listOf(action.query)))
-                        }
-                    }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = backgroundScope,
+                )
 
             store.state.test {
                 assertEquals(emptyList<String>(), awaitItem().values)
@@ -377,11 +396,14 @@ class ConcurrencyStrategyTest {
                 // All actions should process sequentially across types
                 assertEquals(
                     listOf(
-                        "fetch-start-1", "fetch-end-1",
-                        "search-start-a", "search-end-a",
-                        "fetch-start-2", "fetch-end-2"
+                        "fetch-start-1",
+                        "fetch-end-1",
+                        "search-start-a",
+                        "search-end-a",
+                        "fetch-start-2",
+                        "fetch-end-2",
                     ),
-                    executionOrder
+                    executionOrder,
                 )
 
                 cancelAndIgnoreRemainingEvents()
@@ -394,32 +416,35 @@ class ConcurrencyStrategyTest {
             val timestamps = mutableListOf<Pair<String, Long>>()
             val startTime = testScheduler.currentTime
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Fetch>(sequential()) { _, action ->
-                        val eventName = "start-${action.id}"
-                        executionOrder.add(eventName)
-                        timestamps.add(eventName to (testScheduler.currentTime - startTime))
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Fetch>(sequential()) { _, action ->
+                                val eventName = "start-${action.id}"
+                                executionOrder.add(eventName)
+                                timestamps.add(eventName to (testScheduler.currentTime - startTime))
 
-                        // First action takes much longer
-                        val processingTime = if (action.id == "1") 300L else 50L
-                        delay(processingTime)
+                                // First action takes much longer
+                                val processingTime = if (action.id == "1") 300L else 50L
+                                delay(processingTime)
 
-                        val endName = "end-${action.id}"
-                        executionOrder.add(endName)
-                        timestamps.add(endName to (testScheduler.currentTime - startTime))
-                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                    }
+                                val endName = "end-${action.id}"
+                                executionOrder.add(endName)
+                                timestamps.add(endName to (testScheduler.currentTime - startTime))
+                                emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                            }
+                        }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = backgroundScope,
+                )
 
             store.state.test {
                 assertEquals(emptyList<String>(), awaitItem().values)
@@ -439,16 +464,22 @@ class ConcurrencyStrategyTest {
                 // Verify strict sequential order
                 assertEquals(
                     listOf("start-1", "end-1", "start-2", "end-2", "start-3", "end-3"),
-                    executionOrder
+                    executionOrder,
                 )
 
                 // Verify timing: action 2 should not start until action 1 ends at 300ms
                 val start2Time = timestamps.find { it.first == "start-2" }!!.second
-                assertTrue(start2Time >= 300, "Action 2 should start after action 1 ends (300ms), but started at $start2Time")
+                assertTrue(
+                    start2Time >= 300,
+                    "Action 2 should start after action 1 ends (300ms), but started at $start2Time",
+                )
 
                 // Action 3 should start after action 2 ends (300 + 50 = 350ms)
                 val start3Time = timestamps.find { it.first == "start-3" }!!.second
-                assertTrue(start3Time >= 350, "Action 3 should start after action 2 ends (350ms), but started at $start3Time")
+                assertTrue(
+                    start3Time >= 350,
+                    "Action 3 should start after action 2 ends (350ms), but started at $start3Time",
+                )
 
                 cancelAndIgnoreRemainingEvents()
             }
@@ -459,34 +490,38 @@ class ConcurrencyStrategyTest {
             val executionOrder = mutableListOf<String>()
             var errorCount = 0
 
-            val errorProcessor = object : io.flowdux.ErrorProcessor<TestAction> {
-                override fun process(throwable: Throwable): kotlinx.coroutines.flow.Flow<TestAction> {
-                    errorCount++
-                    return kotlinx.coroutines.flow.emptyFlow()
-                }
-            }
-
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Fetch>(sequential()) { _, action ->
-                        executionOrder.add("start-${action.id}")
-                        if (action.id == "2") {
-                            throw RuntimeException("Action 2 fails")
-                        }
-                        delay(50)
-                        executionOrder.add("end-${action.id}")
-                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+            val errorProcessor =
+                object : io.flowdux.ErrorProcessor<TestAction> {
+                    override fun process(throwable: Throwable): kotlinx.coroutines.flow.Flow<TestAction> {
+                        errorCount++
+                        return kotlinx.coroutines.flow.emptyFlow()
                     }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = errorProcessor,
-                scope = backgroundScope,
-            )
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Fetch>(sequential()) { _, action ->
+                                executionOrder.add("start-${action.id}")
+                                if (action.id == "2") {
+                                    throw RuntimeException("Action 2 fails")
+                                }
+                                delay(50)
+                                executionOrder.add("end-${action.id}")
+                                emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                            }
+                        }
+                }
+
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = errorProcessor,
+                    scope = backgroundScope,
+                )
 
             store.state.test {
                 assertEquals(emptyList<String>(), awaitItem().values)
@@ -505,42 +540,43 @@ class ConcurrencyStrategyTest {
                 // Verify order: action 2 started but failed, then action 3 executed
                 assertEquals(
                     listOf("start-1", "end-1", "start-2", "start-3", "end-3"),
-                    executionOrder
+                    executionOrder,
                 )
                 assertEquals(1, errorCount)
 
                 cancelAndIgnoreRemainingEvents()
             }
         }
-
     }
 
     class RealDispatcherTests {
-
         @Test
         fun `takeLatest cancels previous execution with real dispatcher`() = runBlocking {
             // Large timing margins are needed for CI (especially iosSimulatorArm64).
             val executionOrder = mutableListOf<String>()
             val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Fetch>(takeLatest()) { _, action ->
-                        executionOrder.add("start-${action.id}")
-                        delay(500)
-                        executionOrder.add("end-${action.id}")
-                        emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
-                    }
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Fetch>(takeLatest()) { _, action ->
+                                executionOrder.add("start-${action.id}")
+                                delay(500)
+                                executionOrder.add("end-${action.id}")
+                                emit(TestAction.FetchSuccess(action.id, "result-${action.id}"))
+                            }
+                        }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = storeScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = storeScope,
+                )
 
             try {
                 store.state.test {

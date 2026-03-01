@@ -46,9 +46,11 @@ class TimeTravelStore<S : State, A : Action> internal constructor(
     init {
         when {
             !initialHistory.isNullOrEmpty() -> {
-                _history.addAll(initialHistory.mapIndexed { idx, snapshot ->
-                    snapshot.copy(index = idx)
-                })
+                _history.addAll(
+                    initialHistory.mapIndexed { idx, snapshot ->
+                        snapshot.copy(index = idx)
+                    },
+                )
                 _currentIndex = _history.size - 1
                 _state = MutableStateFlow(_history.last().currentState)
             }
@@ -59,8 +61,8 @@ class TimeTravelStore<S : State, A : Action> internal constructor(
                         action = null,
                         previousState = null,
                         currentState = initialState,
-                        timestamp = currentTimeMillis()
-                    )
+                        timestamp = currentTimeMillis(),
+                    ),
                 )
                 _state = MutableStateFlow(initialState)
             }
@@ -82,8 +84,8 @@ class TimeTravelStore<S : State, A : Action> internal constructor(
                 action = action,
                 previousState = previousState,
                 currentState = newState,
-                timestamp = currentTimeMillis()
-            )
+                timestamp = currentTimeMillis(),
+            ),
         )
 
         while (_history.size > maxHistorySize && _history.size > 1) {
@@ -135,8 +137,8 @@ class TimeTravelStore<S : State, A : Action> internal constructor(
                 action = null,
                 previousState = null,
                 currentState = currentState,
-                timestamp = currentTimeMillis()
-            )
+                timestamp = currentTimeMillis(),
+            ),
         )
         _currentIndex = 0
     }
@@ -194,33 +196,37 @@ private fun <S : State, A : Action> createTimeTravelStoreInternal(
 ): TimeTravelStore<S, A> {
     lateinit var timeTravelStore: TimeTravelStore<S, A>
 
-    val timeTravelReducer = Reducer<S, A> { _, action ->
-        reducer.reduce(timeTravelStore.currentState, action)
-    }
-
-    val historyLogger = object : NoOpStoreLogger<S, A>() {
-        override fun onStateReduced(action: A, previousState: S, newState: S) {
-            timeTravelStore.recordStateChange(action, timeTravelStore.currentState, newState)
+    val timeTravelReducer =
+        Reducer<S, A> { _, action ->
+            reducer.reduce(timeTravelStore.currentState, action)
         }
-    }
+
+    val historyLogger =
+        object : NoOpStoreLogger<S, A>() {
+            override fun onStateReduced(action: A, previousState: S, newState: S) {
+                timeTravelStore.recordStateChange(action, timeTravelStore.currentState, newState)
+            }
+        }
 
     val effectiveInitialState = initialHistory?.lastOrNull()?.currentState ?: initialState!!
 
-    val innerStore = createStore(
-        initialState = effectiveInitialState,
-        reducer = timeTravelReducer,
-        middlewares = middlewares,
-        errorProcessor = errorProcessor,
-        logger = historyLogger,
-        scope = scope,
-    )
+    val innerStore =
+        createStore(
+            initialState = effectiveInitialState,
+            reducer = timeTravelReducer,
+            middlewares = middlewares,
+            errorProcessor = errorProcessor,
+            logger = historyLogger,
+            scope = scope,
+        )
 
-    timeTravelStore = TimeTravelStore(
-        innerStore = innerStore,
-        maxHistorySize = maxHistorySize,
-        initialState = initialState,
-        initialHistory = initialHistory,
-    )
+    timeTravelStore =
+        TimeTravelStore(
+            innerStore = innerStore,
+            maxHistorySize = maxHistorySize,
+            initialState = initialState,
+            initialHistory = initialHistory,
+        )
 
     return timeTravelStore
 }

@@ -36,7 +36,6 @@ class AuthServerConnection<P : AuthPrincipal>(
     private val verifier: AuthVerifier<P>,
     private val config: AuthConfig = AuthConfig(),
 ) : ServerConnection {
-
     private val _principal = CompletableDeferred<P>()
     private val rawChannel = Channel<String>(Channel.UNLIMITED)
     private val messageChannel = Channel<String>(Channel.UNLIMITED)
@@ -72,75 +71,82 @@ class AuthServerConnection<P : AuthPrincipal>(
     @OptIn(ExperimentalCoroutinesApi::class)
     suspend fun awaitAuth(scope: CoroutineScope): AuthResult<P> {
         // Bridge delegate.incoming into rawChannel
-        val bridgeJob = scope.launch {
-            delegate.incoming.collect { rawChannel.send(it) }
-            rawChannel.close()
-        }
-
-        val result = try {
-            withTimeoutOrNull(config.handshakeTimeout) {
-                var lastFailure: AuthResult.Failure? = null
-
-                repeat(config.maxAuthAttempts) {
-                    val message = rawChannel.receiveCatching().getOrNull()
-                        ?: return@withTimeoutOrNull (lastFailure
-                            ?: AuthResult.Failure("Connection closed before auth"))
-
-                    if (!AuthProtocol.isAuthMessage(message)) {
-                        val reason = "Expected auth message, got: ${message.take(50)}"
-                        delegate.send(AuthProtocol.encodeAuthError(reason))
-                        return@withTimeoutOrNull AuthResult.Failure(reason)
-                    }
-
-                    val token = try {
-                        AuthProtocol.decodeAuthRequest(message)
-                    } catch (e: Exception) {
-                        val reason = "Malformed auth message: ${e.message}"
-                        delegate.send(AuthProtocol.encodeAuthError(reason))
-                        return@withTimeoutOrNull AuthResult.Failure(reason)
-                    }
-
-                    val verifyResult = try {
-                        verifier.verify(token)
-                    } catch (e: Exception) {
-                        val reason = "Verifier error: ${e.message}"
-                        delegate.send(AuthProtocol.encodeAuthError(reason))
-                        return@withTimeoutOrNull AuthResult.Failure(reason)
-                    }
-
-                    when (verifyResult) {
-                        is AuthResult.Success -> {
-                            _principal.complete(verifyResult.principal)
-                            delegate.send(AuthProtocol.encodeAuthSuccess())
-                            // Start forwarding remaining messages (filtering auth protocol)
-                            scope.launch {
-                                for (raw in rawChannel) {
-                                    if (!AuthProtocol.isAuthMessage(raw)) {
-                                        messageChannel.send(raw)
-                                    }
-                                }
-                                messageChannel.close()
-                            }
-                            return@withTimeoutOrNull verifyResult
-                        }
-
-                        is AuthResult.Failure -> {
-                            delegate.send(AuthProtocol.encodeAuthError(verifyResult.reason))
-                            lastFailure = verifyResult
-                        }
-                    }
-                }
-
-                lastFailure ?: AuthResult.Failure("Auth failed")
-            } ?: AuthResult.Failure("Auth handshake timed out")
-        } finally {
-            // On failure/timeout, clean up channels so consumers don't hang
-            if (!_principal.isCompleted) {
-                bridgeJob.cancel()
+        val bridgeJob =
+            scope.launch {
+                delegate.incoming.collect { rawChannel.send(it) }
                 rawChannel.close()
-                messageChannel.close()
             }
-        }
+
+        val result =
+            try {
+                withTimeoutOrNull(config.handshakeTimeout) {
+                    var lastFailure: AuthResult.Failure? = null
+
+                    repeat(config.maxAuthAttempts) {
+                        val message =
+                            rawChannel.receiveCatching().getOrNull()
+                                ?: return@withTimeoutOrNull (
+                                    lastFailure
+                                        ?: AuthResult.Failure("Connection closed before auth")
+                                    )
+
+                        if (!AuthProtocol.isAuthMessage(message)) {
+                            val reason = "Expected auth message, got: ${message.take(50)}"
+                            delegate.send(AuthProtocol.encodeAuthError(reason))
+                            return@withTimeoutOrNull AuthResult.Failure(reason)
+                        }
+
+                        val token =
+                            try {
+                                AuthProtocol.decodeAuthRequest(message)
+                            } catch (e: Exception) {
+                                val reason = "Malformed auth message: ${e.message}"
+                                delegate.send(AuthProtocol.encodeAuthError(reason))
+                                return@withTimeoutOrNull AuthResult.Failure(reason)
+                            }
+
+                        val verifyResult =
+                            try {
+                                verifier.verify(token)
+                            } catch (e: Exception) {
+                                val reason = "Verifier error: ${e.message}"
+                                delegate.send(AuthProtocol.encodeAuthError(reason))
+                                return@withTimeoutOrNull AuthResult.Failure(reason)
+                            }
+
+                        when (verifyResult) {
+                            is AuthResult.Success -> {
+                                _principal.complete(verifyResult.principal)
+                                delegate.send(AuthProtocol.encodeAuthSuccess())
+                                // Start forwarding remaining messages (filtering auth protocol)
+                                scope.launch {
+                                    for (raw in rawChannel) {
+                                        if (!AuthProtocol.isAuthMessage(raw)) {
+                                            messageChannel.send(raw)
+                                        }
+                                    }
+                                    messageChannel.close()
+                                }
+                                return@withTimeoutOrNull verifyResult
+                            }
+
+                            is AuthResult.Failure -> {
+                                delegate.send(AuthProtocol.encodeAuthError(verifyResult.reason))
+                                lastFailure = verifyResult
+                            }
+                        }
+                    }
+
+                    lastFailure ?: AuthResult.Failure("Auth failed")
+                } ?: AuthResult.Failure("Auth handshake timed out")
+            } finally {
+                // On failure/timeout, clean up channels so consumers don't hang
+                if (!_principal.isCompleted) {
+                    bridgeJob.cancel()
+                    rawChannel.close()
+                    messageChannel.close()
+                }
+            }
 
         return result
     }

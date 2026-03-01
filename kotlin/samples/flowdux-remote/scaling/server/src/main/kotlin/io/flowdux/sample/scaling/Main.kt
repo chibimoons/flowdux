@@ -3,9 +3,9 @@ package io.flowdux.sample.scaling
 import io.flowdux.Middleware
 import io.flowdux.remote.ktor.KtorWebSocketServerConnection
 import io.flowdux.remote.serialization.typedJsonAs
+import io.flowdux.remote.server.pattern.createSharedStateServer
 import io.flowdux.remote.server.session.BroadcastConfig
 import io.flowdux.remote.server.session.InMemorySessionRegistry
-import io.flowdux.remote.server.pattern.createSharedStateServer
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
@@ -80,7 +80,7 @@ fun main() {
                     SharedScalingAction.ServerStats(
                         connectedClients = clientCount,
                         counter = state.counter,
-                    )
+                    ),
                 )
                 println("[Stats] clients=$clientCount, counter=${state.counter}")
             }
@@ -114,7 +114,7 @@ fun main() {
                         "counter": ${state.counter},
                         "broadcastConcurrency": ${broadcastConfig.concurrency}
                     }
-                    """.trimIndent()
+                    """.trimIndent(),
                 )
             }
 
@@ -128,7 +128,7 @@ fun main() {
                     SharedScalingAction.ServerStats(
                         connectedClients = clientCount,
                         counter = state.counter,
-                    )
+                    ),
                 )
 
                 val elapsed = System.currentTimeMillis() - startTime
@@ -167,7 +167,7 @@ fun main() {
                     val state = server.currentState
                     server.sendToClient(
                         clientId,
-                        SharedScalingAction.Pong(state.counter, state.connectedClients)
+                        SharedScalingAction.Pong(state.counter, state.connectedClients),
                     )
 
                     server.handleClient(clientId, connection)
@@ -182,19 +182,18 @@ fun main() {
     server.close()
 }
 
-private fun scalingProcessors() =
-    Middleware.ActionProcessorBuilder<ScalingState, ScalingAction>().apply {
-        on<SharedScalingAction.Ping> { state, _ ->
-            // Respond with pong containing current stats
-            emit(
-                SharedScalingAction.Pong(
-                    counter = state.counter,
-                    connectedClients = state.connectedClients
-                )
-            )
-        }
-        on<SharedScalingAction.Increment> { _, action ->
-            // Pass through to reducer
-            emit(action)
-        }
-    }.build()
+private fun scalingProcessors() = Middleware.ActionProcessorBuilder<ScalingState, ScalingAction>().apply {
+    on<SharedScalingAction.Ping> { state, _ ->
+        // Respond with pong containing current stats
+        emit(
+            SharedScalingAction.Pong(
+                counter = state.counter,
+                connectedClients = state.connectedClients,
+            ),
+        )
+    }
+    on<SharedScalingAction.Increment> { _, action ->
+        // Pass through to reducer
+        emit(action)
+    }
+}.build()

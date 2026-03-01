@@ -9,7 +9,6 @@ data class ClientChatState(
     val messages: List<ChatMessage> = emptyList(),
     val users: Set<String> = emptySet(),
     val lastEvent: ChatEvent? = null,
-
     // Client-local
     val currentUser: String = "",
 ) : State

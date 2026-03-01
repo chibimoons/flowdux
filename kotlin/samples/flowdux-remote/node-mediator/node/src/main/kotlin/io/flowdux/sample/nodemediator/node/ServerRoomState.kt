@@ -21,26 +21,27 @@ data class ServerRoomState(
  * Server-side reducer for room state.
  * Handles SharedChatAction directly without intermediate server-only actions.
  */
-val serverRoomReducer = buildReducer<ServerRoomState, SharedChatAction> {
-    on<SharedChatAction.SendMessage> { state, action ->
-        state.copy(
-            messages = state.messages + ChatMessage(action.user, action.text),
-            lastEvent = ChatEvent.MessageReceived(user = action.user, text = action.text),
-            totalMessagesProcessed = state.totalMessagesProcessed + 1,
-        )
-    }
+val serverRoomReducer =
+    buildReducer<ServerRoomState, SharedChatAction> {
+        on<SharedChatAction.SendMessage> { state, action ->
+            state.copy(
+                messages = state.messages + ChatMessage(action.user, action.text),
+                lastEvent = ChatEvent.MessageReceived(user = action.user, text = action.text),
+                totalMessagesProcessed = state.totalMessagesProcessed + 1,
+            )
+        }
 
-    on<SharedChatAction.JoinRoom> { state, action ->
-        state.copy(
-            users = state.users + action.user,
-            lastEvent = ChatEvent.UserJoined(user = action.user),
-        )
-    }
+        on<SharedChatAction.JoinRoom> { state, action ->
+            state.copy(
+                users = state.users + action.user,
+                lastEvent = ChatEvent.UserJoined(user = action.user),
+            )
+        }
 
-    on<SharedChatAction.LeaveRoom> { state, action ->
-        state.copy(
-            users = state.users - action.user,
-            lastEvent = ChatEvent.UserLeft(user = action.user),
-        )
+        on<SharedChatAction.LeaveRoom> { state, action ->
+            state.copy(
+                users = state.users - action.user,
+                lastEvent = ChatEvent.UserLeft(user = action.user),
+            )
+        }
     }
-}

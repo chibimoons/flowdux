@@ -5,6 +5,4 @@ package io.flowdux.remote
  *
  * @property actions Serialized action JSON strings to be dispatched to the local store.
  */
-data class ServerResponse(
-    val actions: List<String>,
-)
+data class ServerResponse(val actions: List<String>)

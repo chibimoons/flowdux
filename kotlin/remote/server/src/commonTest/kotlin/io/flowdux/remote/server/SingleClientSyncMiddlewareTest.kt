@@ -10,18 +10,20 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SingleClientSyncMiddlewareTest {
-
     @Test
     fun `ClientSharedAction is intercepted and sent to client`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(
-            connection = connection,
-        )
+        val middleware =
+            SingleClientSyncMiddleware<ServerState, ServerAction>(
+                connection = connection,
+            )
 
-        val result = middleware.process(
-            getState = { ServerState() },
-            action = ServerAction.Add(10),
-        ).toList()
+        val result =
+            middleware
+                .process(
+                    getState = { ServerState() },
+                    action = ServerAction.Add(10),
+                ).toList()
 
         // ClientSharedAction is consumed — not emitted downstream
         assertTrue(result.isEmpty())
@@ -35,15 +37,18 @@ class SingleClientSyncMiddlewareTest {
     @Test
     fun `non-ClientSharedAction passes through unchanged`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(
-            connection = connection,
-        )
+        val middleware =
+            SingleClientSyncMiddleware<ServerState, ServerAction>(
+                connection = connection,
+            )
 
         val action = ServerAction.InternalReset(42)
-        val result = middleware.process(
-            getState = { ServerState() },
-            action = action,
-        ).toList()
+        val result =
+            middleware
+                .process(
+                    getState = { ServerState() },
+                    action = action,
+                ).toList()
 
         // Non-ClientSharedAction passes through
         assertEquals(listOf(action), result)
@@ -55,19 +60,22 @@ class SingleClientSyncMiddlewareTest {
     @Test
     fun `multiple ClientSharedActions are each sent separately`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(
-            connection = connection,
-        )
+        val middleware =
+            SingleClientSyncMiddleware<ServerState, ServerAction>(
+                connection = connection,
+            )
 
-        middleware.process(
-            getState = { ServerState() },
-            action = ServerAction.Increment,
-        ).toList()
+        middleware
+            .process(
+                getState = { ServerState() },
+                action = ServerAction.Increment,
+            ).toList()
 
-        middleware.process(
-            getState = { ServerState(1) },
-            action = ServerAction.Add(5),
-        ).toList()
+        middleware
+            .process(
+                getState = { ServerState(1) },
+                action = ServerAction.Add(5),
+            ).toList()
 
         assertEquals(2, connection.sentActions.size)
 
@@ -79,14 +87,16 @@ class SingleClientSyncMiddlewareTest {
     @Test
     fun `typed action roundtrip preserves action data`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(
-            connection = connection,
-        )
+        val middleware =
+            SingleClientSyncMiddleware<ServerState, ServerAction>(
+                connection = connection,
+            )
 
-        middleware.process(
-            getState = { ServerState() },
-            action = ServerAction.Add(42),
-        ).toList()
+        middleware
+            .process(
+                getState = { ServerState() },
+                action = ServerAction.Add(42),
+            ).toList()
 
         val sentAction = connection.sentActions[0]
         assertTrue(sentAction is ServerAction.Add)
@@ -96,17 +106,19 @@ class SingleClientSyncMiddlewareTest {
     @Test
     fun `incoming client messages are dispatched through pipeline via FlowHolderAction`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
-        val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(
-            connection = connection,
-        )
+        val middleware =
+            SingleClientSyncMiddleware<ServerState, ServerAction>(
+                connection = connection,
+            )
 
-        val store = createStore(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // Start listening
         store.dispatchStartListening()
@@ -126,13 +138,14 @@ class SingleClientSyncMiddlewareTest {
     fun `InternalStartListening is consumed by middleware and does not reach reducer`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(connection)
-        val store = createStore(
-            initialState = ServerState(),
-            reducer = serverReducer, // sealed when — would crash if InternalStartListening leaked
-            middlewares = listOf(middleware),
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = ServerState(),
+                reducer = serverReducer, // sealed when — would crash if InternalStartListening leaked
+                middlewares = listOf(middleware),
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // If InternalStartListening leaked to the reducer, the sealed when would crash
         store.dispatchStartListening()
@@ -148,13 +161,14 @@ class SingleClientSyncMiddlewareTest {
     fun `InternalStartListening is handled before processors`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val middleware = ProcessorEmittingMiddleware(connection) // has processors for ClientAdd
-        val store = createStore(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // InternalStartListening should be caught at step 0, not fall into processors
         store.dispatchStartListening()
@@ -174,10 +188,12 @@ class SingleClientSyncMiddlewareTest {
         val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(connection)
 
         val action = ServerAction.ClientAdd(10)
-        val result = middleware.process(
-            getState = { ServerState() },
-            action = action,
-        ).toList()
+        val result =
+            middleware
+                .process(
+                    getState = { ServerState() },
+                    action = action,
+                ).toList()
 
         // ServerSharedAction passes through (not intercepted by middleware)
         assertEquals(listOf(action), result)

@@ -26,9 +26,7 @@ sealed interface AuthResult<out P : AuthPrincipal> {
  * // principal is guaranteed to be non-null here
  * ```
  */
-inline fun <P : AuthPrincipal> AuthResult<P>.getOrElse(
-    onFailure: (reason: String) -> Nothing,
-): P = when (this) {
+inline fun <P : AuthPrincipal> AuthResult<P>.getOrElse(onFailure: (reason: String) -> Nothing): P = when (this) {
     is AuthResult.Success -> principal
     is AuthResult.Failure -> onFailure(reason)
 }

@@ -111,10 +111,7 @@ class SharedStateServer<S : State, A : Action> internal constructor(
      * @param connection Typed connection for sending/receiving actions.
      */
     @Suppress("UNCHECKED_CAST")
-    override suspend fun handleClient(
-        sessionId: String,
-        connection: TypedServerConnection<A>,
-    ) {
+    override suspend fun handleClient(sessionId: String, connection: TypedServerConnection<A>) {
         sessionRegistry.addSession(sessionId, connection)
         val listenerDone = CompletableDeferred<Unit>()
         if (store.isClosed) {
@@ -188,15 +185,16 @@ fun <S : State, A : Action> createSharedStateServer(
 ): SharedStateServer<S, A> {
     val broadcaster = SessionBroadcaster(sessionRegistry, broadcastConfig)
 
-    val store = createMultiClientStore(
-        initialState = initialState,
-        reducer = reducer,
-        broadcaster = broadcaster,
-        processors = processors,
-        errorProcessor = errorProcessor,
-        logger = logger,
-        scope = scope,
-    )
+    val store =
+        createMultiClientStore(
+            initialState = initialState,
+            reducer = reducer,
+            broadcaster = broadcaster,
+            processors = processors,
+            errorProcessor = errorProcessor,
+            logger = logger,
+            scope = scope,
+        )
 
     // Start state broadcasting via FlowHolderAction directly
     store.dispatch(InternalStateServing(store.state, stateMapper as (Any) -> Action) as A)
@@ -282,15 +280,16 @@ fun <S : State, A : Action> createSessionAwareSharedStateServer(
 ): SharedStateServer<S, A> {
     val broadcaster = SessionBroadcaster(sessionRegistry, broadcastConfig)
 
-    val store = createMultiClientStore(
-        initialState = initialState,
-        reducer = reducer,
-        broadcaster = broadcaster,
-        processors = processors,
-        errorProcessor = errorProcessor,
-        logger = logger,
-        scope = scope,
-    )
+    val store =
+        createMultiClientStore(
+            initialState = initialState,
+            reducer = reducer,
+            broadcaster = broadcaster,
+            processors = processors,
+            errorProcessor = errorProcessor,
+            logger = logger,
+            scope = scope,
+        )
 
     // Start per-session state broadcasting via FlowHolderAction directly
     store.dispatch(

@@ -15,6 +15,7 @@ interface Action
 enum class FlowActionDelivery {
     /** Inner actions go directly to the reducer, bypassing user middlewares. */
     Emit,
+
     /** Inner actions are re-dispatched through the full middleware pipeline. */
     Dispatch,
 }

@@ -74,7 +74,6 @@ open class SyncMiddleware<S : State, A : Action>(
     scope: CoroutineScope? = null,
     private val onConnectionError: ((Throwable) -> A)? = null,
 ) : Middleware<S, A> {
-
     private val actualScope: CoroutineScope = scope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val connectionMutex = Mutex()
     private var connectionJob: Job? = null
@@ -106,15 +105,16 @@ open class SyncMiddleware<S : State, A : Action>(
     protected suspend fun FlowCollector<A>.startConnection() {
         connectionMutex.withLock {
             connectionJob?.cancel()
-            connectionJob = actualScope.launch {
-                try {
-                    connection.connect()
-                } catch (e: CancellationException) {
-                    throw e // Propagate cancellation
-                } catch (e: Exception) {
-                    onConnectionError?.invoke(e)?.let { errorChannel.send(it) }
+            connectionJob =
+                actualScope.launch {
+                    try {
+                        connection.connect()
+                    } catch (e: CancellationException) {
+                        throw e // Propagate cancellation
+                    } catch (e: Exception) {
+                        onConnectionError?.invoke(e)?.let { errorChannel.send(it) }
+                    }
                 }
-            }
             if (!listenerEmitted) {
                 listenerEmitted = true
                 emit(ServerListenerAction() as A)

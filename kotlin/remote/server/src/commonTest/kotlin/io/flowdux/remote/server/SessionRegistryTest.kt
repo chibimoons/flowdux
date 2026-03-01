@@ -11,7 +11,6 @@ import kotlin.test.assertTrue
  * Tests for [SessionRegistry] interface contract, using [InMemorySessionRegistry].
  */
 class SessionRegistryTest {
-
     @Test
     fun `empty registry has zero count and empty ids`() = runTest {
         val registry = InMemorySessionRegistry<ServerAction>()

@@ -2,12 +2,12 @@ package io.flowdux.remote.server.session
 
 import io.flowdux.Action
 import io.flowdux.remote.server.connection.TypedServerConnection
-import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flow
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Configuration for broadcast behavior.
@@ -17,9 +17,7 @@ import kotlinx.coroutines.flow.flow
  *   - `16-64` = recommended for 10k-100k clients
  *   - Higher values may improve throughput but increase memory usage
  */
-data class BroadcastConfig(
-    val concurrency: Int = 1,
-) {
+data class BroadcastConfig(val concurrency: Int = 1) {
     init {
         require(concurrency >= 1) { "concurrency must be at least 1" }
     }
@@ -54,7 +52,6 @@ class SessionBroadcaster<A : Action>(
     private val config: BroadcastConfig = BroadcastConfig.Sequential,
     private val onSendError: ((sessionId: String, Exception) -> Unit)? = null,
 ) {
-
     /**
      * Send an action to a specific client by session ID.
      * No-op if the session does not exist.
@@ -108,23 +105,20 @@ class SessionBroadcaster<A : Action>(
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    private suspend fun <T> forEachConcurrent(
-        items: Collection<T>,
-        action: suspend (T) -> Unit,
-    ) {
+    private suspend fun <T> forEachConcurrent(items: Collection<T>, action: suspend (T) -> Unit) {
         if (config.concurrency == 1) {
             for (item in items) {
                 action(item)
             }
         } else {
-            items.asFlow()
+            items
+                .asFlow()
                 .flatMapMerge(config.concurrency) { item ->
                     flow {
                         action(item)
                         emit(Unit)
                     }
-                }
-                .collect()
+                }.collect()
         }
     }
 

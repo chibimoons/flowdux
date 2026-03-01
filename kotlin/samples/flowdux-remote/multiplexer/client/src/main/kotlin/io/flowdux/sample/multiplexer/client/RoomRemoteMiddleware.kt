@@ -10,18 +10,18 @@ import io.flowdux.sample.multiplexer.ChatAction
  * Each room has its own middleware instance that handles communication
  * through its virtual connection from the multiplexer.
  */
-class RoomRemoteMiddleware(
-    connection: TypedClientConnection<ChatAction>,
-) : SyncMiddleware<ClientRoomState, ChatAction>(
-    connection = connection,
-) {
-    override val processors = buildProcessors {
-        on<ClientRoomAction.Connect> { _, _ ->
-            startConnection()
-        }
+class RoomRemoteMiddleware(connection: TypedClientConnection<ChatAction>) :
+    SyncMiddleware<ClientRoomState, ChatAction>(
+        connection = connection,
+    ) {
+    override val processors =
+        buildProcessors {
+            on<ClientRoomAction.Connect> { _, _ ->
+                startConnection()
+            }
 
-        on<ClientRoomAction.Disconnect> { _, _ ->
-            stopConnection()
+            on<ClientRoomAction.Disconnect> { _, _ ->
+                stopConnection()
+            }
         }
-    }
 }

@@ -12,10 +12,7 @@ interface Middleware<S : State, A : Action> {
     val name: String get() = this::class.simpleName ?: "Unknown"
     val processors: ActionProcessorMap<S, A>
 
-    fun process(
-        getState: () -> S,
-        action: A,
-    ): Flow<A> = flow {
+    fun process(getState: () -> S, action: A): Flow<A> = flow {
         val processor = processors[action::class]
         if (processor != null) {
             processor.invoke(this, getState(), action)
@@ -27,10 +24,11 @@ interface Middleware<S : State, A : Action> {
     /**
      * Exception thrown when attempting to register a duplicate action processor.
      */
-    class DuplicateProcessorException(actionClass: KClass<*>) : IllegalArgumentException(
-        "Processor for action type '${actionClass.simpleName}' is already registered. " +
-            "Each action type can only have one processor per middleware."
-    )
+    class DuplicateProcessorException(actionClass: KClass<*>) :
+        IllegalArgumentException(
+            "Processor for action type '${actionClass.simpleName}' is already registered. " +
+                "Each action type can only have one processor per middleware.",
+        )
 
     class ActionProcessorBuilder<S, A> {
         @PublishedApi
@@ -43,17 +41,13 @@ interface Middleware<S : State, A : Action> {
             }
         }
 
-        inline fun <reified T : A> on(
-            noinline processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
-        ) {
+        inline fun <reified T : A> on(noinline processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit) {
             checkDuplicate(T::class)
             @Suppress("UNCHECKED_CAST")
             processors[T::class] = processor as ActionProcessor<S, A>
         }
 
-        inline fun <reified T : A> on(
-            noinline processor: suspend FlowCollector<A>.() -> Unit
-        ) {
+        inline fun <reified T : A> on(noinline processor: suspend FlowCollector<A>.() -> Unit) {
             checkDuplicate(T::class)
             processors[T::class] = { _, _ -> processor() }
         }
@@ -66,7 +60,7 @@ interface Middleware<S : State, A : Action> {
          */
         inline fun <reified T : A> on(
             strategy: ExecutionStrategy,
-            noinline processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
+            noinline processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit,
         ) {
             checkDuplicate(T::class)
             val wrappedProcessor = strategy.wrap(processor)
@@ -82,7 +76,7 @@ interface Middleware<S : State, A : Action> {
          */
         inline fun <reified T : A> on(
             strategy: ExecutionStrategy,
-            noinline processor: suspend FlowCollector<A>.() -> Unit
+            noinline processor: suspend FlowCollector<A>.() -> Unit,
         ) {
             checkDuplicate(T::class)
             val baseProcessor: suspend FlowCollector<A>.(S, T) -> Unit = { _, _ -> processor() }
@@ -119,7 +113,7 @@ interface Middleware<S : State, A : Action> {
      */
     class StrategyGroupBuilder<S, A>(
         @PublishedApi internal val strategy: ExecutionStrategy,
-        @PublishedApi internal val processors: MutableMap<KClass<*>, ActionProcessor<S, A>>
+        @PublishedApi internal val processors: MutableMap<KClass<*>, ActionProcessor<S, A>>,
     ) {
         @PublishedApi
         internal fun checkDuplicate(actionClass: KClass<*>) {
@@ -131,9 +125,7 @@ interface Middleware<S : State, A : Action> {
         /**
          * Registers an action processor that shares this group's execution strategy.
          */
-        inline fun <reified T : A> on(
-            noinline processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit
-        ) {
+        inline fun <reified T : A> on(noinline processor: suspend FlowCollector<A>.(state: S, action: T) -> Unit) {
             checkDuplicate(T::class)
             val wrappedProcessor = strategy.wrap(processor)
             @Suppress("UNCHECKED_CAST")
@@ -143,9 +135,7 @@ interface Middleware<S : State, A : Action> {
         /**
          * Registers an action processor (no parameters) that shares this group's execution strategy.
          */
-        inline fun <reified T : A> on(
-            noinline processor: suspend FlowCollector<A>.() -> Unit
-        ) {
+        inline fun <reified T : A> on(noinline processor: suspend FlowCollector<A>.() -> Unit) {
             checkDuplicate(T::class)
             val baseProcessor: suspend FlowCollector<A>.(S, T) -> Unit = { _, _ -> processor() }
             val wrappedProcessor = strategy.wrap(baseProcessor)
@@ -154,9 +144,6 @@ interface Middleware<S : State, A : Action> {
         }
     }
 
-    fun buildProcessors(
-        block: ActionProcessorBuilder<S, A>.() -> Unit
-    ): ActionProcessorMap<S, A> {
-        return ActionProcessorBuilder<S, A>().apply(block).build()
-    }
+    fun buildProcessors(block: ActionProcessorBuilder<S, A>.() -> Unit): ActionProcessorMap<S, A> =
+        ActionProcessorBuilder<S, A>().apply(block).build()
 }

@@ -20,6 +20,7 @@ class CentralNodeManagerTest {
     @Serializable
     sealed interface TestAction : Action {
         @Serializable data class Message(val text: String) : TestAction
+
         @Serializable data class Ping(val id: Int) : TestAction
     }
 
@@ -333,9 +334,7 @@ class CentralNodeManagerTest {
             override val isActive: Boolean = true
             val incomingFlow = MutableSharedFlow<NodeAction<TestAction>>(extraBufferCapacity = 64)
             override val incoming: Flow<NodeAction<TestAction>> = incomingFlow
-            override suspend fun send(action: NodeAction<TestAction>) {
-                throw RuntimeException("send failed")
-            }
+            override suspend fun send(action: NodeAction<TestAction>): Unit = throw RuntimeException("send failed")
         }
 
         val healthyConn = FakeTypedServerConnection()
@@ -383,8 +382,10 @@ class CentralNodeManagerTest {
 
         // node-1 should receive room-A and room-B
         assertEquals(2, conn1.sentActions.size)
-        assertTrue(conn1.sentActions.contains(NodeAction<TestAction>("room-A", TestAction.Message("announcement"))))
-        assertTrue(conn1.sentActions.contains(NodeAction<TestAction>("room-B", TestAction.Message("announcement"))))
+        val expectedA = NodeAction<TestAction>("room-A", TestAction.Message("announcement"))
+        val expectedB = NodeAction<TestAction>("room-B", TestAction.Message("announcement"))
+        assertTrue(conn1.sentActions.contains(expectedA))
+        assertTrue(conn1.sentActions.contains(expectedB))
 
         // node-2 should receive room-C
         assertEquals(1, conn2.sentActions.size)

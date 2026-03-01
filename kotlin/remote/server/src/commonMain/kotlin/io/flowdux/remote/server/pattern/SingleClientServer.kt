@@ -81,13 +81,14 @@ fun <S : State, A : Action> createSingleClientStore(
     logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ): Store<S, A> {
-    val middleware = if (processors.isEmpty()) {
-        SingleClientSyncMiddleware(connection)
-    } else {
-        object : SingleClientSyncMiddleware<S, A>(connection) {
-            override val processors: ActionProcessorMap<S, A> = processors
+    val middleware =
+        if (processors.isEmpty()) {
+            SingleClientSyncMiddleware(connection)
+        } else {
+            object : SingleClientSyncMiddleware<S, A>(connection) {
+                override val processors: ActionProcessorMap<S, A> = processors
+            }
         }
-    }
 
     return createServerStore(
         initialState = initialState,

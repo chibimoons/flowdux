@@ -18,35 +18,36 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
-import kotlin.test.assertEquals
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimingStrategyTest {
-
     class DebounceTests {
-
         @Test
         fun `debounce delays execution and cancels on rapid actions`() = runTest {
             val searchResults = mutableListOf<String>()
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Search>(debounce(100.milliseconds)) { state, action ->
-                        searchResults.add(action.query)
-                        emit(TestAction.SearchResult(action.query, listOf("result-${action.query}")))
-                    }
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Search>(debounce(100.milliseconds)) { state, action ->
+                                searchResults.add(action.query)
+                                emit(TestAction.SearchResult(action.query, listOf("result-${action.query}")))
+                            }
+                        }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = backgroundScope,
+                )
 
             store.state.test {
                 assertEquals(emptyList<String>(), awaitItem().values)
@@ -74,22 +75,25 @@ class TimingStrategyTest {
         fun `debounce executes after quiet period`() = runTest {
             val executedQueries = mutableListOf<String>()
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Search>(debounce(50.milliseconds)) { state, action ->
-                        executedQueries.add(action.query)
-                        emit(TestAction.SearchResult(action.query, listOf(action.query)))
-                    }
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Search>(debounce(50.milliseconds)) { state, action ->
+                                executedQueries.add(action.query)
+                                emit(TestAction.SearchResult(action.query, listOf(action.query)))
+                            }
+                        }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = backgroundScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = backgroundScope,
+                )
 
             store.state.test {
                 assertEquals(emptyList<String>(), awaitItem().values)
@@ -112,7 +116,6 @@ class TimingStrategyTest {
     }
 
     class ThrottleTests {
-
         @Test
         fun `throttle limits execution rate`() = runBlocking {
             // Throttle uses real time (TimeSource.Monotonic), so we use runBlocking.
@@ -120,22 +123,25 @@ class TimingStrategyTest {
             val executedClicks = mutableListOf<String>()
             val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Click>(throttle(500.milliseconds)) { _, action ->
-                        executedClicks.add(action.buttonId)
-                        emit(TestAction.ClickProcessed(action.buttonId))
-                    }
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Click>(throttle(500.milliseconds)) { _, action ->
+                                executedClicks.add(action.buttonId)
+                                emit(TestAction.ClickProcessed(action.buttonId))
+                            }
+                        }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = storeScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = storeScope,
+                )
 
             try {
                 store.state.test {
@@ -171,22 +177,25 @@ class TimingStrategyTest {
             val executedClicks = mutableListOf<String>()
             val storeScope = CoroutineScope(Dispatchers.Default + Job())
 
-            val middleware = object : Middleware<TestState, TestAction> {
-                override val processors = buildProcessors {
-                    on<TestAction.Click>(throttle(100.milliseconds)) { _, action ->
-                        executedClicks.add(action.buttonId)
-                        emit(TestAction.ClickProcessed(action.buttonId))
-                    }
+            val middleware =
+                object : Middleware<TestState, TestAction> {
+                    override val processors =
+                        buildProcessors {
+                            on<TestAction.Click>(throttle(100.milliseconds)) { _, action ->
+                                executedClicks.add(action.buttonId)
+                                emit(TestAction.ClickProcessed(action.buttonId))
+                            }
+                        }
                 }
-            }
 
-            val store = createStore(
-                initialState = TestState(),
-                reducer = testReducer,
-                middlewares = listOf(middleware),
-                errorProcessor = testErrorProcessor,
-                scope = storeScope,
-            )
+            val store =
+                createStore(
+                    initialState = TestState(),
+                    reducer = testReducer,
+                    middlewares = listOf(middleware),
+                    errorProcessor = testErrorProcessor,
+                    scope = storeScope,
+                )
 
             try {
                 store.state.test {

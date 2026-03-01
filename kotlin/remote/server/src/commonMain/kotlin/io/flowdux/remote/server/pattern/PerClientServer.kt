@@ -61,15 +61,13 @@ class PerClientServer<S : State, A : Action> internal constructor(
      * @param sessionId Unique identifier for this client session.
      * @param connection Typed connection for sending/receiving actions.
      */
-    override suspend fun handleClient(
-        sessionId: String,
-        connection: TypedServerConnection<A>,
-    ) {
-        val store = mutex.withLock {
-            sessionFactory(sessionId, connection).also { store ->
-                sessions[sessionId] = store
+    override suspend fun handleClient(sessionId: String, connection: TypedServerConnection<A>) {
+        val store =
+            mutex.withLock {
+                sessionFactory(sessionId, connection).also { store ->
+                    sessions[sessionId] = store
+                }
             }
-        }
 
         try {
             store.serve(stateMapper)
@@ -87,28 +85,22 @@ class PerClientServer<S : State, A : Action> internal constructor(
      * @param sessionId Unique identifier for the session.
      * @return The [Store] if the session exists, null otherwise.
      */
-    suspend fun getSession(sessionId: String): Store<S, A>? {
-        return mutex.withLock {
-            sessions[sessionId]
-        }
+    suspend fun getSession(sessionId: String): Store<S, A>? = mutex.withLock {
+        sessions[sessionId]
     }
 
     /**
      * Get a snapshot of all active session IDs.
      */
-    override suspend fun sessionIds(): Set<String> {
-        return mutex.withLock {
-            sessions.keys.toSet()
-        }
+    override suspend fun sessionIds(): Set<String> = mutex.withLock {
+        sessions.keys.toSet()
     }
 
     /**
      * Get the number of active sessions.
      */
-    override suspend fun sessionCount(): Int {
-        return mutex.withLock {
-            sessions.size
-        }
+    override suspend fun sessionCount(): Int = mutex.withLock {
+        sessions.size
     }
 
     /**
@@ -153,9 +145,7 @@ fun <S : State, A : Action> createPerClientServer(
     stateMapper: (S) -> A,
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     sessionFactory: (sessionId: String, connection: TypedServerConnection<A>) -> Store<S, A>,
-): PerClientServer<S, A> {
-    return PerClientServer(sessionFactory, stateMapper, scope)
-}
+): PerClientServer<S, A> = PerClientServer(sessionFactory, stateMapper, scope)
 
 /**
  * Create a [PerClientServer] with simple configuration.
@@ -194,19 +184,17 @@ fun <S : State, A : Action> createPerClientServer(
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
     logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-): PerClientServer<S, A> {
-    return createPerClientServer(
-        stateMapper = stateMapper,
+): PerClientServer<S, A> = createPerClientServer(
+    stateMapper = stateMapper,
+    scope = scope,
+) { sessionId, connection ->
+    createSingleClientServer(
+        initialState = initialStateFactory(sessionId),
+        reducer = reducer,
+        connection = connection,
+        processors = processors,
+        errorProcessor = errorProcessor,
+        logger = logger,
         scope = scope,
-    ) { sessionId, connection ->
-        createSingleClientServer(
-            initialState = initialStateFactory(sessionId),
-            reducer = reducer,
-            connection = connection,
-            processors = processors,
-            errorProcessor = errorProcessor,
-            logger = logger,
-            scope = scope,
-        )
-    }
+    )
 }

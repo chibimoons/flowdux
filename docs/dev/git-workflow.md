@@ -71,3 +71,37 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 EOF
 )"
 ```
+
+## Git Hooks 설정
+
+프로젝트에 코드 품질을 강제하는 git hooks가 포함되어 있다.
+
+### 설치 (1회)
+
+```bash
+make setup
+# 또는 직접: git config core.hooksPath .githooks
+```
+
+### Hook 목록
+
+| Hook | 시점 | 검증 내용 |
+|------|------|----------|
+| `pre-commit` | 커밋 전 | `.kt`/`.kts` 파일이 staged 시 `spotlessCheck` 실행 |
+| `commit-msg` | 커밋 메시지 작성 후 | Conventional Commits 형식 검증 |
+| `pre-push` | 푸시 전 | `detekt` + `compileKotlinJvm` 실행 |
+
+### 유용한 명령어
+
+```bash
+make lint      # spotlessCheck + detekt
+make format    # spotlessApply (자동 포맷팅)
+```
+
+### 포맷팅 실패 시
+
+```bash
+./gradlew spotlessApply   # 자동 수정
+git add -u                # 수정된 파일 재스테이지
+git commit                # 다시 커밋
+```

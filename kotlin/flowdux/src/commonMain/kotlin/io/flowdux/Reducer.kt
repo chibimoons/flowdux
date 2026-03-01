@@ -3,10 +3,7 @@ package io.flowdux
 import kotlin.reflect.KClass
 
 fun interface Reducer<S : State, A : Action> {
-    fun reduce(
-        state: S,
-        action: A,
-    ): S
+    fun reduce(state: S, action: A): S
 }
 
 class ReducerBuilder<S : State, A : Action> {
@@ -19,12 +16,10 @@ class ReducerBuilder<S : State, A : Action> {
         }
     }
 
-    fun build(): Reducer<S, A> =
-        Reducer { state, action ->
-            handlers[action::class]?.invoke(state, action) ?: state
-        }
+    fun build(): Reducer<S, A> = Reducer { state, action ->
+        handlers[action::class]?.invoke(state, action) ?: state
+    }
 }
 
-inline fun <S : State, A : Action> buildReducer(
-    block: ReducerBuilder<S, A>.() -> Unit
-): Reducer<S, A> = ReducerBuilder<S, A>().apply(block).build()
+inline fun <S : State, A : Action> buildReducer(block: ReducerBuilder<S, A>.() -> Unit): Reducer<S, A> =
+    ReducerBuilder<S, A>().apply(block).build()

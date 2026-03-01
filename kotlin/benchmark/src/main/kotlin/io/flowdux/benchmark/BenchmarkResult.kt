@@ -18,7 +18,8 @@ data class BenchmarkResult(
     val throughput: Double, // actions per second
 ) {
     fun print() {
-        println("""
+        println(
+            """
             |
             |=== $name ===
             |  Total Actions:  $totalActions
@@ -37,7 +38,8 @@ data class BenchmarkResult(
             |    Can sustain 60 FPS:  ${if (canSustain60Fps()) "YES ✅" else "NO ❌"}
             |    Max sustainable FPS: ${String.format("%.1f", maxSustainableFps())}
             |    Actions per frame (60fps): ${String.format("%.1f", actionsPerFrame(60))}
-        """.trimMargin())
+            """.trimMargin(),
+        )
     }
 
     /** Check if average latency allows 60 FPS (16.67ms per frame) */
@@ -60,9 +62,7 @@ data class BenchmarkResult(
 /**
  * Summary of multiple benchmark runs.
  */
-data class BenchmarkSummary(
-    val results: List<BenchmarkResult>,
-) {
+data class BenchmarkSummary(val results: List<BenchmarkResult>) {
     fun print() {
         println("\n" + "=".repeat(60))
         println("FLOWDUX BENCHMARK SUMMARY")
@@ -76,13 +76,15 @@ data class BenchmarkSummary(
         println(String.format("%-30s %15s %15s %10s", "Benchmark", "Throughput", "Avg Latency", "60fps?"))
         println("-".repeat(70))
         results.forEach { r ->
-            println(String.format(
-                "%-30s %12.0f/s %15s %10s",
-                r.name.take(30),
-                r.throughput,
-                r.avgLatency,
-                if (r.canSustain60Fps()) "✅" else "❌"
-            ))
+            println(
+                String.format(
+                    "%-30s %12.0f/s %15s %10s",
+                    r.name.take(30),
+                    r.throughput,
+                    r.avgLatency,
+                    if (r.canSustain60Fps()) "✅" else "❌",
+                ),
+            )
         }
     }
 }
