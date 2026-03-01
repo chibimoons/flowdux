@@ -59,6 +59,15 @@ class KtorClientConnectionCommonTest {
     }
 
     @Test
+    fun connectAfterDisconnectThrowsIllegalState() = runTest {
+        val connection = KtorWebSocketClientConnection("ws://localhost:8080/test")
+        connection.disconnect()
+        assertFailsWith<IllegalStateException> {
+            connection.connect()
+        }
+    }
+
+    @Test
     fun sendBeforeConnectThrowsIllegalState() = runTest {
         val connection = KtorWebSocketClientConnection("ws://localhost:8080/test")
         try {

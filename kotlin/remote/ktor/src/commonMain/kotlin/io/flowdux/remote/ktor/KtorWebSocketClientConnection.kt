@@ -9,6 +9,7 @@ import io.ktor.websocket.Frame
 import io.ktor.websocket.WebSocketSession
 import io.ktor.websocket.close
 import io.ktor.websocket.readText
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.coroutineScope
@@ -31,6 +32,22 @@ import kotlin.concurrent.Volatile
  * [connect] suspends until the connection is closed — the caller is responsible
  * for launching it in an appropriate coroutine scope.
  *
+ * ## Single-use lifecycle
+ *
+ * Each instance supports a single connect/disconnect cycle. After [disconnect] is called,
+ * the internal channels are closed and cannot be reopened, so calling [connect] again on
+ * the same instance throws [IllegalStateException]. Create a new instance to reconnect:
+ *
+ * ```kotlin
+ * val conn1 = KtorWebSocketClientConnection(url)
+ * conn1.connect()   // suspends until disconnected
+ * conn1.disconnect()
+ *
+ * // Create a new instance for reconnection
+ * val conn2 = KtorWebSocketClientConnection(url)
+ * conn2.connect()
+ * ```
+ *
  * ## Backpressure
  *
  * Both incoming and outgoing channels use [Channel.BUFFERED] (64 elements, SUSPEND overflow):
@@ -42,7 +59,8 @@ import kotlin.concurrent.Volatile
  *   to the caller until the WebSocket can transmit buffered messages.
  *
  * @param url WebSocket URL to connect to (e.g., "ws://localhost:8080/path" or "wss://example.com/path")
- * @param httpClient Optional pre-configured HttpClient. If not provided, uses platform-default engine.
+ * @param httpClient Optional pre-configured HttpClient. If not provided, a dedicated HttpClient
+ *   is created and closed on [disconnect]. If provided, the caller manages its lifecycle.
  */
 class KtorWebSocketClientConnection(
     private val url: String,
@@ -85,9 +103,16 @@ class KtorWebSocketClientConnection(
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override suspend fun connect() {
         connectMutex.withLock {
             if (_connectionState.value != ConnectionState.DISCONNECTED) return
+            if (outgoingChannel.isClosedForSend) {
+                throw IllegalStateException(
+                    "Cannot reconnect: this instance has already been disconnected. " +
+                        "Create a new KtorWebSocketClientConnection instance to reconnect.",
+                )
+            }
             _connectionState.value = ConnectionState.CONNECTING
         }
 

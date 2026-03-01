@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class KtorWebSocketClientConnectionTest {
@@ -461,6 +462,43 @@ class KtorWebSocketClientConnectionTest {
 
             connection.disconnect()
             withTimeout(5_000) { connectJob.join() }
+        } finally {
+            server.stop(500, 1_000)
+        }
+    }
+
+    @Test
+    fun `connect after disconnect throws IllegalStateException`() = runBlocking {
+        val server = embeddedServer(CIO, port = 0) {
+            install(WebSockets)
+            routing {
+                webSocket("/test") {
+                    for (frame in incoming) { /* keep alive */ }
+                }
+            }
+        }.start(wait = false)
+
+        try {
+            val port = server.engine.resolvedConnectors().first().port
+            val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+
+            val connectJob = launch(Dispatchers.Default) { connection.connect() }
+            withTimeout(5_000) {
+                connection.connectionState.first { it == ConnectionState.CONNECTED }
+            }
+
+            connection.disconnect()
+            withTimeout(5_000) { connectJob.join() }
+            assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+
+            // Attempting to connect the same instance again must fail
+            val exception = assertFailsWith<IllegalStateException> {
+                connection.connect()
+            }
+            assertTrue(
+                exception.message!!.contains("Cannot reconnect"),
+                "Expected message about reconnection, got: ${exception.message}",
+            )
         } finally {
             server.stop(500, 1_000)
         }
