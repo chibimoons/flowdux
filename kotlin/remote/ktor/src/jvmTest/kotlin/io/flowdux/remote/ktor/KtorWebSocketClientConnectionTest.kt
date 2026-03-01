@@ -398,8 +398,9 @@ class KtorWebSocketClientConnectionTest {
             }
 
             assertEquals(messageCount, received.size)
-            assertEquals("msg-0", received.first())
-            assertEquals("msg-${messageCount - 1}", received.last())
+            for (i in 0 until messageCount) {
+                assertEquals("msg-$i", received[i], "Message $i out of order or missing")
+            }
 
             connection.disconnect()
             connectJob.join()
@@ -409,7 +410,7 @@ class KtorWebSocketClientConnectionTest {
     }
 
     @Test
-    fun `outgoing backpressure suspends send when server is slow`() = runBlocking {
+    fun `outgoing messages beyond buffer size are all delivered to slow server`() = runBlocking {
         val messageCount = 100
         val serverReceived = AtomicInteger(0)
 
