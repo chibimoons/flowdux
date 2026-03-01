@@ -172,7 +172,9 @@ class ReconnectingClientConnectionTest {
 
             // Wait for backoff + new connection creation
             withTimeoutOrNull(2000) {
-                while (connections.size < 2) { delay(10) }
+                while (connections.size < 2) {
+                    delay(10)
+                }
             }
             assertNotNull(connections.getOrNull(1), "Second connection should be created")
             connections[1].completeConnect()
@@ -219,7 +221,9 @@ class ReconnectingClientConnectionTest {
             connections[0].simulateDisconnect()
             // Wait for backoff + new connection creation
             withTimeoutOrNull(2000) {
-                while (connections.size < 2) { delay(10) }
+                while (connections.size < 2) {
+                    delay(10)
+                }
             }
             assertNotNull(connections.getOrNull(1), "Second connection should be created")
             connections[1].completeConnect()
@@ -419,7 +423,9 @@ class ReconnectingClientConnectionTest {
         // Drop connection — attempt counter resets to 1 after successful connection
         connections[0].simulateDisconnect()
         withTimeoutOrNull(2000) {
-            while (connections.size < 2) { delay(10) }
+            while (connections.size < 2) {
+                delay(10)
+            }
         }
         assertNotNull(connections.getOrNull(1), "Second connection should be created")
         connections[1].completeConnect()
@@ -430,7 +436,9 @@ class ReconnectingClientConnectionTest {
         // Without reset, maxAttempts=2 would be exhausted here
         connections[1].simulateDisconnect()
         withTimeoutOrNull(2000) {
-            while (connections.size < 3) { delay(10) }
+            while (connections.size < 3) {
+                delay(10)
+            }
         }
         assertNotNull(connections.getOrNull(2), "Third connection should be created (attempt reset)")
         connections[2].completeConnect()
@@ -499,21 +507,15 @@ class ReconnectingClientConnectionTest {
     /**
      * Mock connection that always throws from [connect].
      */
-    private class FailingMockConnection<A : Action>(
-        private val exception: Exception,
-    ) : TypedClientConnection<A> {
+    private class FailingMockConnection<A : Action>(private val exception: Exception) : TypedClientConnection<A> {
         private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
         override val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
         override val incoming: Flow<A> = Channel<A>().receiveAsFlow()
 
-        override suspend fun send(action: A) {
-            throw IllegalStateException("Not connected")
-        }
+        override suspend fun send(action: A): Unit = throw IllegalStateException("Not connected")
 
-        override suspend fun connect() {
-            throw exception
-        }
+        override suspend fun connect(): Unit = throw exception
 
         override suspend fun disconnect() {
             _connectionState.value = ConnectionState.DISCONNECTED
