@@ -403,7 +403,7 @@ class KtorWebSocketClientConnectionTest {
             }
 
             connection.disconnect()
-            connectJob.join()
+            withTimeout(5_000) { connectJob.join() }
         } finally {
             server.stop(500, 1_000)
         }
@@ -439,8 +439,8 @@ class KtorWebSocketClientConnectionTest {
             }
 
             // Send more messages than the buffer can hold (64).
-            // With the slow server, the outgoing buffer fills up and send() suspends
-            // until the server drains messages. No messages should be dropped.
+            // With the slow server, the outgoing buffer is likely to fill up, causing
+            // send() to suspend until messages are drained. No messages should be dropped.
             withTimeout(30_000) {
                 for (i in 0 until messageCount) {
                     connection.send("msg-$i")
@@ -460,7 +460,7 @@ class KtorWebSocketClientConnectionTest {
             }
 
             connection.disconnect()
-            connectJob.join()
+            withTimeout(5_000) { connectJob.join() }
         } finally {
             server.stop(500, 1_000)
         }
@@ -482,33 +482,36 @@ class KtorWebSocketClientConnectionTest {
             }
         }.start(wait = false)
 
+        var connection: KtorWebSocketClientConnection? = null
         try {
             val port = server.engine.resolvedConnectors().first().port
-            val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+            connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
 
             val connectJob = launch(Dispatchers.Default) { connection.connect() }
             withTimeout(5_000) {
                 connection.connectionState.first { it == ConnectionState.CONNECTED }
             }
 
-            // Collect slowly with periodic delays to exercise buffer fill/drain cycles.
-            // With BUFFERED (64, SUSPEND), the receive loop suspends when the buffer fills,
-            // then resumes as the consumer drains it. No messages should be dropped.
-            val consumed = mutableListOf<String>()
-            withTimeout(30_000) {
-                connection.incoming.take(messageCount).collect { msg ->
-                    consumed.add(msg)
-                    if (consumed.size % 10 == 0) delay(50)
+            try {
+                // Collect slowly with periodic delays to exercise buffer fill/drain cycles.
+                // With BUFFERED (64, SUSPEND), the receive loop suspends when the buffer fills,
+                // then resumes as the consumer drains it. No messages should be dropped.
+                val consumed = mutableListOf<String>()
+                withTimeout(30_000) {
+                    connection.incoming.take(messageCount).collect { msg ->
+                        consumed.add(msg)
+                        if (consumed.size % 10 == 0) delay(50)
+                    }
                 }
-            }
 
-            assertEquals(messageCount, consumed.size)
-            for (i in 0 until messageCount) {
-                assertEquals("msg-$i", consumed[i], "Message $i out of order or missing")
+                assertEquals(messageCount, consumed.size)
+                for (i in 0 until messageCount) {
+                    assertEquals("msg-$i", consumed[i], "Message $i out of order or missing")
+                }
+            } finally {
+                connection.disconnect()
+                withTimeout(5_000) { connectJob.join() }
             }
-
-            connection.disconnect()
-            connectJob.join()
         } finally {
             server.stop(500, 1_000)
         }
