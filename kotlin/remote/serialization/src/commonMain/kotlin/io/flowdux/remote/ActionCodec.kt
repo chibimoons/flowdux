@@ -1,6 +1,7 @@
 package io.flowdux.remote
 
 import io.flowdux.Action
+import kotlinx.coroutines.CancellationException
 
 /**
  * Codec for serializing and deserializing actions.
@@ -50,6 +51,8 @@ interface ActionCodec<A : Action> {
      */
     fun decodeOrNull(json: String): A? = try {
         decode(json)
+    } catch (e: CancellationException) {
+        throw e
     } catch (_: Exception) {
         null
     }
