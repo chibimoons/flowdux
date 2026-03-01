@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   test-flowdux:
@@ -28,13 +29,42 @@ jobs:
         working-directory: dart/flowdux
         run: dart pub get
 
+      - name: Check formatting
+        working-directory: dart/flowdux
+        run: dart format --set-exit-if-changed .
+
       - name: Analyze
         working-directory: dart/flowdux
         run: dart analyze
 
-      - name: Run tests
+      - name: Run tests with coverage
         working-directory: dart/flowdux
-        run: dart test
+        run: dart test --coverage=coverage
+
+      - name: Convert coverage to LCOV
+        working-directory: dart/flowdux
+        run: |
+          dart pub global activate coverage
+          dart pub global run coverage:format_coverage \
+            --lcov \
+            --in=coverage \
+            --out=coverage/lcov.info \
+            --report-on=lib
+
+      - name: Add coverage report to PR
+        if: github.event_name == 'pull_request'
+        uses: romeovs/lcov-reporter-action@v0.4.0
+        with:
+          lcov-file: dart/flowdux/coverage/lcov.info
+          title: Dart Coverage
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dart-coverage
+          path: dart/flowdux/coverage/
 
   test-flowdux-flutter:
     runs-on: ubuntu-latest
@@ -52,10 +82,29 @@ jobs:
         working-directory: dart/flowdux_flutter
         run: flutter pub get
 
+      - name: Check formatting
+        working-directory: dart/flowdux_flutter
+        run: dart format --set-exit-if-changed .
+
       - name: Analyze
         working-directory: dart/flowdux_flutter
         run: flutter analyze --no-fatal-warnings
 
-      - name: Run tests
+      - name: Run tests with coverage
         working-directory: dart/flowdux_flutter
-        run: flutter test
+        run: flutter test --coverage
+
+      - name: Add coverage report to PR
+        if: github.event_name == 'pull_request'
+        uses: romeovs/lcov-reporter-action@v0.4.0
+        with:
+          lcov-file: dart/flowdux_flutter/coverage/lcov.info
+          title: Flutter Coverage
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-coverage
+          path: dart/flowdux_flutter/coverage/
