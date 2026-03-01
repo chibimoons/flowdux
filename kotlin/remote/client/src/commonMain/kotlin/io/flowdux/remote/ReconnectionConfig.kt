@@ -33,19 +33,18 @@ data class ReconnectionConfig(
     /**
      * Calculate the delay for the given [attempt] (0-based) with optional jitter.
      *
-     * @return delay in milliseconds
+     * @return delay duration, always at least 1 millisecond to prevent tight retry loops.
      */
     internal fun delayForAttempt(attempt: Int, random: () -> Double = { kotlin.random.Random.nextDouble() }): Duration {
-        val maxDelayMs = maxDelay.inWholeMilliseconds.toDouble()
-        var delayMs = initialDelay.inWholeMilliseconds.toDouble()
+        var delay = initialDelay
         for (i in 0 until attempt) {
-            delayMs *= factor
-            if (delayMs >= maxDelayMs) {
-                delayMs = maxDelayMs
+            delay *= factor
+            if (delay >= maxDelay) {
+                delay = maxDelay
                 break
             }
         }
-        val jitter = delayMs * jitterFactor * random()
-        return (delayMs - jitter).toLong().milliseconds
+        val jitter = delay * jitterFactor * random()
+        return (delay - jitter).coerceAtLeast(1.milliseconds)
     }
 }
