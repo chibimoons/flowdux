@@ -412,7 +412,7 @@ class KtorWebSocketClientConnectionTest {
     @Test
     fun `outgoing messages beyond buffer size are all delivered to slow server`() = runBlocking {
         val messageCount = 100
-        val serverReceived = AtomicInteger(0)
+        val serverReceivedMessages = java.util.concurrent.CopyOnWriteArrayList<String>()
 
         val server = embeddedServer(CIO, port = 0) {
             install(WebSockets)
@@ -420,7 +420,7 @@ class KtorWebSocketClientConnectionTest {
                 webSocket("/test") {
                     for (frame in incoming) {
                         if (frame is Frame.Text) {
-                            serverReceived.incrementAndGet()
+                            serverReceivedMessages.add(frame.readText())
                             // Slow server: delays reading to let the outgoing buffer fill up.
                             // This forces the client's send() to suspend when the buffer (64) is full.
                             delay(10)
@@ -450,12 +450,15 @@ class KtorWebSocketClientConnectionTest {
 
             // Wait for server to finish processing all messages
             withTimeout(10_000) {
-                while (serverReceived.get() < messageCount) {
+                while (serverReceivedMessages.size < messageCount) {
                     delay(50)
                 }
             }
 
-            assertEquals(messageCount, serverReceived.get())
+            assertEquals(messageCount, serverReceivedMessages.size)
+            for (i in 0 until messageCount) {
+                assertEquals("msg-$i", serverReceivedMessages[i], "Message $i out of order or missing")
+            }
 
             connection.disconnect()
             connectJob.join()
