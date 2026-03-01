@@ -16,9 +16,11 @@ import kotlinx.coroutines.CancellationException
  * unrecognized action types instead of crashing:
  *
  * ```kotlin
- * val action = codec.decodeOrNull(json) ?: run {
+ * val action = codec.decodeOrNull(json)
+ * if (action == null) {
  *     logger.warn("Unknown action type, skipping: $json")
- *     return
+ * } else {
+ *     // process the decoded action
  * }
  * ```
  *
