@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlin.concurrent.Volatile
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * A [TypedClientConnection] decorator that automatically reconnects when the
@@ -51,6 +53,7 @@ import kotlin.concurrent.Volatile
  * @param onEvent Optional callback for reconnection lifecycle events. Exceptions thrown
  *        by this callback are silently caught to avoid disrupting the reconnection loop.
  */
+@OptIn(ExperimentalAtomicApi::class)
 class ReconnectingClientConnection<A : Action>(
     private val connectionFactory: () -> TypedClientConnection<A>,
     private val config: ReconnectionConfig = ReconnectionConfig(),
@@ -114,21 +117,21 @@ class ReconnectingClientConnection<A : Action>(
 
             if (stopped) break
 
-            // Create the inner connection after the backoff delay to avoid
-            // eagerly allocating transport resources during the wait.
-            val conn = connectionFactory()
-            currentConnection = conn
-
-            // Re-check stopped after creating connection to handle disconnect()
-            // called between factory invocation and conn.connect() start.
-            if (stopped) {
-                conn.disconnect()
-                currentConnection = null
-                break
-            }
-
             try {
-                var wasConnected = false
+                // Create the inner connection after the backoff delay to avoid
+                // eagerly allocating transport resources during the wait.
+                val conn = connectionFactory()
+                currentConnection = conn
+
+                // Re-check stopped after creating connection to handle disconnect()
+                // called between factory invocation and conn.connect() start.
+                if (stopped) {
+                    conn.disconnect()
+                    currentConnection = null
+                    break
+                }
+
+                val wasConnected = AtomicBoolean(false)
 
                 supervisorScope {
                     // Forward incoming actions from inner connection to shared channel
@@ -145,9 +148,12 @@ class ReconnectingClientConnection<A : Action>(
                     // Monitor inner connection state
                     val stateJob: Job = launch {
                         conn.connectionState.collect { state ->
+                            // Suppress state updates once stopped to prevent
+                            // overwriting DISCONNECTED set by disconnect().
+                            if (stopped) return@collect
                             when (state) {
                                 ConnectionState.CONNECTED -> {
-                                    wasConnected = true
+                                    wasConnected.store(true)
                                     _connectionState.value = ConnectionState.CONNECTED
                                     safeOnEvent(ReconnectionEvent.Connected(attempt))
                                 }
@@ -181,7 +187,7 @@ class ReconnectingClientConnection<A : Action>(
                 currentConnection = null
                 if (!stopped) {
                     // Reset attempt counter if we had a successful connection
-                    if (wasConnected) {
+                    if (wasConnected.load()) {
                         attempt = 1 // next iteration applies backoff for attempt 1
                         lastException = null
                     } else {
