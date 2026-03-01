@@ -38,6 +38,13 @@ import kotlin.concurrent.Volatile
  * The shared [incoming] channel uses [Channel.BUFFERED]. When the buffer fills,
  * the inner connection's forwarding coroutine suspends until the consumer collects.
  *
+ * ## Lifecycle
+ *
+ * This connection supports multiple connect/disconnect cycles. The [incoming] channel
+ * remains open across [disconnect] calls so that [SyncMiddleware]'s reusable
+ * `ServerListenerAction` can continue collecting. Call [disconnect] to stop
+ * the reconnection loop and the current inner connection.
+ *
  * @param connectionFactory Factory that creates a fresh [TypedClientConnection] for each
  *        connection attempt. Must return a new instance every time.
  * @param config Reconnection strategy configuration.
@@ -62,7 +69,15 @@ class ReconnectingClientConnection<A : Action>(
     @Volatile
     private var stopped = false
 
+    /**
+     * Send a typed action to the server.
+     *
+     * @throws IllegalStateException if the connection is not in [ConnectionState.CONNECTED] state.
+     */
     override suspend fun send(action: A) {
+        if (_connectionState.value != ConnectionState.CONNECTED) {
+            throw IllegalStateException("Cannot send: not connected")
+        }
         val conn = currentConnection
             ?: throw IllegalStateException("Cannot send: not connected")
         conn.send(action)
@@ -82,9 +97,6 @@ class ReconnectingClientConnection<A : Action>(
         var lastException: Exception? = null
 
         while (!stopped && attempt < config.maxAttempts) {
-            val conn = connectionFactory()
-            currentConnection = conn
-
             if (attempt == 0) {
                 _connectionState.value = ConnectionState.CONNECTING
             } else {
@@ -99,6 +111,11 @@ class ReconnectingClientConnection<A : Action>(
             // that disconnect() already requested to stop.
             if (stopped) break
 
+            // Create the inner connection after the backoff delay to avoid
+            // eagerly allocating transport resources during the wait.
+            val conn = connectionFactory()
+            currentConnection = conn
+
             try {
                 var wasConnected = false
 
@@ -109,7 +126,7 @@ class ReconnectingClientConnection<A : Action>(
                             try {
                                 incomingChannel.send(action)
                             } catch (_: ClosedSendChannelException) {
-                                // disconnect() closed the shared channel — stop forwarding
+                                // Channel closed — stop forwarding
                             }
                         }
                     }
@@ -180,12 +197,18 @@ class ReconnectingClientConnection<A : Action>(
         }
     }
 
+    /**
+     * Stop the reconnection loop and disconnect the current inner connection.
+     *
+     * The shared [incoming] channel remains open so that this instance can be
+     * reused with a subsequent [connect] call (matching [SyncMiddleware]'s
+     * `startConnection()`/`stopConnection()` lifecycle).
+     */
     override suspend fun disconnect() {
         stopped = true
         _connectionState.value = ConnectionState.DISCONNECTED
         currentConnection?.disconnect()
         currentConnection = null
-        incomingChannel.close()
     }
 
     private fun safeOnEvent(event: ReconnectionEvent) {
