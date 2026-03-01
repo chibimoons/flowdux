@@ -259,7 +259,7 @@ class FetchDataAction with FlowHolderAction {
 
 ### API Compatibility (Frequently Caught in Past PRs)
 
-1. **Removing public/protected methods without `@Deprecated`**: Always add `@Deprecated(level = WARNING)` wrapper before removing. Direct deletion is a breaking change for external consumers.
+1. **Removing public/protected methods without `@Deprecated`**: Always add `@Deprecated(message = "Scheduled for removal in a future release", level = DeprecationLevel.WARNING)` wrapper before removing. Direct deletion is a breaking change for external consumers.
 2. **Adding methods to interface without default implementation**: External implementors will fail to compile. Always provide a default.
 3. **`println` in commonMain library code**: Library code must not use `println`. Use injectable `onEvent` callback or sealed event class.
 

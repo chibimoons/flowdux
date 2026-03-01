@@ -1,6 +1,6 @@
 ---
 paths:
-  - "kotlin/**/test/**/*.kt"
+  - "kotlin/**/src/*Test/**/*.kt"
   - "kotlin/**/*Test.kt"
   - "kotlin/**/*Tests.kt"
 ---

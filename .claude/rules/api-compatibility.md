@@ -1,7 +1,6 @@
 ---
 paths:
-  - "kotlin/**/main/**/*.kt"
-  - "kotlin/**/commonMain/**/*.kt"
+  - "kotlin/**/src/*Main/**/*.kt"
 ---
 
 # API Compatibility Rules
