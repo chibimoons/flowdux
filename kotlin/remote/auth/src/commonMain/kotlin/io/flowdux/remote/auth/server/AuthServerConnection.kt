@@ -3,6 +3,7 @@ package io.flowdux.remote.auth.server
 import io.flowdux.remote.auth.AuthConfig
 import io.flowdux.remote.auth.AuthProtocol
 import io.flowdux.remote.server.connection.ServerConnection
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -18,6 +19,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Call [awaitAuth] to wait for the client's auth message, verify it, and
  * start forwarding non-auth messages to [incoming].
  *
+ * Error messages sent to the client are intentionally generic ("Authentication failed")
+ * to prevent information leakage. Use [onAuthError] to receive detailed error
+ * information for server-side logging and diagnostics.
+ *
  * Usage:
  * ```kotlin
  * val authed = KtorWebSocketServerConnection(session).withAuth(jwtVerifier)
@@ -30,11 +35,16 @@ import kotlinx.coroutines.withTimeoutOrNull
  * // use authed as a normal ServerConnection
  * server.handleClient(principal.userId, authed.typedJsonAs<...>())
  * ```
+ *
+ * @param onAuthError Optional callback invoked with detailed error information when
+ *   authentication fails. Use this for server-side logging instead of relying on
+ *   client-facing error messages, which are intentionally sanitized.
  */
 class AuthServerConnection<P : AuthPrincipal>(
     private val delegate: ServerConnection,
     private val verifier: AuthVerifier<P>,
     private val config: AuthConfig = AuthConfig(),
+    private val onAuthError: ((String) -> Unit)? = null,
 ) : ServerConnection {
     private val _principal = CompletableDeferred<P>()
     private val rawChannel = Channel<String>(Channel.UNLIMITED)
@@ -91,27 +101,29 @@ class AuthServerConnection<P : AuthPrincipal>(
                                     )
 
                         if (!AuthProtocol.isAuthMessage(message)) {
-                            val reason = "Expected auth message, got: ${message.take(50)}"
-                            delegate.send(AuthProtocol.encodeAuthError(reason))
-                            return@withTimeoutOrNull AuthResult.Failure(reason)
+                            onAuthError?.invoke("Expected auth message, got: ${message.take(50)}")
+                            delegate.send(AuthProtocol.encodeAuthError(CLIENT_ERROR_MESSAGE))
+                            return@withTimeoutOrNull AuthResult.Failure("Expected auth message")
                         }
 
                         val token =
                             try {
                                 AuthProtocol.decodeAuthRequest(message)
                             } catch (e: Exception) {
-                                val reason = "Malformed auth message: ${e.message}"
-                                delegate.send(AuthProtocol.encodeAuthError(reason))
-                                return@withTimeoutOrNull AuthResult.Failure(reason)
+                                onAuthError?.invoke("Malformed auth message: ${e.message}")
+                                delegate.send(AuthProtocol.encodeAuthError(CLIENT_ERROR_MESSAGE))
+                                return@withTimeoutOrNull AuthResult.Failure("Malformed auth message")
                             }
 
                         val verifyResult =
                             try {
                                 verifier.verify(token)
+                            } catch (e: CancellationException) {
+                                throw e
                             } catch (e: Exception) {
-                                val reason = "Verifier error: ${e.message}"
-                                delegate.send(AuthProtocol.encodeAuthError(reason))
-                                return@withTimeoutOrNull AuthResult.Failure(reason)
+                                onAuthError?.invoke("Verifier error: ${e.message}")
+                                delegate.send(AuthProtocol.encodeAuthError(CLIENT_ERROR_MESSAGE))
+                                return@withTimeoutOrNull AuthResult.Failure(CLIENT_ERROR_MESSAGE)
                             }
 
                         when (verifyResult) {
@@ -131,7 +143,7 @@ class AuthServerConnection<P : AuthPrincipal>(
                             }
 
                             is AuthResult.Failure -> {
-                                delegate.send(AuthProtocol.encodeAuthError(verifyResult.reason))
+                                delegate.send(AuthProtocol.encodeAuthError(CLIENT_ERROR_MESSAGE))
                                 lastFailure = verifyResult
                             }
                         }
@@ -149,5 +161,9 @@ class AuthServerConnection<P : AuthPrincipal>(
             }
 
         return result
+    }
+
+    private companion object {
+        const val CLIENT_ERROR_MESSAGE = "Authentication failed"
     }
 }

@@ -17,8 +17,12 @@ import io.flowdux.remote.server.connection.ServerConnection
  * // use authed as a normal ServerConnection
  * server.handleClient(principal.userId, authed.typedJsonAs<...>())
  * ```
+ *
+ * @param onAuthError Optional callback invoked with detailed error information when
+ *   authentication fails. Use this for server-side logging.
  */
 fun <P : AuthPrincipal> ServerConnection.withAuth(
     verifier: AuthVerifier<P>,
     config: AuthConfig = AuthConfig(),
-): AuthServerConnection<P> = AuthServerConnection(this, verifier, config)
+    onAuthError: ((String) -> Unit)? = null,
+): AuthServerConnection<P> = AuthServerConnection(this, verifier, config, onAuthError)
