@@ -549,7 +549,9 @@ class KtorWebSocketClientConnectionTest {
 
                 // Wait until at least some sends are in-flight, then disconnect
                 withTimeout(5_000) {
-                    while (sendsStarted.get() == 0) { delay(1) }
+                    while (sendsStarted.get() == 0) {
+                        delay(1)
+                    }
                 }
                 connection.disconnect()
 
