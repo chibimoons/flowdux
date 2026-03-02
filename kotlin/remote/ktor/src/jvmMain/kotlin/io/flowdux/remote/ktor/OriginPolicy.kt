@@ -53,7 +53,8 @@ sealed interface OriginPolicy {
      */
     data class AllowList(val origins: Set<String>, val allowNullOrigin: Boolean = false) : OriginPolicy {
 
-        private val normalized: Set<String> = origins.map { it.trimEnd('/').lowercase(Locale.ROOT) }.toSet()
+        private val normalized: Set<String> =
+            origins.toSet().map { it.trimEnd('/').lowercase(Locale.ROOT) }.toSet()
 
         override fun isAllowed(origin: String?): Boolean {
             if (origin == null) return allowNullOrigin

@@ -13,6 +13,7 @@ import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import io.ktor.websocket.readText
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -49,7 +50,7 @@ class OriginCheckTest {
                     path = "/ws",
                     request = { header("Origin", allowedOrigin) },
                 ) {
-                    val frame = incoming.receive() as Frame.Text
+                    val frame = withTimeout(5_000) { incoming.receive() } as Frame.Text
                     assertEquals("hello", frame.readText())
                 }
             }
@@ -79,8 +80,7 @@ class OriginCheckTest {
                     path = "/ws",
                     request = { header("Origin", "https://evil.com") },
                 ) {
-                    // Server closes with VIOLATED_POLICY; Ktor client surfaces it via closeReason
-                    val reason = closeReason.await()
+                    val reason = withTimeout(5_000) { closeReason.await() }
                     assertNotNull(reason)
                     assertEquals(CloseReason.Codes.VIOLATED_POLICY.code, reason.code)
                 }
@@ -111,7 +111,7 @@ class OriginCheckTest {
                     port = port,
                     path = "/ws",
                 ) {
-                    val reason = closeReason.await()
+                    val reason = withTimeout(5_000) { closeReason.await() }
                     assertNotNull(reason)
                     assertEquals(CloseReason.Codes.VIOLATED_POLICY.code, reason.code)
                 }
@@ -142,7 +142,7 @@ class OriginCheckTest {
                     path = "/ws",
                     request = { header("Origin", "https://any-site.com") },
                 ) {
-                    val frame = incoming.receive() as Frame.Text
+                    val frame = withTimeout(5_000) { incoming.receive() } as Frame.Text
                     assertEquals("welcome", frame.readText())
                 }
             }
@@ -174,7 +174,7 @@ class OriginCheckTest {
                     path = "/ws",
                     request = { header("Origin", allowedOrigin) },
                 ) {
-                    val frame = incoming.receive() as Frame.Text
+                    val frame = withTimeout(5_000) { incoming.receive() } as Frame.Text
                     assertEquals("passed", frame.readText())
                 }
             }
