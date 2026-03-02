@@ -1,5 +1,7 @@
 package io.flowdux.remote.ktor
 
+import java.util.Locale
+
 /**
  * Policy for validating WebSocket `Origin` headers to prevent
  * Cross-Site WebSocket Hijacking (CSWSH) attacks.
@@ -51,11 +53,11 @@ sealed interface OriginPolicy {
      */
     data class AllowList(val origins: Set<String>, val allowNullOrigin: Boolean = false) : OriginPolicy {
 
-        private val normalized: Set<String> = origins.map { it.trimEnd('/').lowercase() }.toSet()
+        private val normalized: Set<String> = origins.map { it.trimEnd('/').lowercase(Locale.ROOT) }.toSet()
 
         override fun isAllowed(origin: String?): Boolean {
             if (origin == null) return allowNullOrigin
-            return origin.trimEnd('/').lowercase() in normalized
+            return origin.trimEnd('/').lowercase(Locale.ROOT) in normalized
         }
     }
 }

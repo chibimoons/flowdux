@@ -26,6 +26,8 @@ class OriginCheckTest {
         origins = setOf(allowedOrigin),
     )
 
+    private fun createClient() = HttpClient { install(ClientWebSockets) }
+
     @Test
     fun `allowed origin connects successfully`() = runBlocking {
         val server = embeddedServer(CIO, port = 0) {
@@ -40,19 +42,17 @@ class OriginCheckTest {
 
         try {
             val port = server.engine.resolvedConnectors().first().port
-            val client = HttpClient { install(ClientWebSockets) }
-
-            client.webSocket(
-                host = "localhost",
-                port = port,
-                path = "/ws",
-                request = { header("Origin", allowedOrigin) },
-            ) {
-                val frame = incoming.receive() as Frame.Text
-                assertEquals("hello", frame.readText())
+            createClient().use { client ->
+                client.webSocket(
+                    host = "localhost",
+                    port = port,
+                    path = "/ws",
+                    request = { header("Origin", allowedOrigin) },
+                ) {
+                    val frame = incoming.receive() as Frame.Text
+                    assertEquals("hello", frame.readText())
+                }
             }
-
-            client.close()
         } finally {
             server.stop(500, 1_000)
         }
@@ -72,21 +72,19 @@ class OriginCheckTest {
 
         try {
             val port = server.engine.resolvedConnectors().first().port
-            val client = HttpClient { install(ClientWebSockets) }
-
-            client.webSocket(
-                host = "localhost",
-                port = port,
-                path = "/ws",
-                request = { header("Origin", "https://evil.com") },
-            ) {
-                // Server closes with VIOLATED_POLICY; Ktor client surfaces it via closeReason
-                val reason = closeReason.await()
-                assertNotNull(reason)
-                assertEquals(CloseReason.Codes.VIOLATED_POLICY.code, reason.code)
+            createClient().use { client ->
+                client.webSocket(
+                    host = "localhost",
+                    port = port,
+                    path = "/ws",
+                    request = { header("Origin", "https://evil.com") },
+                ) {
+                    // Server closes with VIOLATED_POLICY; Ktor client surfaces it via closeReason
+                    val reason = closeReason.await()
+                    assertNotNull(reason)
+                    assertEquals(CloseReason.Codes.VIOLATED_POLICY.code, reason.code)
+                }
             }
-
-            client.close()
         } finally {
             server.stop(500, 1_000)
         }
@@ -106,20 +104,18 @@ class OriginCheckTest {
 
         try {
             val port = server.engine.resolvedConnectors().first().port
-            val client = HttpClient { install(ClientWebSockets) }
-
-            // No Origin header sent
-            client.webSocket(
-                host = "localhost",
-                port = port,
-                path = "/ws",
-            ) {
-                val reason = closeReason.await()
-                assertNotNull(reason)
-                assertEquals(CloseReason.Codes.VIOLATED_POLICY.code, reason.code)
+            createClient().use { client ->
+                // No Origin header sent
+                client.webSocket(
+                    host = "localhost",
+                    port = port,
+                    path = "/ws",
+                ) {
+                    val reason = closeReason.await()
+                    assertNotNull(reason)
+                    assertEquals(CloseReason.Codes.VIOLATED_POLICY.code, reason.code)
+                }
             }
-
-            client.close()
         } finally {
             server.stop(500, 1_000)
         }
@@ -139,19 +135,17 @@ class OriginCheckTest {
 
         try {
             val port = server.engine.resolvedConnectors().first().port
-            val client = HttpClient { install(ClientWebSockets) }
-
-            client.webSocket(
-                host = "localhost",
-                port = port,
-                path = "/ws",
-                request = { header("Origin", "https://any-site.com") },
-            ) {
-                val frame = incoming.receive() as Frame.Text
-                assertEquals("welcome", frame.readText())
+            createClient().use { client ->
+                client.webSocket(
+                    host = "localhost",
+                    port = port,
+                    path = "/ws",
+                    request = { header("Origin", "https://any-site.com") },
+                ) {
+                    val frame = incoming.receive() as Frame.Text
+                    assertEquals("welcome", frame.readText())
+                }
             }
-
-            client.close()
         } finally {
             server.stop(500, 1_000)
         }
@@ -172,20 +166,18 @@ class OriginCheckTest {
 
         try {
             val port = server.engine.resolvedConnectors().first().port
-            val client = HttpClient { install(ClientWebSockets) }
-
-            // Allowed origin
-            client.webSocket(
-                host = "localhost",
-                port = port,
-                path = "/ws",
-                request = { header("Origin", allowedOrigin) },
-            ) {
-                val frame = incoming.receive() as Frame.Text
-                assertEquals("passed", frame.readText())
+            createClient().use { client ->
+                // Allowed origin
+                client.webSocket(
+                    host = "localhost",
+                    port = port,
+                    path = "/ws",
+                    request = { header("Origin", allowedOrigin) },
+                ) {
+                    val frame = incoming.receive() as Frame.Text
+                    assertEquals("passed", frame.readText())
+                }
             }
-
-            client.close()
         } finally {
             server.stop(500, 1_000)
         }
