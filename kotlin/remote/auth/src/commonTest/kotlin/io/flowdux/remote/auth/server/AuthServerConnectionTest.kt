@@ -409,6 +409,24 @@ class AuthServerConnectionTest {
     }
 
     @Test
+    fun onAuthError_receivesReasonForVerifierRejection() = runTest {
+        val mock = MockServerConnection()
+        val errors = mutableListOf<String>()
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = rejectAllVerifier,
+                onAuthError = { errors.add(it) },
+            )
+
+        mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-token"))
+        authConn.awaitAuth(backgroundScope)
+
+        assertEquals(1, errors.size)
+        assertEquals("Access denied", errors[0])
+    }
+
+    @Test
     fun wireMessages_neverContainInternalDetails() = runTest {
         val mock = MockServerConnection()
         val authConn =

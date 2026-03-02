@@ -25,10 +25,13 @@ import kotlinx.coroutines.withTimeoutOrNull
  *
  * Usage:
  * ```kotlin
- * val authed = KtorWebSocketServerConnection(session).withAuth(jwtVerifier)
+ * val authed = KtorWebSocketServerConnection(session)
+ *     .withAuth(jwtVerifier) { detail -> logger.warn("Auth failed: $detail") }
  *
- * val principal = authed.awaitAuth(scope).getOrElse { reason ->
- *     session.close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, reason))
+ * val principal = authed.awaitAuth(scope).getOrElse {
+ *     // Use a generic message for the close reason — do NOT forward
+ *     // AuthResult.Failure.reason to the client as it may contain details.
+ *     session.close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "Authentication failed"))
  *     return@webSocket
  * }
  *
@@ -46,6 +49,14 @@ class AuthServerConnection<P : AuthPrincipal>(
     private val config: AuthConfig = AuthConfig(),
     private val onAuthError: ((String) -> Unit)? = null,
 ) : ServerConnection {
+
+    /** Binary-compatible constructor for code compiled against versions without [onAuthError]. */
+    constructor(
+        delegate: ServerConnection,
+        verifier: AuthVerifier<P>,
+        config: AuthConfig,
+    ) : this(delegate, verifier, config, null)
+
     private val _principal = CompletableDeferred<P>()
     private val rawChannel = Channel<String>(Channel.UNLIMITED)
     private val messageChannel = Channel<String>(Channel.UNLIMITED)
@@ -101,7 +112,7 @@ class AuthServerConnection<P : AuthPrincipal>(
                                     )
 
                         if (!AuthProtocol.isAuthMessage(message)) {
-                            onAuthError?.invoke("Expected auth message, got: ${message.take(50)}")
+                            notifyAuthError("Expected auth message, got: ${message.take(50)}")
                             delegate.send(AuthProtocol.encodeAuthError(CLIENT_ERROR_MESSAGE))
                             return@withTimeoutOrNull AuthResult.Failure("Expected auth message")
                         }
@@ -110,7 +121,7 @@ class AuthServerConnection<P : AuthPrincipal>(
                             try {
                                 AuthProtocol.decodeAuthRequest(message)
                             } catch (e: Exception) {
-                                onAuthError?.invoke("Malformed auth message: ${e.message}")
+                                notifyAuthError("Malformed auth message: ${e.message}")
                                 delegate.send(AuthProtocol.encodeAuthError(CLIENT_ERROR_MESSAGE))
                                 return@withTimeoutOrNull AuthResult.Failure("Malformed auth message")
                             }
@@ -121,7 +132,7 @@ class AuthServerConnection<P : AuthPrincipal>(
                             } catch (e: CancellationException) {
                                 throw e
                             } catch (e: Exception) {
-                                onAuthError?.invoke("Verifier error: ${e.message}")
+                                notifyAuthError("Verifier error: ${e.message}")
                                 delegate.send(AuthProtocol.encodeAuthError(CLIENT_ERROR_MESSAGE))
                                 return@withTimeoutOrNull AuthResult.Failure(CLIENT_ERROR_MESSAGE)
                             }
@@ -143,7 +154,7 @@ class AuthServerConnection<P : AuthPrincipal>(
                             }
 
                             is AuthResult.Failure -> {
-                                onAuthError?.invoke(verifyResult.reason)
+                                notifyAuthError(verifyResult.reason)
                                 delegate.send(AuthProtocol.encodeAuthError(CLIENT_ERROR_MESSAGE))
                                 lastFailure = verifyResult
                             }
@@ -162,6 +173,15 @@ class AuthServerConnection<P : AuthPrincipal>(
             }
 
         return result
+    }
+
+    /** Invoke [onAuthError] safely so a throwing callback never disrupts the auth protocol. */
+    private fun notifyAuthError(detail: String) {
+        try {
+            onAuthError?.invoke(detail)
+        } catch (_: Exception) {
+            // Never let a logging callback abort the auth handshake
+        }
     }
 
     private companion object {
