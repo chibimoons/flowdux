@@ -68,7 +68,27 @@ PR 생성 전에 전체 변경사항을 리뷰합니다. Task(general-purpose) �
 - WARNING만 남은 경우 → 사용자에게 진행 여부 확인
 - 문제 없으면 → 1-6으로 진행
 
-### 1-6. PR 생성
+### 1-6. 로컬 테스트
+
+변경된 모듈에 따라 테스트를 실행합니다.
+
+```bash
+# 변경 파일 기준으로 모듈 판별
+git diff --name-only <base-branch>...HEAD
+```
+
+| 변경 모듈 | 테스트 명령 |
+|-----------|------------|
+| `kotlin/` | `./gradlew test` (프로젝트 루트에서) |
+| `dart/flowdux/` | `cd dart/flowdux && dart test` |
+| `dart/flowdux_flutter/` | `cd dart/flowdux_flutter && flutter test` |
+| `.github/workflows/` | 테스트 불필요 (CI 설정만) |
+| `.claude/`, `docs/` | 테스트 불필요 (문서/설정만) |
+
+- 테스트 실패 시 → 수정 → 커밋 → 다시 테스트
+- 모두 통과 → 1-7로 진행
+
+### 1-7. PR 생성
 
 ```bash
 gh pr create --repo chibimoons/flowdux --base <target> --title "<title>" --body "$(cat <<'EOF'
@@ -83,7 +103,7 @@ EOF
 )"
 ```
 
-### 1-7. Copilot 리뷰 요청 & 대기
+### 1-8. Copilot 리뷰 요청 & 대기
 
 > **주의**: `gh pr edit --add-reviewer copilot`은 재요청 시 트리거되지 않습니다. 초기/재요청 모두 `requested_reviewers` API를 사용하세요. Copilot은 GitHub App 봇이라 `requested_reviewers` 목록에 나타나지 않으므로, 리뷰 도착 확인은 **reviews API 폴링**으로 해야 합니다.
 
