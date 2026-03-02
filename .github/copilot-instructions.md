@@ -249,6 +249,17 @@ class FetchDataAction with FlowHolderAction {
 4. **`trySend()` result ignored**: When `trySend()` fails (buffer full), the message is silently dropped. Check the result and report via logging or event callback.
 5. **TOCTOU race with `isClosed` / boolean flags**: `if (!closed) { doSomething() }` has a race window. Use `AtomicBoolean.compareAndSet()` for check-and-act patterns.
 6. **`Channel.UNLIMITED` memory risk**: Unbounded channels can cause OOM under load. Prefer `Channel.BUFFERED` and document backpressure behavior in KDoc.
+7. **Callback/lambda invocation safety**: External callbacks invoked inline inside coroutines can throw and disrupt protocol flow. Wrap in try-catch and rethrow `CancellationException` to preserve structured concurrency.
+   ```kotlin
+   // Bad: callback exception aborts auth handshake
+   onAuthError?.invoke(detail)
+
+   // Good: safe invocation
+   try {
+       onAuthError?.invoke(detail)
+   } catch (e: CancellationException) { throw e }
+   catch (e: Exception) { /* log and continue */ }
+   ```
 
 ### Performance Issues
 
@@ -262,6 +273,19 @@ class FetchDataAction with FlowHolderAction {
 1. **Removing public/protected methods without `@Deprecated`**: Always add `@Deprecated(message = "Scheduled for removal in a future release", level = DeprecationLevel.WARNING)` wrapper before removing. Direct deletion is a breaking change for external consumers.
 2. **Adding methods to interface without default implementation**: External implementors will fail to compile. Always provide a default.
 3. **`println` in commonMain library code**: Library code must not use `println`. Use injectable `onEvent` callback or sealed event class.
+4. **Constructor parameter ABI changes**: Adding parameters to a public class constructor (even with defaults) is binary-incompatible on JVM/Kotlin. Provide a secondary constructor or overload to preserve the old signature.
+   ```kotlin
+   // Bad: adding onError to primary constructor breaks existing binaries
+   class MyConnection(val delegate: Connection, val onError: ((String) -> Unit)? = null)
+
+   // Good: keep old primary, add secondary
+   class MyConnection(val delegate: Connection) {
+       private var onError: ((String) -> Unit)? = null
+       constructor(delegate: Connection, onError: ((String) -> Unit)?) : this(delegate) {
+           this.onError = onError
+       }
+   }
+   ```
 
 ### Code Quality Issues
 
@@ -269,6 +293,7 @@ class FetchDataAction with FlowHolderAction {
 2. **Magic strings/numbers**: Use constants or enums
 3. **Overly complex FlowHolderAction**: Consider splitting into multiple actions
 4. **Missing error handling**: Unhandled exceptions in middleware
+5. **Inconsistent callback invocation across paths**: If a callback is documented to fire on a condition (e.g., `onAuthError` on auth failure), ensure **all** code paths that satisfy that condition invoke it — not just exception paths but also logical rejection paths
 
 ---
 
@@ -335,6 +360,15 @@ class FetchDataAction with FlowHolderAction {
 4. **Test name does not match assertion**: If a test is named `factoryCreateBuildsCorrectWsUrl` but only asserts `connectionState == DISCONNECTED`, the name is misleading. Test names must accurately describe what is verified.
 
 5. **Missing test coverage for code changes**: Every behavioral change (race condition fix, new parameter, error handling path) should have a corresponding test that exercises the specific path.
+6. **Missing negative assertions for security/sanitization**: When testing that error messages are sanitized or sensitive data is masked, assert that the sensitive detail is **absent**, not just that a generic message is **present**.
+   ```kotlin
+   // Bad: only checks generic message exists
+   assertTrue(response.contains("auth_error"))
+
+   // Good: also checks sensitive detail is absent
+   assertTrue(response.contains("auth_error"))
+   assertFalse(response.contains("Access denied"))
+   ```
 
 ### Test Patterns
 
@@ -379,7 +413,8 @@ fun `middleware emits correct actions`() = runTest {
 6. **Cross-Platform Consistency**: Do Kotlin and Dart implementations match in behavior?
 7. **Concurrency Safety**: Are shared mutable fields protected with `@Volatile`/`Atomic*`? Is `CancellationException` handled correctly?
 8. **Test Reliability**: Are tests using `runBlocking`+`Dispatchers.Default` for concurrency? No fixed `delay()` for timing?
-9. **API Compatibility**: Are public method removals preceded by `@Deprecated`? Do new interface methods have defaults?
+9. **API Compatibility**: Are public method removals preceded by `@Deprecated`? Do new interface methods have defaults? Do constructor changes preserve binary compatibility?
+10. **Callback Safety & Consistency**: Are external callbacks wrapped in try-catch? Are they invoked on all documented failure paths?
 
 ---
 

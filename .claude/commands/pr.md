@@ -53,6 +53,7 @@ PR 생성 전에 전체 변경사항을 리뷰합니다. Task(general-purpose) �
 3. 프로젝트 컨벤션 위반 — CLAUDE.md의 규칙과 기존 코드 패턴 참조
 4. 불필요한 코드 — 미사용 import, 데드코드, 불필요한 주석
 5. 누락된 에러 처리 — 예외 미처리, 경계값 미검증
+6. 프로젝트 리뷰 규칙 위반 — `.github/copilot-instructions.md`를 Read하여 이번 변경에 해당하는 항목을 모두 대조
 
 결과를 severity별로 정리하세요:
 - [CRITICAL] 반드시 수정 필요
