@@ -18,7 +18,6 @@ import kotlin.test.assertTrue
  * interception check.
  */
 class ServeStateTest {
-
     /**
      * Reproduces the sample-app bug.
      *
@@ -32,13 +31,14 @@ class ServeStateTest {
     fun `without serveState - server updates state but client receives nothing`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val middleware = ProcessorEmittingMiddleware(connection)
-        val store = createStore(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // Server starts listening
         store.dispatchStartListening()
@@ -68,18 +68,20 @@ class ServeStateTest {
     fun `with serveState - client receives state after each server change`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val middleware = ProcessorEmittingMiddleware(connection)
-        val store = createStore(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // serveState runs alongside the store (like sample server: store.serveState { ... })
-        val serveJob = backgroundScope.launch {
-            store.serveState { ServerAction.SyncState(it) }
-        }
+        val serveJob =
+            backgroundScope.launch {
+                store.serveState { ServerAction.SyncState(it) }
+            }
         delay(100)
 
         store.dispatchStartListening()
@@ -111,17 +113,19 @@ class ServeStateTest {
     fun `serve - auto starts listening and syncs state`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val middleware = ProcessorEmittingMiddleware(connection)
-        val store = createStore(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
-        val serveJob = backgroundScope.launch {
-            store.serve { ServerAction.SyncState(it) }
-        }
+        val serveJob =
+            backgroundScope.launch {
+                store.serve { ServerAction.SyncState(it) }
+            }
         delay(100)
 
         // Client sends actions
@@ -148,17 +152,19 @@ class ServeStateTest {
     fun `serve - closes store after cancellation`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(connection)
-        val store = createStore(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
-        val serveJob = backgroundScope.launch {
-            store.serve { ServerAction.SyncState(it) }
-        }
+        val serveJob =
+            backgroundScope.launch {
+                store.serve { ServerAction.SyncState(it) }
+            }
         delay(100)
 
         serveJob.cancel()
@@ -174,13 +180,14 @@ class ServeStateTest {
     fun `use - closes store after block`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
         val middleware = SingleClientSyncMiddleware<ServerState, ServerAction>(connection)
-        val store = createStore(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            middlewares = listOf(middleware),
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                middlewares = listOf(middleware),
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.use {
             delay(50)

@@ -10,10 +10,7 @@ import kotlinx.serialization.Serializable
 /**
  * Server state for the scaling demo.
  */
-data class ScalingState(
-    val counter: Long = 0,
-    val connectedClients: Int = 0,
-) : State
+data class ScalingState(val counter: Long = 0, val connectedClients: Int = 0) : State
 
 /**
  * Base action interface for scaling demo.
@@ -28,23 +25,30 @@ interface ScalingAction : Action
 sealed interface SharedScalingAction : ScalingAction {
     // Client -> Server
     @Serializable
-    data class Ping(val clientId: String) : SharedScalingAction, ServerSharedAction
+    data class Ping(val clientId: String) :
+        SharedScalingAction,
+        ServerSharedAction
 
     @Serializable
-    data class Increment(val amount: Int = 1) : SharedScalingAction, ServerSharedAction
+    data class Increment(val amount: Int = 1) :
+        SharedScalingAction,
+        ServerSharedAction
 
     // Server -> Client
     @Serializable
-    data class Pong(val counter: Long, val connectedClients: Int) : SharedScalingAction, ClientSharedAction
+    data class Pong(val counter: Long, val connectedClients: Int) :
+        SharedScalingAction,
+        ClientSharedAction
 
     @Serializable
-    data class CounterUpdate(val counter: Long) : SharedScalingAction, ClientSharedAction
+    data class CounterUpdate(val counter: Long) :
+        SharedScalingAction,
+        ClientSharedAction
 
     @Serializable
-    data class ServerStats(
-        val connectedClients: Int,
-        val counter: Long,
-    ) : SharedScalingAction, ClientSharedAction
+    data class ServerStats(val connectedClients: Int, val counter: Long) :
+        SharedScalingAction,
+        ClientSharedAction
 }
 
 /**
@@ -52,24 +56,28 @@ sealed interface SharedScalingAction : ScalingAction {
  */
 sealed interface ServerScalingAction : ScalingAction {
     data class ClientConnected(val clientId: String) : ServerScalingAction
+
     data class ClientDisconnected(val clientId: String) : ServerScalingAction
 }
 
 /**
  * Reducer for the scaling demo.
  */
-val scalingReducer = Reducer<ScalingState, ScalingAction> { state, action ->
-    when (action) {
-        is SharedScalingAction.Ping -> state
-        is SharedScalingAction.Increment -> state.copy(counter = state.counter + action.amount)
-        is ServerScalingAction.ClientConnected -> state.copy(connectedClients = state.connectedClients + 1)
-        is ServerScalingAction.ClientDisconnected -> state.copy(
-            connectedClients = maxOf(0, state.connectedClients - 1)
-        )
-        // Client-side actions (never reach reducer on server)
-        is SharedScalingAction.Pong,
-        is SharedScalingAction.CounterUpdate,
-        is SharedScalingAction.ServerStats -> state
-        else -> state
+val scalingReducer =
+    Reducer<ScalingState, ScalingAction> { state, action ->
+        when (action) {
+            is SharedScalingAction.Ping -> state
+            is SharedScalingAction.Increment -> state.copy(counter = state.counter + action.amount)
+            is ServerScalingAction.ClientConnected -> state.copy(connectedClients = state.connectedClients + 1)
+            is ServerScalingAction.ClientDisconnected ->
+                state.copy(
+                    connectedClients = maxOf(0, state.connectedClients - 1),
+                )
+            // Client-side actions (never reach reducer on server)
+            is SharedScalingAction.Pong,
+            is SharedScalingAction.CounterUpdate,
+            is SharedScalingAction.ServerStats,
+            -> state
+            else -> state
+        }
     }
-}

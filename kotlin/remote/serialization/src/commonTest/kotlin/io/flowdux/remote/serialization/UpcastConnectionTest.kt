@@ -7,7 +7,6 @@ import io.flowdux.remote.server.connection.TypedServerConnection
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -17,12 +16,13 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class UpcastConnectionTest {
-
     // -- Test Action Hierarchy --
     interface AppAction : Action
+
     sealed interface SharedAction : AppAction {
         data class Message(val text: String) : SharedAction
     }
+
     data class LocalAction(val value: Int) : AppAction
 
     // -- Mock TypedClientConnection --

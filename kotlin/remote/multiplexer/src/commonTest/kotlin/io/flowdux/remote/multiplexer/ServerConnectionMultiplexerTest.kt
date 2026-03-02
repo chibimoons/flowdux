@@ -15,20 +15,19 @@ import kotlinx.coroutines.yield
 import kotlinx.serialization.Serializable
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ServerConnectionMultiplexerTest {
-
     @Serializable
     sealed interface TestAction : Action {
         @Serializable data class Message(val text: String) : TestAction
+
         @Serializable data class Ping(val id: Int) : TestAction
     }
 
-    private fun routed(roomId: String, action: TestAction): RoutedAction<TestAction> =
-        RoutedAction(roomId, action)
+    private fun routed(roomId: String, action: TestAction): RoutedAction<TestAction> = RoutedAction(roomId, action)
 
     private class FakeTypedServerConnection<A : Action> : TypedServerConnection<RoutedAction<A>> {
         override val isActive: Boolean = true
@@ -110,12 +109,14 @@ class ServerConnectionMultiplexerTest {
         val room1Actions = mutableListOf<TestAction>()
         val room2Actions = mutableListOf<TestAction>()
 
-        val job1 = launch {
-            room1.incoming.take(2).toList(room1Actions)
-        }
-        val job2 = launch {
-            room2.incoming.take(1).toList(room2Actions)
-        }
+        val job1 =
+            launch {
+                room1.incoming.take(2).toList(room1Actions)
+            }
+        val job2 =
+            launch {
+                room2.incoming.take(1).toList(room2Actions)
+            }
 
         // Allow collectors to start
         yield()
@@ -129,15 +130,17 @@ class ServerConnectionMultiplexerTest {
             job2.join()
         }
 
-        val expectedRoom1: List<TestAction> = listOf(
-            TestAction.Message("hello from room 1"),
-            TestAction.Ping(42),
-        )
+        val expectedRoom1: List<TestAction> =
+            listOf(
+                TestAction.Message("hello from room 1"),
+                TestAction.Ping(42),
+            )
         assertEquals(expectedRoom1, room1Actions)
 
-        val expectedRoom2: List<TestAction> = listOf(
-            TestAction.Message("hello from room 2"),
-        )
+        val expectedRoom2: List<TestAction> =
+            listOf(
+                TestAction.Message("hello from room 2"),
+            )
         assertEquals(expectedRoom2, room2Actions)
 
         mux.close()
@@ -171,9 +174,10 @@ class ServerConnectionMultiplexerTest {
         val room1 = mux.getOrCreateRoom("room-1")
         val room1Actions = mutableListOf<TestAction>()
 
-        val job = launch {
-            room1.incoming.take(1).toList(room1Actions)
-        }
+        val job =
+            launch {
+                room1.incoming.take(1).toList(room1Actions)
+            }
 
         // Allow collector to start
         yield()
@@ -226,9 +230,11 @@ class ServerConnectionMultiplexerTest {
         val physical = FakeTypedServerConnection<TestAction>()
         val mux = ServerConnectionMultiplexer(physical, this)
 
-        val results = (1..10).map {
-            async { mux.getOrCreateRoom("shared-room") }
-        }.awaitAll()
+        val results =
+            (1..10)
+                .map {
+                    async { mux.getOrCreateRoom("shared-room") }
+                }.awaitAll()
 
         // All should be the same instance
         val first = results.first()
@@ -246,9 +252,10 @@ class ServerConnectionMultiplexerTest {
         mux.getOrCreateRoom("room-1")
 
         // Multiple concurrent removes should not throw
-        val jobs = (1..5).map {
-            async { mux.removeRoom("room-1") }
-        }
+        val jobs =
+            (1..5).map {
+                async { mux.removeRoom("room-1") }
+            }
         jobs.awaitAll()
 
         assertFalse(mux.hasRoom("room-1"))
@@ -278,11 +285,12 @@ class ServerConnectionMultiplexerTest {
         val physical = FakeTypedServerConnection<TestAction>()
         val receivedCalls = mutableListOf<Pair<String, TestAction>>()
 
-        val mux = ServerConnectionMultiplexer(
-            physicalConnection = physical,
-            scope = this,
-            onUnknownRoom = { roomId, action -> receivedCalls.add(roomId to action) },
-        )
+        val mux =
+            ServerConnectionMultiplexer(
+                physicalConnection = physical,
+                scope = this,
+                onUnknownRoom = { roomId, action -> receivedCalls.add(roomId to action) },
+            )
 
         yield()
 
@@ -302,22 +310,24 @@ class ServerConnectionMultiplexerTest {
         val physical = FakeTypedServerConnection<TestAction>()
         var callCount = 0
 
-        val mux = ServerConnectionMultiplexer(
-            physicalConnection = physical,
-            scope = this,
-            onUnknownRoom = { _, _ ->
-                callCount++
-                if (callCount == 1) throw RuntimeException("callback error")
-            },
-        )
+        val mux =
+            ServerConnectionMultiplexer(
+                physicalConnection = physical,
+                scope = this,
+                onUnknownRoom = { _, _ ->
+                    callCount++
+                    if (callCount == 1) throw RuntimeException("callback error")
+                },
+            )
 
         // Also create a known room to verify routing continues
         val room1 = mux.getOrCreateRoom("room-1")
         val room1Actions = mutableListOf<TestAction>()
 
-        val job = launch {
-            room1.incoming.take(1).toList(room1Actions)
-        }
+        val job =
+            launch {
+                room1.incoming.take(1).toList(room1Actions)
+            }
         yield()
 
         // First unknown room triggers exception in callback
@@ -337,6 +347,117 @@ class ServerConnectionMultiplexerTest {
         val expectedRoom1: List<TestAction> = listOf(TestAction.Message("hello"))
         assertEquals(expectedRoom1, room1Actions)
 
+        mux.close()
+    }
+
+    @Test
+    fun concurrentGetOrCreateRoomAndCloseDoesNotCorruptState() = runTest {
+        val physical = FakeTypedServerConnection<TestAction>()
+        val mux = ServerConnectionMultiplexer(physical, this)
+
+        // Race: coroutines create rooms while another closes the multiplexer.
+        // getOrCreateRoom should either succeed or throw ISE — never corrupt state.
+        val createJobs =
+            (1..10).map { i ->
+                async {
+                    // Yield to allow interleaving with the close coroutine
+                    yield()
+                    try {
+                        mux.getOrCreateRoom("room-$i")
+                        true
+                    } catch (_: IllegalStateException) {
+                        false // Expected: "Multiplexer is closed"
+                    }
+                }
+            }
+        val closeJob =
+            async {
+                yield()
+                mux.close()
+            }
+
+        // Advance all coroutines to ensure interleaving
+        createJobs.awaitAll()
+        closeJob.await()
+
+        // After close, new rooms must be rejected
+        assertFailsWith<IllegalStateException> {
+            mux.getOrCreateRoom("room-after-close")
+        }
+    }
+
+    @Test
+    fun concurrentCloseIsSafe() = runTest {
+        val physical = FakeTypedServerConnection<TestAction>()
+        val mux = ServerConnectionMultiplexer(physical, this)
+
+        mux.getOrCreateRoom("room-1")
+        mux.getOrCreateRoom("room-2")
+
+        // Multiple concurrent close calls should not throw
+        val jobs =
+            (1..5).map {
+                async { mux.close() }
+            }
+        jobs.awaitAll()
+
+        assertEquals(emptySet(), mux.roomIds())
+        assertFailsWith<IllegalStateException> {
+            mux.getOrCreateRoom("room-3")
+        }
+    }
+
+    @Test
+    fun removeRoomWhileRoutingMessagesIsSafe() = runTest {
+        val physical = FakeTypedServerConnection<TestAction>()
+        val mux = ServerConnectionMultiplexer(physical, this)
+
+        val room1 = mux.getOrCreateRoom("room-1")
+        mux.getOrCreateRoom("room-2")
+
+        // Start collecting from room-1
+        val room1Actions = mutableListOf<TestAction>()
+        val collectJob =
+            launch {
+                room1.incoming.collect { room1Actions.add(it) }
+            }
+        yield()
+
+        // Route a message, then concurrently remove the room while routing continues
+        physical.simulateIncoming(routed("room-1", TestAction.Message("msg-1")))
+        yield()
+
+        // Concurrent: remove room while routing job may still reference it
+        val removeJob =
+            async {
+                mux.removeRoom("room-1")
+            }
+        physical.simulateIncoming(routed("room-1", TestAction.Message("during-remove")))
+        yield()
+
+        removeJob.await()
+        assertFalse(mux.hasRoom("room-1"))
+
+        // Messages to removed room should be silently dropped (no crash)
+        physical.simulateIncoming(routed("room-1", TestAction.Message("after-remove")))
+        yield()
+
+        // room-2 should still work normally after room-1 removal
+        val room2 = mux.getOrCreateRoom("room-2")
+        val room2Actions = mutableListOf<TestAction>()
+        val job =
+            launch {
+                room2.incoming.take(1).toList(room2Actions)
+            }
+        yield()
+
+        physical.simulateIncoming(routed("room-2", TestAction.Message("still works")))
+        withTimeout(1000) { job.join() }
+
+        val expected: List<TestAction> = listOf(TestAction.Message("still works"))
+        assertEquals(expected, room2Actions)
+
+        collectJob.cancel()
         mux.close()
     }
 

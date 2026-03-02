@@ -15,14 +15,15 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 fun main(args: Array<String>) = runBlocking {
-    val username = args.firstOrNull() ?: run {
-        print("Enter your name: ")
-        System.out.flush()
-        readlnOrNull()?.trim()?.ifEmpty { null }
-    } ?: run {
-        println("No name provided. Exiting.")
-        return@runBlocking
-    }
+    val username =
+        args.firstOrNull() ?: run {
+            print("Enter your name: ")
+            System.out.flush()
+            readlnOrNull()?.trim()?.ifEmpty { null }
+        } ?: run {
+            println("No name provided. Exiting.")
+            return@runBlocking
+        }
 
     println()
     println("=== Flowdux Auth Chat ===")
@@ -34,26 +35,27 @@ fun main(args: Array<String>) = runBlocking {
     val store = createChatStore(username)
 
     var lastAnnouncement: String? = null
-    val collectorJob = launch {
-        store.state.collect { state ->
-            if (state.systemAnnouncement != null && state.systemAnnouncement != lastAnnouncement) {
-                lastAnnouncement = state.systemAnnouncement
-                println()
-                println("  *** SYSTEM: ${state.systemAnnouncement} ***")
-                println()
-            }
+    val collectorJob =
+        launch {
+            store.state.collect { state ->
+                if (state.systemAnnouncement != null && state.systemAnnouncement != lastAnnouncement) {
+                    lastAnnouncement = state.systemAnnouncement
+                    println()
+                    println("  *** SYSTEM: ${state.systemAnnouncement} ***")
+                    println()
+                }
 
-            when (val event = state.lastEvent) {
-                is ChatEvent.UserJoined ->
-                    println("  * ${event.user} joined (online: ${state.users})")
-                is ChatEvent.UserLeft ->
-                    println("  * ${event.user} left (online: ${state.users})")
-                is ChatEvent.MessageReceived ->
-                    println("  [${event.user}] ${event.text}")
-                null -> {}
+                when (val event = state.lastEvent) {
+                    is ChatEvent.UserJoined ->
+                        println("  * ${event.user} joined (online: ${state.users})")
+                    is ChatEvent.UserLeft ->
+                        println("  * ${event.user} left (online: ${state.users})")
+                    is ChatEvent.MessageReceived ->
+                        println("  [${event.user}] ${event.text}")
+                    null -> {}
+                }
             }
         }
-    }
 
     store.dispatch(ClientChatAction.SetCurrentUser(username))
     store.dispatch(ClientChatAction.Connect)
@@ -102,13 +104,14 @@ fun main(args: Array<String>) = runBlocking {
 }
 
 private fun createChatStore(username: String): Store<ClientChatState, ChatAction> {
-    val connection = KtorWebSocketClientConnection.create(
-        host = "localhost",
-        port = 8080,
-        path = "/chat",
-    )
-        .withAuth(token = "user:$username")
-        .typedJsonAs<SharedChatAction, ChatAction>()
+    val connection =
+        KtorWebSocketClientConnection
+            .create(
+                host = "localhost",
+                port = 8080,
+                path = "/chat",
+            ).withAuth(token = "user:$username")
+            .typedJsonAs<SharedChatAction, ChatAction>()
 
     return createClientStore(
         initialState = ClientChatState(),

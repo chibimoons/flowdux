@@ -36,7 +36,7 @@ fun main() {
                     messages = serverState.messages,
                     users = serverState.users,
                     lastEvent = serverState.lastEvent,
-                )
+                ),
             )
         },
         scope = applicationScope,
@@ -45,8 +45,10 @@ fun main() {
     // Monitor state changes
     applicationScope.launch {
         server.state.collect { state ->
-            println("[Server] clients=${runCatching { server.sessionCount() }.getOrDefault(0)}, " +
-                "users=${state.users}, messages=${state.totalMessagesProcessed}")
+            println(
+                "[Server] clients=${runCatching { server.sessionCount() }.getOrDefault(0)}, " +
+                    "users=${state.users}, messages=${state.totalMessagesProcessed}",
+            )
         }
     }
 
@@ -93,15 +95,14 @@ fun main() {
     server.close()
 }
 
-private fun chatProcessors() =
-    Middleware.ActionProcessorBuilder<ServerChatState, ChatAction>().apply {
-        on<SharedChatAction.SendMessage> { _, action ->
-            emit(ServerChatAction.MessageReceived(user = action.user, text = action.text))
-        }
-        on<SharedChatAction.JoinRoom> { _, action ->
-            emit(ServerChatAction.UserJoined(user = action.user))
-        }
-        on<SharedChatAction.LeaveRoom> { _, action ->
-            emit(ServerChatAction.UserLeft(user = action.user))
-        }
-    }.build()
+private fun chatProcessors() = Middleware.ActionProcessorBuilder<ServerChatState, ChatAction>().apply {
+    on<SharedChatAction.SendMessage> { _, action ->
+        emit(ServerChatAction.MessageReceived(user = action.user, text = action.text))
+    }
+    on<SharedChatAction.JoinRoom> { _, action ->
+        emit(ServerChatAction.UserJoined(user = action.user))
+    }
+    on<SharedChatAction.LeaveRoom> { _, action ->
+        emit(ServerChatAction.UserLeft(user = action.user))
+    }
+}.build()

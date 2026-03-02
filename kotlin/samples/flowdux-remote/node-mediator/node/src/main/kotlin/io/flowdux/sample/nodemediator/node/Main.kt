@@ -61,7 +61,7 @@ fun main(args: Array<String>) {
                     messages = state.messages,
                     users = state.users,
                     lastEvent = state.lastEvent,
-                )
+                ),
             )
         },
         scope = applicationScope,
@@ -118,7 +118,7 @@ fun main(args: Array<String>) {
         ║    WS  /ws/{roomId} — Client connections       ║
         ║    GET /rooms       — Local room list          ║
         ╚════════════════════════════════════════════════╝
-        """.trimIndent()
+        """.trimIndent(),
     )
     println()
 
@@ -130,7 +130,11 @@ fun main(args: Array<String>) {
         routing {
             get("/rooms") {
                 val roomIds = nodeRoomServer.roomIds()
-                call.respondText("Rooms on $nodeId (${roomIds.size}): ${roomIds.joinToString(", ").ifEmpty { "(none)" }}")
+                call.respondText(
+                    "Rooms on $nodeId (${roomIds.size}): ${roomIds.joinToString(", ").ifEmpty {
+                        "(none)"
+                    }}",
+                )
             }
 
             webSocket("/ws/{roomId}") {
@@ -155,13 +159,15 @@ fun main(args: Array<String>) {
         }
     }
 
-    Runtime.getRuntime().addShutdownHook(Thread {
-        println("[$nodeId] Shutting down...")
-        cleanupJob.cancel()
-        kotlinx.coroutines.runBlocking {
-            nodeRoomServer.close()
-        }
-    })
+    Runtime.getRuntime().addShutdownHook(
+        Thread {
+            println("[$nodeId] Shutting down...")
+            cleanupJob.cancel()
+            kotlinx.coroutines.runBlocking {
+                nodeRoomServer.close()
+            }
+        },
+    )
 
     server.start(wait = true)
 }

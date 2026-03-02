@@ -3,8 +3,8 @@ package io.flowdux
 import app.cash.turbine.test
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import kotlin.test.assertEquals
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * Core store functionality tests.
@@ -19,89 +19,88 @@ import kotlin.test.Test
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class StoreTest {
-
     @Test
-    fun `store initializes with initial state`() =
-        runTest {
-            val store = createStore(
+    fun `store initializes with initial state`() = runTest {
+        val store =
+            createStore(
                 initialState = CounterState(count = 5),
                 reducer = counterReducer,
                 errorProcessor = testErrorProcessor,
                 scope = backgroundScope,
             )
 
-            assertEquals(5, store.currentState.count)
-        }
+        assertEquals(5, store.currentState.count)
+    }
 
     @Test
-    fun `dispatch increment action updates state`() =
-        runTest {
-            val store = createStore(
+    fun `dispatch increment action updates state`() = runTest {
+        val store =
+            createStore(
                 initialState = CounterState(),
                 reducer = counterReducer,
                 errorProcessor = testErrorProcessor,
                 scope = backgroundScope,
             )
 
-            store.state.test {
-                assertEquals(0, awaitItem().count)
+        store.state.test {
+            assertEquals(0, awaitItem().count)
 
-                store.dispatch(CounterAction.Increment)
-                assertEquals(1, awaitItem().count)
+            store.dispatch(CounterAction.Increment)
+            assertEquals(1, awaitItem().count)
 
-                cancelAndIgnoreRemainingEvents()
-            }
+            cancelAndIgnoreRemainingEvents()
         }
+    }
 
     @Test
-    fun `dispatch multiple actions updates state correctly`() =
-        runTest {
-            val store = createStore(
+    fun `dispatch multiple actions updates state correctly`() = runTest {
+        val store =
+            createStore(
                 initialState = CounterState(),
                 reducer = counterReducer,
                 errorProcessor = testErrorProcessor,
                 scope = backgroundScope,
             )
 
-            store.state.test {
-                assertEquals(0, awaitItem().count)
+        store.state.test {
+            assertEquals(0, awaitItem().count)
 
-                store.dispatch(CounterAction.Increment)
-                assertEquals(1, awaitItem().count)
+            store.dispatch(CounterAction.Increment)
+            assertEquals(1, awaitItem().count)
 
-                store.dispatch(CounterAction.Increment)
-                assertEquals(2, awaitItem().count)
+            store.dispatch(CounterAction.Increment)
+            assertEquals(2, awaitItem().count)
 
-                store.dispatch(CounterAction.Decrement)
-                assertEquals(1, awaitItem().count)
+            store.dispatch(CounterAction.Decrement)
+            assertEquals(1, awaitItem().count)
 
-                store.dispatch(CounterAction.Add(10))
-                assertEquals(11, awaitItem().count)
+            store.dispatch(CounterAction.Add(10))
+            assertEquals(11, awaitItem().count)
 
-                cancelAndIgnoreRemainingEvents()
-            }
+            cancelAndIgnoreRemainingEvents()
         }
+    }
 
     @Test
-    fun `state flow emits updates`() =
-        runTest {
-            val store = createStore(
+    fun `state flow emits updates`() = runTest {
+        val store =
+            createStore(
                 initialState = CounterState(),
                 reducer = counterReducer,
                 errorProcessor = testErrorProcessor,
                 scope = backgroundScope,
             )
 
-            store.state.test {
-                assertEquals(0, awaitItem().count)
+        store.state.test {
+            assertEquals(0, awaitItem().count)
 
-                store.dispatch(CounterAction.Increment)
-                assertEquals(1, awaitItem().count)
+            store.dispatch(CounterAction.Increment)
+            assertEquals(1, awaitItem().count)
 
-                store.dispatch(CounterAction.Add(5))
-                assertEquals(6, awaitItem().count)
+            store.dispatch(CounterAction.Add(5))
+            assertEquals(6, awaitItem().count)
 
-                cancelAndIgnoreRemainingEvents()
-            }
+            cancelAndIgnoreRemainingEvents()
         }
+    }
 }

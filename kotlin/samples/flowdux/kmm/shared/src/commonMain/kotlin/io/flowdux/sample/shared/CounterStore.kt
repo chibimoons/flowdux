@@ -43,7 +43,7 @@ class CounterStore(private val scope: CoroutineScope) {
     private val store = createStore(
         initialState = CounterState(),
         reducer = counterReducer,
-        scope = scope
+        scope = scope,
     )
 
     val state: StateFlow<CounterState> = store.state

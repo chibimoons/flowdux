@@ -13,18 +13,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SingleClientServerTest {
-
     @Test
     fun `createSingleClientServer creates store with SingleClientSyncMiddleware`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
 
-        val server = createSingleClientServer(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            connection = connection,
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val server =
+            createSingleClientServer(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                connection = connection,
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // Start listening
         server.dispatchStartListening()
@@ -44,13 +44,14 @@ class SingleClientServerTest {
     fun `ClientSharedAction is sent to client`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
 
-        val server = createSingleClientServer(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            connection = connection,
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val server =
+            createSingleClientServer(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                connection = connection,
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // Dispatch a ClientSharedAction
         server.dispatch(ServerAction.Add(42))
@@ -67,13 +68,14 @@ class SingleClientServerTest {
     fun `serve syncs state to client`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
 
-        val server = createSingleClientServer(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            connection = connection,
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val server =
+            createSingleClientServer(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                connection = connection,
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // Use serve to start listening and syncing state
         val serveJob = backgroundScope.launchServe(server) { ServerAction.SyncState(it) }
@@ -100,21 +102,25 @@ class SingleClientServerTest {
     fun `processors are invoked for matching actions`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
 
-        val processors = Middleware.ActionProcessorBuilder<ServerState, ServerAction>().apply {
-            on<ServerAction.ClientAdd> { _, action ->
-                // Transform ClientAdd into InternalReset
-                emit(ServerAction.InternalReset(action.value * 3))
-            }
-        }.build()
+        val processors =
+            Middleware
+                .ActionProcessorBuilder<ServerState, ServerAction>()
+                .apply {
+                    on<ServerAction.ClientAdd> { _, action ->
+                        // Transform ClientAdd into InternalReset
+                        emit(ServerAction.InternalReset(action.value * 3))
+                    }
+                }.build()
 
-        val server = createSingleClientServer(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            connection = connection,
-            processors = processors,
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val server =
+            createSingleClientServer(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                connection = connection,
+                processors = processors,
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // Start listening
         server.dispatchStartListening()
@@ -135,23 +141,27 @@ class SingleClientServerTest {
         val connection = MockTypedServerConnection<ServerAction>()
 
         // Processor that emits a ClientSharedAction
-        val processors = Middleware.ActionProcessorBuilder<ServerState, ServerAction>().apply {
-            on<ServerAction.TriggerEmitClientAction> { _, action ->
-                // emit(ClientSharedAction) - should be auto-forwarded to client
-                emit(ServerAction.Add(action.value))
-                // Also emit local action to verify processor runs
-                emit(ServerAction.InternalReset(1))
-            }
-        }.build()
+        val processors =
+            Middleware
+                .ActionProcessorBuilder<ServerState, ServerAction>()
+                .apply {
+                    on<ServerAction.TriggerEmitClientAction> { _, action ->
+                        // emit(ClientSharedAction) - should be auto-forwarded to client
+                        emit(ServerAction.Add(action.value))
+                        // Also emit local action to verify processor runs
+                        emit(ServerAction.InternalReset(1))
+                    }
+                }.build()
 
-        val server = createSingleClientServer(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            connection = connection,
-            processors = processors,
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val server =
+            createSingleClientServer(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                connection = connection,
+                processors = processors,
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // Start listening
         server.dispatchStartListening()
@@ -176,13 +186,14 @@ class SingleClientServerTest {
     fun `non-ClientSharedAction passes through to reducer`() = runTest {
         val connection = MockTypedServerConnection<ServerAction>()
 
-        val server = createSingleClientServer(
-            initialState = ServerState(),
-            reducer = serverReducer,
-            connection = connection,
-            errorProcessor = serverErrorProcessor,
-            scope = backgroundScope,
-        )
+        val server =
+            createSingleClientServer(
+                initialState = ServerState(),
+                reducer = serverReducer,
+                connection = connection,
+                errorProcessor = serverErrorProcessor,
+                scope = backgroundScope,
+            )
 
         // Dispatch a non-ClientSharedAction
         server.dispatch(ServerAction.InternalReset(100))

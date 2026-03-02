@@ -3,9 +3,9 @@ package io.flowdux.sample.poker.server
 import io.flowdux.State
 import io.flowdux.Store
 import io.flowdux.buildReducer
+import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.createServerStore
 import io.flowdux.remote.server.middleware.SingleClientSyncMiddleware
-import io.flowdux.remote.server.connection.TypedServerConnection
 import io.flowdux.remote.server.serve
 import io.flowdux.sample.poker.Card
 import io.flowdux.sample.poker.PokerAction
@@ -23,17 +23,15 @@ import io.flowdux.sample.poker.SharedPokerAction
  * - Room Store (PokerTable) manages shared game state
  * - Per-Client Store (PlayerSession) manages player-specific private state
  */
-class PlayerSession(
-    val playerId: String,
-    private val connection: TypedServerConnection<PokerAction>,
-) {
+class PlayerSession(val playerId: String, private val connection: TypedServerConnection<PokerAction>) {
     private val middleware = PlayerRemoteMiddleware(connection)
 
-    val store: Store<PlayerState, PokerAction> = createServerStore(
-        initialState = PlayerState(playerId = playerId),
-        syncMiddleware = middleware,
-        reducer = playerReducer,
-    )
+    val store: Store<PlayerState, PokerAction> =
+        createServerStore(
+            initialState = PlayerState(playerId = playerId),
+            syncMiddleware = middleware,
+            reducer = playerReducer,
+        )
 
     /**
      * Called by PokerTable to update this player's private hand.
@@ -59,10 +57,7 @@ class PlayerSession(
 }
 
 /** Player-local state (private hand). */
-data class PlayerState(
-    val playerId: String,
-    val hand: List<Card> = emptyList(),
-) : State
+data class PlayerState(val playerId: String, val hand: List<Card> = emptyList()) : State
 
 /** Player-local actions (not sent over wire). */
 sealed interface PlayerAction : PokerAction {
@@ -70,18 +65,18 @@ sealed interface PlayerAction : PokerAction {
 }
 
 /** Reducer for player-local state. */
-private val playerReducer = buildReducer<PlayerState, PokerAction> {
-    on<PlayerAction.SetHand> { state, action ->
-        state.copy(hand = action.cards)
+private val playerReducer =
+    buildReducer<PlayerState, PokerAction> {
+        on<PlayerAction.SetHand> { state, action ->
+            state.copy(hand = action.cards)
+        }
     }
-}
 
 /** Middleware for player session - handles private state sync. */
-private class PlayerRemoteMiddleware(
-    connection: TypedServerConnection<PokerAction>,
-) : SingleClientSyncMiddleware<PlayerState, PokerAction>(
-    connection = connection,
-) {
+private class PlayerRemoteMiddleware(connection: TypedServerConnection<PokerAction>) :
+    SingleClientSyncMiddleware<PlayerState, PokerAction>(
+        connection = connection,
+    ) {
     // No processors needed - this store only sends state, doesn't receive actions
     override val processors = buildProcessors { }
 }

@@ -18,20 +18,19 @@ import kotlinx.coroutines.yield
 import kotlinx.serialization.Serializable
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ClientConnectionMultiplexerTest {
-
     @Serializable
     sealed interface TestAction : Action {
         @Serializable data class Message(val text: String) : TestAction
+
         @Serializable data class Ping(val id: Int) : TestAction
     }
 
-    private fun routed(roomId: String, action: TestAction): RoutedAction<TestAction> =
-        RoutedAction(roomId, action)
+    private fun routed(roomId: String, action: TestAction): RoutedAction<TestAction> = RoutedAction(roomId, action)
 
     private class FakeTypedClientConnection<A : Action> : TypedClientConnection<RoutedAction<A>> {
         private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
@@ -142,12 +141,14 @@ class ClientConnectionMultiplexerTest {
         val room1Actions = mutableListOf<TestAction>()
         val room2Actions = mutableListOf<TestAction>()
 
-        val job1 = launch {
-            room1.incoming.take(2).toList(room1Actions)
-        }
-        val job2 = launch {
-            room2.incoming.take(1).toList(room2Actions)
-        }
+        val job1 =
+            launch {
+                room1.incoming.take(2).toList(room1Actions)
+            }
+        val job2 =
+            launch {
+                room2.incoming.take(1).toList(room2Actions)
+            }
 
         // Allow collectors to start
         yield()
@@ -161,15 +162,17 @@ class ClientConnectionMultiplexerTest {
             job2.join()
         }
 
-        val expectedRoom1: List<TestAction> = listOf(
-            TestAction.Message("hello from room 1"),
-            TestAction.Ping(42),
-        )
+        val expectedRoom1: List<TestAction> =
+            listOf(
+                TestAction.Message("hello from room 1"),
+                TestAction.Ping(42),
+            )
         assertEquals(expectedRoom1, room1Actions)
 
-        val expectedRoom2: List<TestAction> = listOf(
-            TestAction.Message("hello from room 2"),
-        )
+        val expectedRoom2: List<TestAction> =
+            listOf(
+                TestAction.Message("hello from room 2"),
+            )
         assertEquals(expectedRoom2, room2Actions)
 
         mux.close()
@@ -205,9 +208,10 @@ class ClientConnectionMultiplexerTest {
         val room1 = mux.getOrCreateRoom("room-1")
         val room1Actions = mutableListOf<TestAction>()
 
-        val job = launch {
-            room1.incoming.take(1).toList(room1Actions)
-        }
+        val job =
+            launch {
+                room1.incoming.take(1).toList(room1Actions)
+            }
 
         // Allow collector to start
         yield()
@@ -282,9 +286,11 @@ class ClientConnectionMultiplexerTest {
         val mux = ClientConnectionMultiplexer(physical, this)
         mux.connect()
 
-        val results = (1..10).map {
-            async { mux.getOrCreateRoom("shared-room") }
-        }.awaitAll()
+        val results =
+            (1..10)
+                .map {
+                    async { mux.getOrCreateRoom("shared-room") }
+                }.awaitAll()
 
         // All should be the same instance
         val first = results.first()
@@ -303,9 +309,10 @@ class ClientConnectionMultiplexerTest {
         mux.getOrCreateRoom("room-1")
 
         // Multiple concurrent removes should not throw
-        val jobs = (1..5).map {
-            async { mux.removeRoom("room-1") }
-        }
+        val jobs =
+            (1..5).map {
+                async { mux.removeRoom("room-1") }
+            }
         jobs.awaitAll()
 
         assertFalse(mux.hasRoom("room-1"))
@@ -347,9 +354,10 @@ class ClientConnectionMultiplexerTest {
         val room1 = mux.getOrCreateRoom("room-1")
         val room1Actions = mutableListOf<TestAction>()
 
-        val job = launch {
-            room1.incoming.take(1).toList(room1Actions)
-        }
+        val job =
+            launch {
+                room1.incoming.take(1).toList(room1Actions)
+            }
         yield()
 
         physical.simulateIncoming(routed("room-1", TestAction.Message("hello")))

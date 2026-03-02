@@ -5,7 +5,11 @@ plugins {
 }
 
 mavenPublishing {
-    coordinates("io.github.chibimoons", "flowdux-remote-node-mediator", providers.gradleProperty("flowdux.version").get())
+    coordinates(
+        "io.github.chibimoons",
+        "flowdux-remote-node-mediator",
+        providers.gradleProperty("flowdux.version").get(),
+    )
     pom {
         name.set("Flowdux Remote Node Mediator")
         description.set("Node mediator for horizontal scaling across multiple server nodes")
@@ -13,7 +17,7 @@ mavenPublishing {
 }
 
 // JitPack only publishes JVM artifacts to avoid variant resolution issues for JVM/Android consumers
-val isJitPack = System.getenv("JITPACK") == "true"
+val isJitPack = providers.environmentVariable("JITPACK").map { it == "true" }.getOrElse(false)
 
 kotlin {
     jvm()
@@ -49,6 +53,7 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.turbine)
         }
     }
 

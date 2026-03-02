@@ -75,8 +75,7 @@ class _StoreConsumerState<S, A extends Action>
 
   @override
   Widget build(BuildContext context) {
-    final effectiveStore =
-        widget.store ?? StoreProvider.of<S, A>(context);
+    final effectiveStore = widget.store ?? StoreProvider.of<S, A>(context);
 
     return StreamBuilder<S>(
       stream: effectiveStore.state,
@@ -171,8 +170,9 @@ class _StoreListenerState<S, A extends Action>
           return widget.child;
         }
 
-        final shouldListen = widget.listenWhen?.call(_previousState as S, currentState) ??
-            (_previousState != currentState);
+        final shouldListen =
+            widget.listenWhen?.call(_previousState as S, currentState) ??
+                (_previousState != currentState);
 
         if (shouldListen) {
           WidgetsBinding.instance.addPostFrameCallback((_) {

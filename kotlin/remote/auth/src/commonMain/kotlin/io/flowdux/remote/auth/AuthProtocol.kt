@@ -19,7 +19,6 @@ import kotlinx.serialization.json.put
  * ```
  */
 internal object AuthProtocol {
-
     private const val TYPE_KEY = "type"
     private const val TYPE_AUTH = "auth"
     private const val TYPE_AUTH_OK = "auth_ok"
@@ -30,24 +29,21 @@ internal object AuthProtocol {
     private val json = Json { ignoreUnknownKeys = true }
 
     /** Encode a client → server auth request with the given [token]. */
-    fun encodeAuthRequest(token: String): String =
-        buildJsonObject {
-            put(TYPE_KEY, TYPE_AUTH)
-            put(TOKEN_KEY, token)
-        }.toString()
+    fun encodeAuthRequest(token: String): String = buildJsonObject {
+        put(TYPE_KEY, TYPE_AUTH)
+        put(TOKEN_KEY, token)
+    }.toString()
 
     /** Encode a server → client auth success response. */
-    fun encodeAuthSuccess(): String =
-        buildJsonObject {
-            put(TYPE_KEY, TYPE_AUTH_OK)
-        }.toString()
+    fun encodeAuthSuccess(): String = buildJsonObject {
+        put(TYPE_KEY, TYPE_AUTH_OK)
+    }.toString()
 
     /** Encode a server → client auth error response with the given [reason]. */
-    fun encodeAuthError(reason: String): String =
-        buildJsonObject {
-            put(TYPE_KEY, TYPE_AUTH_ERROR)
-            put(REASON_KEY, reason)
-        }.toString()
+    fun encodeAuthError(reason: String): String = buildJsonObject {
+        put(TYPE_KEY, TYPE_AUTH_ERROR)
+        put(REASON_KEY, reason)
+    }.toString()
 
     /** Check whether a raw message is an auth protocol message. */
     fun isAuthMessage(raw: String): Boolean {
@@ -84,5 +80,6 @@ internal object AuthProtocol {
 /** Server-side auth response parsed from wire protocol. */
 internal sealed interface AuthProtocolResponse {
     data object Success : AuthProtocolResponse
+
     data class Error(val reason: String) : AuthProtocolResponse
 }

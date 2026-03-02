@@ -1,7 +1,6 @@
 package io.flowdux.sample.poker.server
 
 import io.flowdux.Middleware
-import io.flowdux.sequential
 import io.flowdux.remote.server.pattern.SharedStateServer
 import io.flowdux.remote.server.pattern.createSharedStateServer
 import io.flowdux.sample.poker.Card
@@ -10,6 +9,7 @@ import io.flowdux.sample.poker.PokerAction
 import io.flowdux.sample.poker.Rank
 import io.flowdux.sample.poker.SharedPokerAction
 import io.flowdux.sample.poker.Suit
+import io.flowdux.sequential
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -37,20 +37,19 @@ import java.util.concurrent.ConcurrentHashMap
  * 3. Room Store distributes private hands → each PlayerSession
  * 4. PlayerSession syncs hand → only to that specific client
  */
-class PokerTable(
-    private val applicationScope: CoroutineScope,
-) {
+class PokerTable(private val applicationScope: CoroutineScope) {
     private val players = ConcurrentHashMap<String, PlayerSession>()
 
-    val roomStore: SharedStateServer<ServerTableState, PokerAction> = createSharedStateServer(
-        initialState = ServerTableState(),
-        reducer = serverTableReducer,
-        processors = tableProcessors(),
-        stateMapper = { state ->
-            SharedPokerAction.SyncTableState(state.toPublicState())
-        },
-        scope = applicationScope,
-    )
+    val roomStore: SharedStateServer<ServerTableState, PokerAction> =
+        createSharedStateServer(
+            initialState = ServerTableState(),
+            reducer = serverTableReducer,
+            processors = tableProcessors(),
+            stateMapper = { state ->
+                SharedPokerAction.SyncTableState(state.toPublicState())
+            },
+            scope = applicationScope,
+        )
 
     init {
         // Watch for hand changes and propagate to Per-Client Stores
@@ -140,8 +139,9 @@ class PokerTable(
         roomStore.close()
     }
 
-    private fun tableProcessors() =
-        Middleware.ActionProcessorBuilder<ServerTableState, PokerAction>().apply {
+    private fun tableProcessors() = Middleware
+        .ActionProcessorBuilder<ServerTableState, PokerAction>()
+        .apply {
             // Use sequential strategy to ensure poker actions are processed in order
             // and prevent race conditions from rapid action submissions.
             // Processors validate that it's the player's turn before passing to reducer.

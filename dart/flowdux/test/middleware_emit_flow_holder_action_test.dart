@@ -29,7 +29,10 @@ class InfiniteObserverFlowAction with FlowHolderAction {
   final String id;
   final Duration emitInterval;
 
-  InfiniteObserverFlowAction(this.id, {this.emitInterval = const Duration(milliseconds: 50)});
+  InfiniteObserverFlowAction(
+    this.id, {
+    this.emitInterval = const Duration(milliseconds: 50),
+  });
 
   @override
   Stream<Action> toStreamAction() async* {
@@ -45,7 +48,10 @@ class SecondaryObserverFlowAction with FlowHolderAction {
   final String id;
   final Duration emitInterval;
 
-  SecondaryObserverFlowAction(this.id, {this.emitInterval = const Duration(milliseconds: 50)});
+  SecondaryObserverFlowAction(
+    this.id, {
+    this.emitInterval = const Duration(milliseconds: 50),
+  });
 
   @override
   Stream<Action> toStreamAction() async* {
@@ -74,7 +80,9 @@ class AppReducer extends ReducerBase<AppState, Action> {
 
   AppReducer() {
     on<IncrementAction>((state, _) => state.copyWith(count: state.count + 1));
-    on<AddAction>((state, action) => state.copyWith(count: state.count + action.value));
+    on<AddAction>(
+      (state, action) => state.copyWith(count: state.count + action.value),
+    );
     on<SetupCompleteAction>((state, action) {
       setupCompleteReceived = true;
       return state;
@@ -88,11 +96,17 @@ class MultiObserverMiddleware extends Middleware<AppState, Action> {
   MultiObserverMiddleware() {
     on<StartMultipleObserversAction>((state, action) async* {
       // Emit first infinite FlowHolderAction
-      yield InfiniteObserverFlowAction('observer1', emitInterval: Duration(milliseconds: 50));
+      yield InfiniteObserverFlowAction(
+        'observer1',
+        emitInterval: Duration(milliseconds: 50),
+      );
 
       // Emit second infinite FlowHolderAction
       // With flatMap, this executes concurrently (not blocked by first yield)
-      yield SecondaryObserverFlowAction('observer2', emitInterval: Duration(milliseconds: 50));
+      yield SecondaryObserverFlowAction(
+        'observer2',
+        emitInterval: Duration(milliseconds: 50),
+      );
 
       // Emit a marker action to indicate setup is complete
       // With flatMap, this also executes without blocking
@@ -103,48 +117,51 @@ class MultiObserverMiddleware extends Middleware<AppState, Action> {
 
 void main() {
   group('Middleware Emit FlowHolderAction Tests', () {
-    test('emitting multiple FlowHolderActions from middleware should not block', () async {
-      final appReducer = AppReducer();
-      final store = createStore<AppState, Action>(
-        initialState: AppState(),
-        reducer: appReducer.reducer,
-        middlewares: [MultiObserverMiddleware()],
-      );
+    test(
+      'emitting multiple FlowHolderActions from middleware should not block',
+      () async {
+        final appReducer = AppReducer();
+        final store = createStore<AppState, Action>(
+          initialState: AppState(),
+          reducer: appReducer.reducer,
+          middlewares: [MultiObserverMiddleware()],
+        );
 
-      // Dispatch action that triggers multiple FlowHolderAction emissions
-      store.dispatch(StartMultipleObserversAction());
+        // Dispatch action that triggers multiple FlowHolderAction emissions
+        store.dispatch(StartMultipleObserversAction());
 
-      // We should see emissions from BOTH streams
-      // InfiniteObserverFlowAction adds 1 per emission
-      // SecondaryObserverFlowAction adds 10 per emission
-      // If both are running, we should see both +1 and +10 increments
+        // We should see emissions from BOTH streams
+        // InfiniteObserverFlowAction adds 1 per emission
+        // SecondaryObserverFlowAction adds 10 per emission
+        // If both are running, we should see both +1 and +10 increments
 
-      var sawIncrementByOne = false;
-      var sawIncrementByTen = false;
-      var previousCount = 0;
+        var sawIncrementByOne = false;
+        var sawIncrementByTen = false;
+        var previousCount = 0;
 
-      // Listen to state changes
-      final subscription = store.state.listen((state) {
-        final increment = state.count - previousCount;
-        if (increment == 1) sawIncrementByOne = true;
-        if (increment == 10) sawIncrementByTen = true;
-        previousCount = state.count;
-      });
+        // Listen to state changes
+        final subscription = store.state.listen((state) {
+          final increment = state.count - previousCount;
+          if (increment == 1) sawIncrementByOne = true;
+          if (increment == 10) sawIncrementByTen = true;
+          previousCount = state.count;
+        });
 
-      // Wait for some emissions (with timeout to detect blocking)
-      await Future.delayed(Duration(milliseconds: 500));
+        // Wait for some emissions (with timeout to detect blocking)
+        await Future.delayed(Duration(milliseconds: 500));
 
-      await subscription.cancel();
-      await store.close();
+        await subscription.cancel();
+        await store.close();
 
-      expect(
-        sawIncrementByOne && sawIncrementByTen,
-        isTrue,
-        reason: 'Expected both FlowHolderActions to run concurrently. '
-            'sawIncrementByOne=$sawIncrementByOne, sawIncrementByTen=$sawIncrementByTen. '
-            'If only sawIncrementByOne=true, the second yield was blocked.',
-      );
-    });
+        expect(
+          sawIncrementByOne && sawIncrementByTen,
+          isTrue,
+          reason: 'Expected both FlowHolderActions to run concurrently. '
+              'sawIncrementByOne=$sawIncrementByOne, sawIncrementByTen=$sawIncrementByTen. '
+              'If only sawIncrementByOne=true, the second yield was blocked.',
+        );
+      },
+    );
 
     test('code after yielding FlowHolderAction should execute', () async {
       final appReducer = AppReducer();
@@ -164,7 +181,8 @@ void main() {
       expect(
         appReducer.setupCompleteReceived,
         isTrue,
-        reason: 'SetupCompleteAction should have been yielded after the FlowHolderActions, '
+        reason:
+            'SetupCompleteAction should have been yielded after the FlowHolderActions, '
             'but the code after yield was blocked.',
       );
     });

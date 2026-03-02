@@ -40,7 +40,9 @@ class DefaultTypedConnectionTest {
         override suspend fun connect() {}
         override suspend fun disconnect() {}
 
-        fun emit(raw: String) { _incoming.tryEmit(raw) }
+        fun emit(raw: String) {
+            _incoming.tryEmit(raw)
+        }
     }
 
     // -- Mock ServerConnection --
@@ -51,7 +53,9 @@ class DefaultTypedConnectionTest {
         override val incoming: Flow<String> = _incoming
         override suspend fun send(message: String) {}
 
-        fun emit(raw: String) { _incoming.tryEmit(raw) }
+        fun emit(raw: String) {
+            _incoming.tryEmit(raw)
+        }
     }
 
     // -- Failing codecs --
@@ -65,7 +69,8 @@ class DefaultTypedConnectionTest {
         override fun encodeActionMessage(actionJson: String) = ""
         override fun decodeActionFromClient(raw: String): String = throw RuntimeException("message decode failed")
         override fun encodeServerResponse(actions: List<String>) = ""
-        override fun decodeServerMessage(raw: String): ServerResponse = throw RuntimeException("server message decode failed")
+        override fun decodeServerMessage(raw: String): ServerResponse =
+            throw RuntimeException("server message decode failed")
     }
 
     private val goodActionCodec = actionCodecOf<TestAction>()
@@ -116,7 +121,11 @@ class DefaultTypedConnectionTest {
         yield()
 
         // Valid server response wrapping an action
-        val serverMsg = goodMessageCodec.encodeServerResponse(listOf("""{"type":"io.flowdux.remote.serialization.DefaultTypedConnectionTest.TestAction.Ping","id":1}"""))
+        val serverMsg = goodMessageCodec.encodeServerResponse(
+            listOf(
+                """{"type":"io.flowdux.remote.serialization.DefaultTypedConnectionTest.TestAction.Ping","id":1}""",
+            ),
+        )
         mockConn.emit(serverMsg)
         yield()
 
@@ -228,7 +237,9 @@ class DefaultTypedConnectionTest {
         yield()
 
         // Valid client message wrapping an action
-        val clientMsg = goodMessageCodec.encodeActionMessage("""{"type":"io.flowdux.remote.serialization.DefaultTypedConnectionTest.TestAction.Ping","id":1}""")
+        val clientMsg = goodMessageCodec.encodeActionMessage(
+            """{"type":"io.flowdux.remote.serialization.DefaultTypedConnectionTest.TestAction.Ping","id":1}""",
+        )
         mockConn.emit(clientMsg)
         yield()
 

@@ -48,14 +48,18 @@ class BatchTab extends StatelessWidget {
                 children: [
                   ElevatedButton(
                     onPressed: () {
-                      context.dispatch<AppState, Action>(BatchIncrementAction(3));
+                      context.dispatch<AppState, Action>(
+                        BatchIncrementAction(3),
+                      );
                     },
                     child: const Text('+3 (instant)'),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () {
-                      context.dispatch<AppState, Action>(BatchIncrementAction(5));
+                      context.dispatch<AppState, Action>(
+                        BatchIncrementAction(5),
+                      );
                     },
                     child: const Text('+5 (instant)'),
                   ),
@@ -75,7 +79,10 @@ class BatchTab extends StatelessWidget {
                   ElevatedButton(
                     onPressed: () {
                       context.dispatch<AppState, Action>(
-                        AsyncBatchIncrementAction(3, delay: const Duration(milliseconds: 300)),
+                        AsyncBatchIncrementAction(
+                          3,
+                          delay: const Duration(milliseconds: 300),
+                        ),
                       );
                     },
                     child: const Text('+3 (animated)'),
@@ -84,7 +91,10 @@ class BatchTab extends StatelessWidget {
                   ElevatedButton(
                     onPressed: () {
                       context.dispatch<AppState, Action>(
-                        AsyncBatchIncrementAction(5, delay: const Duration(milliseconds: 200)),
+                        AsyncBatchIncrementAction(
+                          5,
+                          delay: const Duration(milliseconds: 200),
+                        ),
                       );
                     },
                     child: const Text('+5 (animated)'),
@@ -111,7 +121,9 @@ class BatchTab extends StatelessWidget {
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () {
-                      context.dispatch<AppState, Action>(ResetAndSetAction(100));
+                      context.dispatch<AppState, Action>(
+                        ResetAndSetAction(100),
+                      );
                     },
                     child: const Text('Reset → 100'),
                   ),
@@ -157,10 +169,7 @@ class BatchTab extends StatelessWidget {
                     '    }\n'
                     '  }\n'
                     '}',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(fontFamily: 'monospace', fontSize: 12),
                   ),
                 ],
               ),
@@ -178,10 +187,7 @@ class BatchTab extends StatelessWidget {
   }) {
     return Column(
       children: [
-        Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
+        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
         Text(
           description,

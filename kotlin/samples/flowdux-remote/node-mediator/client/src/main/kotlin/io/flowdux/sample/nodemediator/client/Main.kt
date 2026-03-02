@@ -27,11 +27,12 @@ import kotlinx.coroutines.withContext
  * Args: username [roomId] [nodeHost] [nodePort]
  */
 fun main(args: Array<String>) = runBlocking {
-    val username = args.getOrElse(0) {
-        print("Enter your name: ")
-        System.out.flush()
-        readlnOrNull()?.trim()?.ifEmpty { null } ?: "User${(1..1000).random()}"
-    }
+    val username =
+        args.getOrElse(0) {
+            print("Enter your name: ")
+            System.out.flush()
+            readlnOrNull()?.trim()?.ifEmpty { null } ?: "User${(1..1000).random()}"
+        }
     var currentRoom = args.getOrElse(1) { "lobby" }
     val nodeHost = args.getOrElse(2) { "localhost" }
     val nodePort = args.getOrElse(3) { "8081" }.toInt()
@@ -48,19 +49,20 @@ fun main(args: Array<String>) = runBlocking {
     var collectorJob: Job? = null
 
     fun startCollector() {
-        collectorJob = launch {
-            store.state.collect { state ->
-                when (val event = state.lastEvent) {
-                    is ChatEvent.UserJoined ->
-                        println("  [${state.currentRoom}] * ${event.user} joined (online: ${state.users})")
-                    is ChatEvent.UserLeft ->
-                        println("  [${state.currentRoom}] * ${event.user} left (online: ${state.users})")
-                    is ChatEvent.MessageReceived ->
-                        println("  [${state.currentRoom}] [${event.user}] ${event.text}")
-                    null -> {}
+        collectorJob =
+            launch {
+                store.state.collect { state ->
+                    when (val event = state.lastEvent) {
+                        is ChatEvent.UserJoined ->
+                            println("  [${state.currentRoom}] * ${event.user} joined (online: ${state.users})")
+                        is ChatEvent.UserLeft ->
+                            println("  [${state.currentRoom}] * ${event.user} left (online: ${state.users})")
+                        is ChatEvent.MessageReceived ->
+                            println("  [${state.currentRoom}] [${event.user}] ${event.text}")
+                        null -> {}
+                    }
                 }
             }
-        }
     }
 
     // Connect and join default room
@@ -141,11 +143,13 @@ private fun createChatStore(
     roomId: String,
     username: String,
 ): Store<ClientChatState, ChatAction> {
-    val connection = KtorWebSocketClientConnection.create(
-        host = host,
-        port = port,
-        path = "/ws/$roomId?user=$username",
-    ).typedJsonAs<SharedChatAction, ChatAction>()
+    val connection =
+        KtorWebSocketClientConnection
+            .create(
+                host = host,
+                port = port,
+                path = "/ws/$roomId?user=$username",
+            ).typedJsonAs<SharedChatAction, ChatAction>()
 
     return createClientStore(
         initialState = ClientChatState(),
@@ -154,17 +158,17 @@ private fun createChatStore(
     )
 }
 
-private class ChatRemoteMiddleware(
-    connection: TypedClientConnection<ChatAction>,
-) : SyncMiddleware<ClientChatState, ChatAction>(
-    connection = connection,
-) {
-    override val processors: ActionProcessorMap<ClientChatState, ChatAction> = buildProcessors {
-        on<ClientChatAction.Connect> { _, _ ->
-            startConnection()
+private class ChatRemoteMiddleware(connection: TypedClientConnection<ChatAction>) :
+    SyncMiddleware<ClientChatState, ChatAction>(
+        connection = connection,
+    ) {
+    override val processors: ActionProcessorMap<ClientChatState, ChatAction> =
+        buildProcessors {
+            on<ClientChatAction.Connect> { _, _ ->
+                startConnection()
+            }
+            on<ClientChatAction.Disconnect> { _, _ ->
+                stopConnection()
+            }
         }
-        on<ClientChatAction.Disconnect> { _, _ ->
-            stopConnection()
-        }
-    }
 }

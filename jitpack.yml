@@ -17,5 +17,8 @@ install:
     :kotlin:flowdux-remote-server:publishToMavenLocal
     :kotlin:flowdux-remote-serialization:publishToMavenLocal
     :kotlin:flowdux-remote-ktor:publishToMavenLocal
+    :kotlin:flowdux-remote-auth:publishToMavenLocal
+    :kotlin:flowdux-remote-multiplexer:publishToMavenLocal
+    :kotlin:flowdux-remote-node-mediator:publishToMavenLocal
     -x kotlinNpmInstall -x kotlinStoreYarnLock
     -x jsTest -x wasmJsTest -x iosX64Test -x iosSimulatorArm64Test

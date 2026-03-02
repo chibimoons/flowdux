@@ -64,7 +64,7 @@ fun main() {
                     messages = state.messages,
                     users = state.users,
                     lastEvent = state.lastEvent,
-                )
+                ),
             )
         },
         scope = applicationScope,
@@ -106,7 +106,7 @@ fun main() {
         ╠══════════════════════════════════════════════════════════╣
         ║  Example rooms: general, kotlin, java, random            ║
         ╚══════════════════════════════════════════════════════════╝
-        """.trimIndent()
+        """.trimIndent(),
     )
     println()
 
@@ -172,7 +172,9 @@ fun main() {
     roomServer.close()
 }
 
-private suspend fun printStatus(roomServer: io.flowdux.remote.server.pattern.RoomServer<SharedStateServer<ServerRoomState, ChatAction>>) {
+private suspend fun printStatus(
+    roomServer: io.flowdux.remote.server.pattern.RoomServer<SharedStateServer<ServerRoomState, ChatAction>>,
+) {
     val roomIds = roomServer.roomIds()
     if (roomIds.isEmpty()) {
         println("  No active rooms")
@@ -187,15 +189,14 @@ private suspend fun printStatus(roomServer: io.flowdux.remote.server.pattern.Roo
     }
 }
 
-private fun roomProcessors() =
-    Middleware.ActionProcessorBuilder<ServerRoomState, ChatAction>().apply {
-        on<SharedChatAction.SendMessage> { _, action ->
-            emit(ServerRoomAction.MessageReceived(user = action.user, text = action.text))
-        }
-        on<SharedChatAction.JoinRoom> { _, action ->
-            emit(ServerRoomAction.UserJoined(user = action.user))
-        }
-        on<SharedChatAction.LeaveRoom> { _, action ->
-            emit(ServerRoomAction.UserLeft(user = action.user))
-        }
-    }.build()
+private fun roomProcessors() = Middleware.ActionProcessorBuilder<ServerRoomState, ChatAction>().apply {
+    on<SharedChatAction.SendMessage> { _, action ->
+        emit(ServerRoomAction.MessageReceived(user = action.user, text = action.text))
+    }
+    on<SharedChatAction.JoinRoom> { _, action ->
+        emit(ServerRoomAction.UserJoined(user = action.user))
+    }
+    on<SharedChatAction.LeaveRoom> { _, action ->
+        emit(ServerRoomAction.UserLeft(user = action.user))
+    }
+}.build()

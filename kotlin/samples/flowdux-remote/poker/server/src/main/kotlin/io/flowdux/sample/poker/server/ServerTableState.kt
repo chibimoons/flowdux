@@ -17,7 +17,6 @@ data class ServerTableState(
     val phase: GamePhase = GamePhase.WAITING,
     val minimumBet: Int = 10,
     val lastEvent: TableEvent? = null,
-
     // Private information (server-only)
     val deck: List<Card> = emptyList(),
     val hands: Map<String, List<Card>> = emptyMap(), // playerId -> private hand

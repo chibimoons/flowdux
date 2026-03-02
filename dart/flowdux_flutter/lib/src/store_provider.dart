@@ -17,11 +17,7 @@ class StoreProvider<S, A extends Action> extends InheritedWidget {
   final Store<S, A> store;
 
   /// Creates a [StoreProvider] with the given [store].
-  const StoreProvider({
-    super.key,
-    required this.store,
-    required super.child,
-  });
+  const StoreProvider({super.key, required this.store, required super.child});
 
   /// Retrieves the [Store] from the nearest [StoreProvider] ancestor.
   ///

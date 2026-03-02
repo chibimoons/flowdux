@@ -2,11 +2,10 @@ package io.flowdux
 
 import app.cash.turbine.test
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
-import kotlin.test.assertTrue
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 /**
  * Tests for emitting multiple FlowHolderActions from within a middleware processor.
@@ -17,37 +16,38 @@ import kotlin.test.Test
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class MiddlewareEmitFlowHolderActionTest {
-
     /**
      * Middleware that emits multiple FlowHolderActions when StartMultipleObservers is dispatched.
      * This simulates the real-world scenario where an app starts observing multiple data streams.
      */
     private class MultiObserverMiddleware : Middleware<CounterState, CounterAction> {
-        override val processors: ActionProcessorMap<CounterState, CounterAction> = buildProcessors {
-            on<CounterAction.StartMultipleObservers> { _, _ ->
-                // Emit first infinite FlowHolderAction
-                emit(CounterAction.InfiniteStreamAction("observer1", emitInterval = 50L))
+        override val processors: ActionProcessorMap<CounterState, CounterAction> =
+            buildProcessors {
+                on<CounterAction.StartMultipleObservers> { _, _ ->
+                    // Emit first infinite FlowHolderAction
+                    emit(CounterAction.InfiniteStreamAction("observer1", emitInterval = 50L))
 
-                // Emit second infinite FlowHolderAction
-                // With flatMapMerge, this executes concurrently (not blocked by first emit)
-                emit(CounterAction.SecondaryStreamAction("observer2", emitInterval = 50L))
+                    // Emit second infinite FlowHolderAction
+                    // With flatMapMerge, this executes concurrently (not blocked by first emit)
+                    emit(CounterAction.SecondaryStreamAction("observer2", emitInterval = 50L))
 
-                // Emit a marker action to indicate setup is complete
-                // With flatMapMerge, this also executes without blocking
-                emit(CounterAction.SetupComplete(0L))
+                    // Emit a marker action to indicate setup is complete
+                    // With flatMapMerge, this also executes without blocking
+                    emit(CounterAction.SetupComplete(0L))
+                }
             }
-        }
     }
 
     @Test
     fun `emitting multiple FlowHolderActions from middleware should not block`() = runTest {
-        val store = createStore(
-            initialState = CounterState(),
-            middlewares = listOf(MultiObserverMiddleware()),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                middlewares = listOf(MultiObserverMiddleware()),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(0, awaitItem().count)
@@ -84,7 +84,7 @@ class MiddlewareEmitFlowHolderActionTest {
                 sawIncrementByOne && sawIncrementByTen,
                 "Expected both FlowHolderActions to run concurrently. " +
                     "sawIncrementByOne=$sawIncrementByOne, sawIncrementByTen=$sawIncrementByTen. " +
-                    "If only sawIncrementByOne=true, the second emit was blocked."
+                    "If only sawIncrementByOne=true, the second emit was blocked.",
             )
 
             cancelAndIgnoreRemainingEvents()
@@ -95,24 +95,26 @@ class MiddlewareEmitFlowHolderActionTest {
     fun `code after emitting FlowHolderAction should execute`() = runTest {
         var setupCompleteReceived = false
 
-        val testReducer = Reducer<CounterState, CounterAction> { state, action ->
-            when (action) {
-                is CounterAction.SetupComplete -> {
-                    setupCompleteReceived = true
-                    state
+        val testReducer =
+            Reducer<CounterState, CounterAction> { state, action ->
+                when (action) {
+                    is CounterAction.SetupComplete -> {
+                        setupCompleteReceived = true
+                        state
+                    }
+                    is CounterAction.Add -> state.copy(count = state.count + action.value)
+                    else -> state
                 }
-                is CounterAction.Add -> state.copy(count = state.count + action.value)
-                else -> state
             }
-        }
 
-        val store = createStore(
-            initialState = CounterState(),
-            middlewares = listOf(MultiObserverMiddleware()),
-            reducer = testReducer,
-            errorProcessor = testErrorProcessor,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                middlewares = listOf(MultiObserverMiddleware()),
+                reducer = testReducer,
+                errorProcessor = testErrorProcessor,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             assertEquals(0, awaitItem().count)
@@ -130,7 +132,7 @@ class MiddlewareEmitFlowHolderActionTest {
             assertTrue(
                 setupCompleteReceived,
                 "SetupComplete action should have been emitted after the FlowHolderActions, " +
-                    "but the code after emit() was blocked."
+                    "but the code after emit() was blocked.",
             )
 
             cancelAndIgnoreRemainingEvents()

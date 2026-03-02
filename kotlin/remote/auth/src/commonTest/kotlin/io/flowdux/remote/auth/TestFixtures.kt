@@ -16,17 +16,11 @@ import kotlinx.coroutines.flow.receiveAsFlow
 
 // ── Test Principal ──
 
-data class TestPrincipal(
-    val userId: String,
-    val name: String = "Test User",
-) : AuthPrincipal
+data class TestPrincipal(val userId: String, val name: String = "Test User") : AuthPrincipal
 
 // ── Mock ClientConnection (raw string level) ──
 
-class MockClientConnection(
-    private val autoConnect: Boolean = true,
-) : ClientConnection {
-
+class MockClientConnection(private val autoConnect: Boolean = true) : ClientConnection {
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     override val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
@@ -70,7 +64,6 @@ class MockClientConnection(
 // ── Mock ServerConnection (raw string level) ──
 
 class MockServerConnection : ServerConnection {
-
     override val isActive: Boolean = true
     private val incomingChannel = Channel<String>(Channel.UNLIMITED)
     override val incoming: Flow<String> = incomingChannel.receiveAsFlow()
@@ -95,14 +88,16 @@ class MockServerConnection : ServerConnection {
 // ── Test Verifiers ──
 
 /** Always-accept verifier that returns a [TestPrincipal]. */
-val acceptAllVerifier = AuthVerifier<TestPrincipal> { token ->
-    AuthResult.Success(TestPrincipal(userId = token, name = "User $token"))
-}
+val acceptAllVerifier =
+    AuthVerifier<TestPrincipal> { token ->
+        AuthResult.Success(TestPrincipal(userId = token, name = "User $token"))
+    }
 
 /** Always-reject verifier. */
-val rejectAllVerifier = AuthVerifier<TestPrincipal> { _ ->
-    AuthResult.Failure("Access denied")
-}
+val rejectAllVerifier =
+    AuthVerifier<TestPrincipal> { _ ->
+        AuthResult.Failure("Access denied")
+    }
 
 /** Verifier that accepts only a specific token. */
 fun tokenVerifier(validToken: String) = AuthVerifier<TestPrincipal> { token ->
@@ -114,6 +109,7 @@ fun tokenVerifier(validToken: String) = AuthVerifier<TestPrincipal> { token ->
 }
 
 /** Verifier that throws an exception (simulates JWT library crash). */
-val throwingVerifier = AuthVerifier<TestPrincipal> { _ ->
-    throw RuntimeException("JWT decode failed")
-}
+val throwingVerifier =
+    AuthVerifier<TestPrincipal> { _ ->
+        throw RuntimeException("JWT decode failed")
+    }

@@ -59,11 +59,9 @@ class RoomServer<H : ClientHandler<*>> internal constructor(
      * @param roomId Unique identifier for the room.
      * @return The [ClientHandler] for the room.
      */
-    suspend fun getOrCreateRoom(roomId: String): H {
-        return mutex.withLock {
-            rooms.getOrPut(roomId) {
-                roomFactory(roomId)
-            }
+    suspend fun getOrCreateRoom(roomId: String): H = mutex.withLock {
+        rooms.getOrPut(roomId) {
+            roomFactory(roomId)
         }
     }
 
@@ -73,10 +71,8 @@ class RoomServer<H : ClientHandler<*>> internal constructor(
      * @param roomId Unique identifier for the room.
      * @return The [ClientHandler] if the room exists, null otherwise.
      */
-    suspend fun getRoom(roomId: String): H? {
-        return mutex.withLock {
-            rooms[roomId]
-        }
+    suspend fun getRoom(roomId: String): H? = mutex.withLock {
+        rooms[roomId]
     }
 
     /**
@@ -85,13 +81,11 @@ class RoomServer<H : ClientHandler<*>> internal constructor(
      * @param roomId Unique identifier for the room.
      * @return true if the room existed and was destroyed, false otherwise.
      */
-    suspend fun destroyRoom(roomId: String): Boolean {
-        return mutex.withLock {
-            rooms.remove(roomId)?.let { room ->
-                room.close()
-                true
-            } ?: false
-        }
+    suspend fun destroyRoom(roomId: String): Boolean = mutex.withLock {
+        rooms.remove(roomId)?.let { room ->
+            room.close()
+            true
+        } ?: false
     }
 
     /**
@@ -115,19 +109,15 @@ class RoomServer<H : ClientHandler<*>> internal constructor(
     /**
      * Get a snapshot of all active room IDs.
      */
-    suspend fun roomIds(): Set<String> {
-        return mutex.withLock {
-            rooms.keys.toSet()
-        }
+    suspend fun roomIds(): Set<String> = mutex.withLock {
+        rooms.keys.toSet()
     }
 
     /**
      * Get the number of active rooms.
      */
-    suspend fun roomCount(): Int {
-        return mutex.withLock {
-            rooms.size
-        }
+    suspend fun roomCount(): Int = mutex.withLock {
+        rooms.size
     }
 
     /**
@@ -138,9 +128,12 @@ class RoomServer<H : ClientHandler<*>> internal constructor(
     suspend fun cleanupEmptyRooms(): List<String> {
         val destroyedRooms = mutableListOf<String>()
         mutex.withLock {
-            val emptyRoomIds = rooms.filter { (_, room) ->
-                room.sessionCount() == 0
-            }.keys.toList()
+            val emptyRoomIds =
+                rooms
+                    .filter { (_, room) ->
+                        room.sessionCount() == 0
+                    }.keys
+                    .toList()
 
             emptyRoomIds.forEach { roomId ->
                 rooms.remove(roomId)?.let { room ->
@@ -201,9 +194,7 @@ class RoomServer<H : ClientHandler<*>> internal constructor(
 fun <H : ClientHandler<*>> createRoomServer(
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     roomFactory: (roomId: String) -> H,
-): RoomServer<H> {
-    return RoomServer(roomFactory, scope)
-}
+): RoomServer<H> = RoomServer(roomFactory, scope)
 
 /**
  * Create a [RoomServer] with [SharedStateServer] rooms using simple configuration.
@@ -241,20 +232,18 @@ fun <S : State, A : Action> createSharedStateRoomServer(
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
     logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-): RoomServer<SharedStateServer<S, A>> {
-    return createRoomServer(scope) { roomId ->
-        createSharedStateServer(
-            initialState = initialStateFactory(roomId),
-            reducer = reducer,
-            stateMapper = stateMapper,
-            processors = processors,
-            sessionRegistry = sessionRegistryFactory(),
-            broadcastConfig = broadcastConfig,
-            errorProcessor = errorProcessor,
-            logger = logger,
-            scope = scope,
-        )
-    }
+): RoomServer<SharedStateServer<S, A>> = createRoomServer(scope) { roomId ->
+    createSharedStateServer(
+        initialState = initialStateFactory(roomId),
+        reducer = reducer,
+        stateMapper = stateMapper,
+        processors = processors,
+        sessionRegistry = sessionRegistryFactory(),
+        broadcastConfig = broadcastConfig,
+        errorProcessor = errorProcessor,
+        logger = logger,
+        scope = scope,
+    )
 }
 
 /**
@@ -297,16 +286,14 @@ fun <S : State, A : Action> createPerClientRoomServer(
     errorProcessor: ErrorProcessor<A> = DefaultErrorProcessor(),
     logger: StoreLogger<S, A> = NoOpStoreLogger(),
     scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-): RoomServer<PerClientServer<S, A>> {
-    return createRoomServer(scope) { roomId ->
-        createPerClientServer(
-            initialStateFactory = { sessionId -> initialStateFactory(roomId, sessionId) },
-            reducer = reducer,
-            stateMapper = stateMapper,
-            processors = processors,
-            errorProcessor = errorProcessor,
-            logger = logger,
-            scope = scope,
-        )
-    }
+): RoomServer<PerClientServer<S, A>> = createRoomServer(scope) { roomId ->
+    createPerClientServer(
+        initialStateFactory = { sessionId -> initialStateFactory(roomId, sessionId) },
+        reducer = reducer,
+        stateMapper = stateMapper,
+        processors = processors,
+        errorProcessor = errorProcessor,
+        logger = logger,
+        scope = scope,
+    )
 }

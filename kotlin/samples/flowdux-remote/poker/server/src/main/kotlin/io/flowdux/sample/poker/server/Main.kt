@@ -54,8 +54,10 @@ fun main() {
     // Monitor table state
     applicationScope.launch {
         pokerTable.roomStore.state.collect { state ->
-            println("[Server] Phase: ${state.phase}, Players: ${state.players.size}, " +
-                "Pot: ${state.pot}, Turn: ${state.currentTurnPlayerId ?: "none"}")
+            println(
+                "[Server] Phase: ${state.phase}, Players: ${state.players.size}, " +
+                    "Pot: ${state.pot}, Turn: ${state.currentTurnPlayerId ?: "none"}",
+            )
         }
     }
 
@@ -85,8 +87,9 @@ fun main() {
                 println("[Server] Player connecting: $playerId")
 
                 // Create typed connection for this player
-                val connection = KtorWebSocketServerConnection(this)
-                    .typedJsonAs<SharedPokerAction, PokerAction>()
+                val connection =
+                    KtorWebSocketServerConnection(this)
+                        .typedJsonAs<SharedPokerAction, PokerAction>()
 
                 // Create Per-Client Store for private state
                 val playerSession = PlayerSession(playerId, connection)

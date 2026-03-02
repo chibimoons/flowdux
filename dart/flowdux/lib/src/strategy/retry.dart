@@ -147,7 +147,4 @@ ExecutionStrategy retry(
   int maxAttempts, {
   bool Function(Object error)? retryIf,
 }) =>
-    RetryStrategy(
-      maxAttempts: maxAttempts,
-      retryIf: retryIf,
-    );
+    RetryStrategy(maxAttempts: maxAttempts, retryIf: retryIf);

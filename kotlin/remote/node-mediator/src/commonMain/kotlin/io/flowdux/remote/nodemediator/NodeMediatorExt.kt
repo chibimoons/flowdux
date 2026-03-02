@@ -30,9 +30,7 @@ import kotlinx.serialization.json.Json
  */
 inline fun <reified A : Action> ClientConnection.typedNodeActionJson(
     json: Json = SerializableActionCodec.DefaultJson,
-): TypedClientConnection<NodeAction<A>> {
-    return typed(actionCodecOf<NodeAction<A>>(json), JsonMessageCodec())
-}
+): TypedClientConnection<NodeAction<A>> = typed(actionCodecOf<NodeAction<A>>(json), JsonMessageCodec())
 
 /**
  * Creates a [TypedServerConnection] for [NodeAction] using JSON serialization.
@@ -52,9 +50,7 @@ inline fun <reified A : Action> ClientConnection.typedNodeActionJson(
  */
 inline fun <reified A : Action> ServerConnection.typedNodeActionJson(
     json: Json = SerializableActionCodec.DefaultJson,
-): TypedServerConnection<NodeAction<A>> {
-    return typed(actionCodecOf<NodeAction<A>>(json), JsonMessageCodec())
-}
+): TypedServerConnection<NodeAction<A>> = typed(actionCodecOf<NodeAction<A>>(json), JsonMessageCodec())
 
 /**
  * Creates a [WebSocketNodeTransport] for [NodeAction] using JSON serialization.
@@ -72,6 +68,4 @@ inline fun <reified A : Action> ServerConnection.typedNodeActionJson(
  */
 inline fun <reified A : Action> ClientConnection.webSocketNodeTransport(
     json: Json = SerializableActionCodec.DefaultJson,
-): NodeTransport<A> {
-    return WebSocketNodeTransport(typedNodeActionJson<A>(json))
-}
+): NodeTransport<A> = WebSocketNodeTransport(typedNodeActionJson<A>(json))

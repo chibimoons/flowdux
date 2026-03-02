@@ -18,5 +18,6 @@ class DefaultErrorProcessor<A extends Action> implements ErrorProcessor<A> {
   DefaultErrorProcessor();
 
   @override
-  Stream<A> process(Object error, StackTrace stackTrace) => const Stream.empty();
+  Stream<A> process(Object error, StackTrace stackTrace) =>
+      const Stream.empty();
 }

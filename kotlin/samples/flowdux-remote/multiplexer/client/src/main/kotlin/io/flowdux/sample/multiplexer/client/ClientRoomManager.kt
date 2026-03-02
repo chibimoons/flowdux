@@ -63,10 +63,11 @@ class ClientRoomManager(
 
     /** Leave a room */
     suspend fun leaveRoom(roomId: String) {
-        val roomConnection = rooms.remove(roomId) ?: run {
-            println("[Client] Not in room: $roomId")
-            return
-        }
+        val roomConnection =
+            rooms.remove(roomId) ?: run {
+                println("[Client] Not in room: $roomId")
+                return
+            }
 
         println("[Client] Leaving room: $roomId")
 
@@ -122,51 +123,47 @@ class ClientRoomManager(
     private fun createRoomStore(
         roomId: String,
         connection: TypedClientConnection<ChatAction>,
-    ): Store<ClientRoomState, ChatAction> {
-        return createClientStore(
-            initialState = ClientRoomState(roomId = roomId),
-            syncMiddleware = RoomRemoteMiddleware(connection),
-            reducer = clientRoomReducer,
-        )
-    }
+    ): Store<ClientRoomState, ChatAction> = createClientStore(
+        initialState = ClientRoomState(roomId = roomId),
+        syncMiddleware = RoomRemoteMiddleware(connection),
+        reducer = clientRoomReducer,
+    )
 }
 
 /**
  * Represents a connection to a single room.
  */
-class RoomConnection(
-    val roomId: String,
-    val store: Store<ClientRoomState, ChatAction>,
-) {
+class RoomConnection(val roomId: String, val store: Store<ClientRoomState, ChatAction>) {
     private var observerJob: kotlinx.coroutines.Job? = null
 
     fun startObserving(scope: CoroutineScope, currentUser: String) {
-        observerJob = scope.launch {
-            var lastEventId = 0
-            store.state.collect { state ->
-                // Only show events we haven't seen
-                val event = state.lastEvent
-                if (event != null && state.hashCode() != lastEventId) {
-                    lastEventId = state.hashCode()
+        observerJob =
+            scope.launch {
+                var lastEventId = 0
+                store.state.collect { state ->
+                    // Only show events we haven't seen
+                    val event = state.lastEvent
+                    if (event != null && state.hashCode() != lastEventId) {
+                        lastEventId = state.hashCode()
 
-                    when (event) {
-                        is io.flowdux.sample.multiplexer.ChatEvent.UserJoined -> {
-                            if (event.user != currentUser) {
-                                println("\n[$roomId] ${event.user} joined the room")
+                        when (event) {
+                            is io.flowdux.sample.multiplexer.ChatEvent.UserJoined -> {
+                                if (event.user != currentUser) {
+                                    println("\n[$roomId] ${event.user} joined the room")
+                                }
                             }
-                        }
-                        is io.flowdux.sample.multiplexer.ChatEvent.UserLeft -> {
-                            println("\n[$roomId] ${event.user} left the room")
-                        }
-                        is io.flowdux.sample.multiplexer.ChatEvent.MessageReceived -> {
-                            if (event.user != currentUser) {
-                                println("\n[$roomId] ${event.user}: ${event.text}")
+                            is io.flowdux.sample.multiplexer.ChatEvent.UserLeft -> {
+                                println("\n[$roomId] ${event.user} left the room")
+                            }
+                            is io.flowdux.sample.multiplexer.ChatEvent.MessageReceived -> {
+                                if (event.user != currentUser) {
+                                    println("\n[$roomId] ${event.user}: ${event.text}")
+                                }
                             }
                         }
                     }
                 }
             }
-        }
     }
 
     fun close() {

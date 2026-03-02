@@ -30,15 +30,9 @@ class AppState {
   final List<String> searchResults;
   final List<int> refreshResults;
 
-  AppState({
-    this.searchResults = const [],
-    this.refreshResults = const [],
-  });
+  AppState({this.searchResults = const [], this.refreshResults = const []});
 
-  AppState copyWith({
-    List<String>? searchResults,
-    List<int>? refreshResults,
-  }) =>
+  AppState copyWith({List<String>? searchResults, List<int>? refreshResults}) =>
       AppState(
         searchResults: searchResults ?? this.searchResults,
         refreshResults: refreshResults ?? this.refreshResults,
@@ -48,10 +42,14 @@ class AppState {
 // Test Reducer
 class AppReducer extends ReducerBase<AppState, Action> {
   AppReducer() {
-    on<SearchResultAction>((state, action) =>
-        state.copyWith(searchResults: [...state.searchResults, action.query]));
-    on<DataLoadedAction>((state, action) =>
-        state.copyWith(refreshResults: [...state.refreshResults, action.id]));
+    on<SearchResultAction>(
+      (state, action) =>
+          state.copyWith(searchResults: [...state.searchResults, action.query]),
+    );
+    on<DataLoadedAction>(
+      (state, action) =>
+          state.copyWith(refreshResults: [...state.refreshResults, action.id]),
+    );
   }
 }
 
@@ -68,12 +66,13 @@ void main() {
         final executionOrder = <String>[];
         final strategy = debounce(Duration(milliseconds: 100));
 
-        final wrappedProcessor = strategy.wrap<AppState, Action, SearchAction>(
-          (state, action) async* {
-            executionOrder.add('executed:${action.query}');
-            yield SearchResultAction(action.query);
-          },
-        );
+        final wrappedProcessor = strategy.wrap<AppState, Action, SearchAction>((
+          state,
+          action,
+        ) async* {
+          executionOrder.add('executed:${action.query}');
+          yield SearchResultAction(action.query);
+        });
 
         final state = AppState();
 
@@ -105,11 +104,12 @@ void main() {
         final results = <String>[];
         final strategy = debounce(Duration(milliseconds: 100));
 
-        final wrappedProcessor = strategy.wrap<AppState, Action, SearchAction>(
-          (state, action) async* {
-            yield SearchResultAction(action.query);
-          },
-        );
+        final wrappedProcessor = strategy.wrap<AppState, Action, SearchAction>((
+          state,
+          action,
+        ) async* {
+          yield SearchResultAction(action.query);
+        });
 
         final state = AppState();
 
@@ -141,11 +141,12 @@ void main() {
         final results = <String>[];
         final strategy = debounce(Duration(milliseconds: 100));
 
-        final wrappedProcessor = strategy.wrap<AppState, Action, SearchAction>(
-          (state, action) async* {
-            yield SearchResultAction(action.query);
-          },
-        );
+        final wrappedProcessor = strategy.wrap<AppState, Action, SearchAction>((
+          state,
+          action,
+        ) async* {
+          yield SearchResultAction(action.query);
+        });
 
         final state = AppState();
 
@@ -170,11 +171,12 @@ void main() {
         final results = <String>[];
         final strategy = debounceMs(50);
 
-        final wrappedProcessor = strategy.wrap<AppState, Action, SearchAction>(
-          (state, action) async* {
-            yield SearchResultAction(action.query);
-          },
-        );
+        final wrappedProcessor = strategy.wrap<AppState, Action, SearchAction>((
+          state,
+          action,
+        ) async* {
+          yield SearchResultAction(action.query);
+        });
 
         final state = AppState();
 
@@ -388,7 +390,10 @@ void main() {
 // Test Middlewares using new DSL
 class _DebounceMiddleware extends Middleware<AppState, Action> {
   _DebounceMiddleware() {
-    apply(debounce(Duration(milliseconds: 50))).on<SearchAction>((state, action) async* {
+    apply(debounce(Duration(milliseconds: 50))).on<SearchAction>((
+      state,
+      action,
+    ) async* {
       yield SearchResultAction(action.query);
     });
   }
@@ -396,7 +401,10 @@ class _DebounceMiddleware extends Middleware<AppState, Action> {
 
 class _ThrottleMiddleware extends Middleware<AppState, Action> {
   _ThrottleMiddleware() {
-    apply(throttle(Duration(milliseconds: 50))).on<RefreshAction>((state, action) async* {
+    apply(throttle(Duration(milliseconds: 50))).on<RefreshAction>((
+      state,
+      action,
+    ) async* {
       yield DataLoadedAction(action.id);
     });
   }

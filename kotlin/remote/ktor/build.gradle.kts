@@ -12,7 +12,7 @@ mavenPublishing {
 }
 
 // JitPack only publishes JVM artifacts to avoid variant resolution issues for JVM/Android consumers
-val isJitPack = System.getenv("JITPACK") == "true"
+val isJitPack = providers.environmentVariable("JITPACK").map { it == "true" }.getOrElse(false)
 
 kotlin {
     jvm()
@@ -37,9 +37,15 @@ kotlin {
             implementation(libs.ktor.client.core.multiplatform)
             implementation(libs.ktor.client.websockets.multiplatform)
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+        }
         jvmMain.dependencies {
             implementation(libs.ktor.client.cio.multiplatform)
             api(project(":kotlin:flowdux-remote-server"))
+            api(libs.ktor.server.core)
+            api(libs.ktor.server.websockets)
         }
         jvmTest.dependencies {
             implementation(kotlin("test"))

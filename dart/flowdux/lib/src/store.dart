@@ -130,7 +130,8 @@ class Store<S, A extends Action> {
     final previousState = _currentState;
     final newState = _reducer(previousState, action);
     _currentState = newState;
-    if (_isLoggingEnabled) _logger.onStateReduced(action, previousState, newState);
+    if (_isLoggingEnabled)
+      _logger.onStateReduced(action, previousState, newState);
     return newState;
   }
 

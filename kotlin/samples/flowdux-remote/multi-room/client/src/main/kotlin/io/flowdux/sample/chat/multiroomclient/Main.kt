@@ -29,33 +29,36 @@ import kotlinx.coroutines.withContext
  * - /quit — Exit
  */
 fun main(args: Array<String>) = runBlocking {
-    val username = args.firstOrNull() ?: run {
-        print("Enter your name: ")
-        System.out.flush()
-        readlnOrNull()?.trim()?.ifEmpty { null }
-    } ?: run {
-        println("No name provided. Exiting.")
-        return@runBlocking
-    }
+    val username =
+        args.firstOrNull() ?: run {
+            print("Enter your name: ")
+            System.out.flush()
+            readlnOrNull()?.trim()?.ifEmpty { null }
+        } ?: run {
+            println("No name provided. Exiting.")
+            return@runBlocking
+        }
 
     val initialRoom = args.getOrNull(1) ?: "general"
 
-    println("""
+    println(
+        """
 
-        ╔══════════════════════════════════════════════════╗
-        ║     FlowDux Multi-Room Chat Client               ║
-        ╠══════════════════════════════════════════════════╣
-        ║  Commands:                                       ║
-        ║    /join <room>  - Join a different room         ║
-        ║    /rooms        - List suggested rooms          ║
-        ║    /users        - Show users in current room    ║
-        ║    /history      - Show message history          ║
-        ║    /quit         - Exit                          ║
-        ╠══════════════════════════════════════════════════╣
-        ║  Just type to send a message!                    ║
-        ╚══════════════════════════════════════════════════╝
+            ╔══════════════════════════════════════════════════╗
+            ║     FlowDux Multi-Room Chat Client               ║
+            ╠══════════════════════════════════════════════════╣
+            ║  Commands:                                       ║
+            ║    /join <room>  - Join a different room         ║
+            ║    /rooms        - List suggested rooms          ║
+            ║    /users        - Show users in current room    ║
+            ║    /history      - Show message history          ║
+            ║    /quit         - Exit                          ║
+            ╠══════════════════════════════════════════════════╣
+            ║  Just type to send a message!                    ║
+            ╚══════════════════════════════════════════════════╝
 
-    """.trimIndent())
+        """.trimIndent(),
+    )
 
     var currentRoom = initialRoom
     var store: Store<ClientChatState, ChatAction>? = null
@@ -80,19 +83,20 @@ fun main(args: Array<String>) = runBlocking {
         val newStore = createChatStore(roomId)
 
         // Observe state changes
-        collectorJob = launch {
-            newStore.state.collect { state ->
-                when (val event = state.lastEvent) {
-                    is ChatEvent.UserJoined ->
-                        println("  * ${event.user} joined [$roomId] (online: ${state.users})")
-                    is ChatEvent.UserLeft ->
-                        println("  * ${event.user} left [$roomId] (online: ${state.users})")
-                    is ChatEvent.MessageReceived ->
-                        println("  [$roomId] [${event.user}] ${event.text}")
-                    null -> {}
+        collectorJob =
+            launch {
+                newStore.state.collect { state ->
+                    when (val event = state.lastEvent) {
+                        is ChatEvent.UserJoined ->
+                            println("  * ${event.user} joined [$roomId] (online: ${state.users})")
+                        is ChatEvent.UserLeft ->
+                            println("  * ${event.user} left [$roomId] (online: ${state.users})")
+                        is ChatEvent.MessageReceived ->
+                            println("  [$roomId] [${event.user}] ${event.text}")
+                        null -> {}
+                    }
                 }
             }
-        }
 
         // Connect and join
         newStore.dispatch(ClientChatAction.SetRoomId(roomId))
@@ -181,11 +185,13 @@ fun main(args: Array<String>) = runBlocking {
 
 @Suppress("UNCHECKED_CAST")
 private fun createChatStore(roomId: String): Store<ClientChatState, ChatAction> {
-    val connection = KtorWebSocketClientConnection.create(
-        host = "localhost",
-        port = 8080,
-        path = "/room/$roomId",
-    ).typedJson<SharedChatAction>() as TypedClientConnection<ChatAction>
+    val connection =
+        KtorWebSocketClientConnection
+            .create(
+                host = "localhost",
+                port = 8080,
+                path = "/room/$roomId",
+            ).typedJson<SharedChatAction>() as TypedClientConnection<ChatAction>
 
     return createClientStore(
         initialState = ClientChatState(roomId = roomId),

@@ -1,0 +1,91 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:Main.kt$fun main(args: Array&lt;String&gt;)</ID>
+    <ID>EmptyFunctionBlock:DefaultTypedConnectionTest.kt$DefaultTypedConnectionTest.MockClientConnection${}</ID>
+    <ID>EmptyFunctionBlock:DefaultTypedConnectionTest.kt$DefaultTypedConnectionTest.MockServerConnection${}</ID>
+    <ID>EmptyFunctionBlock:NodeMediatorTest.kt$NodeMediatorTest.&lt;no name provided&gt;${}</ID>
+    <ID>EmptyFunctionBlock:NodeRoomServerTest.kt$NodeRoomServerTest.&lt;no name provided&gt;${}</ID>
+    <ID>EmptyFunctionBlock:ScopeAndLifecycleTest.kt$ScopeAndLifecycleTest.&lt;no name provided&gt;${}</ID>
+    <ID>EmptyFunctionBlock:StoreLogger.kt$NoOpStoreLogger${}</ID>
+    <ID>EmptyFunctionBlock:SyncMiddlewareTest.kt$SyncMiddlewareTest.&lt;no name provided&gt;${}</ID>
+    <ID>EmptyWhileBlock:ConcurrencyTest.kt$ConcurrencyTest${ }</ID>
+    <ID>ImplicitDefaultLocale:BenchmarkResult.kt$BenchmarkResult$String.format("%,.0f", throughput)</ID>
+    <ID>ImplicitDefaultLocale:BenchmarkResult.kt$BenchmarkResult$String.format("%.1f", actionsPerFrame(60))</ID>
+    <ID>ImplicitDefaultLocale:BenchmarkResult.kt$BenchmarkResult$String.format("%.1f", maxSustainableFps())</ID>
+    <ID>ImplicitDefaultLocale:BenchmarkResult.kt$BenchmarkSummary$String.format( "%-30s %12.0f/s %15s %10s", r.name.take(30), r.throughput, r.avgLatency, if (r.canSustain60Fps()) "✅" else "❌", )</ID>
+    <ID>ImplicitDefaultLocale:BenchmarkResult.kt$BenchmarkSummary$String.format("%-30s %15s %15s %10s", "Benchmark", "Throughput", "Avg Latency", "60fps?")</ID>
+    <ID>ImplicitDefaultLocale:SerializationBenchmark.kt$SerializationBenchmark$String.format("%-15s %10s %10s", "Size", "ActionJSON", "Wire Msg")</ID>
+    <ID>ImplicitDefaultLocale:SerializationBenchmark.kt$SerializationBenchmark$String.format("%-15s %8dB %8dB", "Large", largeJson.length, largeWire.length)</ID>
+    <ID>ImplicitDefaultLocale:SerializationBenchmark.kt$SerializationBenchmark$String.format("%-15s %8dB %8dB", "Medium", mediumJson.length, mediumWire.length)</ID>
+    <ID>ImplicitDefaultLocale:SerializationBenchmark.kt$SerializationBenchmark$String.format("%-15s %8dB %8dB", "Small", smallJson.length, smallWire.length)</ID>
+    <ID>LongMethod:AuthServerConnection.kt$AuthServerConnection$@OptIn(ExperimentalCoroutinesApi::class) suspend fun awaitAuth(scope: CoroutineScope): AuthResult&lt;P&gt;</ID>
+    <ID>LongMethod:CounterScreen.kt$@Composable fun CounterScreen(viewModel: CounterViewModel = viewModel())</ID>
+    <ID>LongMethod:Main.kt$fun main()</ID>
+    <ID>LongMethod:Main.kt$fun main(args: Array&lt;String&gt;)</ID>
+    <ID>LongMethod:ResilienceStrategyTest.kt$ResilienceStrategyTest$@Test fun `retryWithBackoff jitter causes variation in delays across multiple runs`()</ID>
+    <ID>LongMethod:SerializationBenchmark.kt$SerializationBenchmark$fun runAll(): List&lt;BenchmarkResult&gt;</ID>
+    <ID>LongParameterList:CreateClientStore.kt$( initialState: S, syncMiddleware: SyncMiddleware&lt;S, A&gt;, additionalMiddlewares: List&lt;Middleware&lt;S, A&gt;&gt; = emptyList(), reducer: Reducer&lt;S, A&gt;, errorProcessor: ErrorProcessor&lt;A&gt; = DefaultErrorProcessor(), logger: StoreLogger&lt;S, A&gt; = NoOpStoreLogger(), scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default), concurrency: Int = 16, )</ID>
+    <ID>LongParameterList:CreateServerStore.kt$( initialState: S, syncMiddleware: Middleware&lt;S, A&gt;, additionalMiddlewares: List&lt;Middleware&lt;S, A&gt;&gt; = emptyList(), reducer: Reducer&lt;S, A&gt;, errorProcessor: ErrorProcessor&lt;A&gt; = DefaultErrorProcessor(), logger: StoreLogger&lt;S, A&gt; = NoOpStoreLogger(), scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default), concurrency: Int = 16, )</ID>
+    <ID>LongParameterList:ExecutionStrategy.kt$( maxAttempts: Int, initialDelay: Duration, maxDelay: Duration = Duration.INFINITE, factor: Double = 2.0, jitter: Double = 0.0, retryIf: (Throwable) -&gt; Boolean = { true }, )</ID>
+    <ID>LongParameterList:MultiClientStore.kt$( initialState: S, reducer: Reducer&lt;S, A&gt;, broadcaster: SessionBroadcaster&lt;A&gt;, processors: ActionProcessorMap&lt;S, A&gt; = emptyMap(), errorProcessor: ErrorProcessor&lt;A&gt; = DefaultErrorProcessor(), logger: StoreLogger&lt;S, A&gt; = NoOpStoreLogger(), scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default), )</ID>
+    <ID>LongParameterList:PerClientServer.kt$( initialStateFactory: (sessionId: String) -&gt; S, reducer: Reducer&lt;S, A&gt;, stateMapper: (S) -&gt; A, processors: ActionProcessorMap&lt;S, A&gt; = emptyMap(), errorProcessor: ErrorProcessor&lt;A&gt; = DefaultErrorProcessor(), logger: StoreLogger&lt;S, A&gt; = NoOpStoreLogger(), scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default), )</ID>
+    <ID>LongParameterList:RoomServer.kt$( initialStateFactory: (roomId: String) -&gt; S, reducer: Reducer&lt;S, A&gt;, stateMapper: (S) -&gt; A, processors: ActionProcessorMap&lt;S, A&gt; = emptyMap(), sessionRegistryFactory: () -&gt; SessionRegistry&lt;A&gt; = { InMemorySessionRegistry() }, broadcastConfig: BroadcastConfig = BroadcastConfig.Sequential, errorProcessor: ErrorProcessor&lt;A&gt; = DefaultErrorProcessor(), logger: StoreLogger&lt;S, A&gt; = NoOpStoreLogger(), scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default), )</ID>
+    <ID>LongParameterList:RoomServer.kt$( initialStateFactory: (roomId: String, sessionId: String) -&gt; S, reducer: Reducer&lt;S, A&gt;, stateMapper: (S) -&gt; A, processors: ActionProcessorMap&lt;S, A&gt; = emptyMap(), errorProcessor: ErrorProcessor&lt;A&gt; = DefaultErrorProcessor(), logger: StoreLogger&lt;S, A&gt; = NoOpStoreLogger(), scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default), )</ID>
+    <ID>LongParameterList:SharedStateServer.kt$( initialState: S, reducer: Reducer&lt;S, A&gt;, sessionStateMapper: (S, String) -&gt; A?, processors: ActionProcessorMap&lt;S, A&gt; = emptyMap(), sessionRegistry: SessionRegistry&lt;A&gt; = InMemorySessionRegistry(), broadcastConfig: BroadcastConfig = BroadcastConfig.Sequential, errorProcessor: ErrorProcessor&lt;A&gt; = DefaultErrorProcessor(), logger: StoreLogger&lt;S, A&gt; = NoOpStoreLogger(), scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default), )</ID>
+    <ID>LongParameterList:SharedStateServer.kt$( initialState: S, reducer: Reducer&lt;S, A&gt;, stateMapper: (S) -&gt; A, processors: ActionProcessorMap&lt;S, A&gt; = emptyMap(), sessionRegistry: SessionRegistry&lt;A&gt; = InMemorySessionRegistry(), broadcastConfig: BroadcastConfig = BroadcastConfig.Sequential, errorProcessor: ErrorProcessor&lt;A&gt; = DefaultErrorProcessor(), logger: StoreLogger&lt;S, A&gt; = NoOpStoreLogger(), scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default), )</ID>
+    <ID>LongParameterList:SingleClientServer.kt$( initialState: S, reducer: Reducer&lt;S, A&gt;, connection: TypedServerConnection&lt;A&gt;, processors: ActionProcessorMap&lt;S, A&gt; = emptyMap(), errorProcessor: ErrorProcessor&lt;A&gt; = DefaultErrorProcessor(), logger: StoreLogger&lt;S, A&gt; = NoOpStoreLogger(), scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default), )</ID>
+    <ID>LongParameterList:Store.kt$( initialState: S, middlewares: List&lt;Middleware&lt;S, A&gt;&gt; = emptyList(), reducer: Reducer&lt;S, A&gt;, errorProcessor: ErrorProcessor&lt;A&gt; = DefaultErrorProcessor(), logger: StoreLogger&lt;S, A&gt; = NoOpStoreLogger(), scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default), concurrency: Int = DEFAULT_CONCURRENCY, )</ID>
+    <ID>LongParameterList:TimeTravelStore.kt$( initialHistory: List&lt;StateSnapshot&lt;S, A&gt;&gt;, reducer: Reducer&lt;S, A&gt;, middlewares: List&lt;Middleware&lt;S, A&gt;&gt; = emptyList(), errorProcessor: ErrorProcessor&lt;A&gt; = DefaultErrorProcessor(), maxHistorySize: Int = 100, scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default), )</ID>
+    <ID>LongParameterList:TimeTravelStore.kt$( initialState: S, reducer: Reducer&lt;S, A&gt;, middlewares: List&lt;Middleware&lt;S, A&gt;&gt; = emptyList(), errorProcessor: ErrorProcessor&lt;A&gt; = DefaultErrorProcessor(), maxHistorySize: Int = 100, scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default), )</ID>
+    <ID>LongParameterList:TimeTravelStore.kt$( initialState: S?, initialHistory: List&lt;StateSnapshot&lt;S, A&gt;&gt;?, reducer: Reducer&lt;S, A&gt;, middlewares: List&lt;Middleware&lt;S, A&gt;&gt;, errorProcessor: ErrorProcessor&lt;A&gt;, maxHistorySize: Int, scope: CoroutineScope, )</ID>
+    <ID>LoopWithTooManyJumpStatements:Main.kt$while</ID>
+    <ID>MatchingDeclarationName:FlowUtils.kt$MainScope : CoroutineScope</ID>
+    <ID>MatchingDeclarationName:RemoteMessage.kt$ServerResponse</ID>
+    <ID>MaxLineLength:FlowHolderActionTest.kt$FlowHolderActionTest$"Default Emit delivery should bypass user middlewares, but found inner actions: $innerActionsInMiddleware"</ID>
+    <ID>MaxLineLength:Main.kt$" Now at index ${timeTravelStore.currentIndex}, canUndo=${timeTravelStore.canUndo}, canRedo=${timeTravelStore.canRedo}"</ID>
+    <ID>MaxLineLength:Main.kt$" [$userId] devices=${state.connectedDevices}, notes=${state.notes.size}, edits=${state.totalEdits}"</ID>
+    <ID>MaxLineLength:SerializationBenchmark.kt$SerializationBenchmark.BenchActionCodec$"""{"type":"Large","userId":"${action.userId}","items":[$items],"scores":[$scores],"nested":"${action.nested}"}"""</ID>
+    <ID>MaxLineLength:SerializationBenchmark.kt$SerializationBenchmark.BenchActionCodec$"""{"type":"Medium","userId":"${action.userId}","message":"${action.message}","timestamp":${action.timestamp},"metadata":"${action.metadata}"}"""</ID>
+    <ID>RethrowCaughtException:ExecutionStrategy.kt$TakeLatest$throw e</ID>
+    <ID>ReturnCount:AuthClientConnection.kt$AuthClientConnection$private suspend fun tryRefresh(): Boolean</ID>
+    <ID>ThrowsCount:NodeMediator.kt$NodeMediator$private fun startRouting()</ID>
+    <ID>ThrowsCount:ServerConnectionMultiplexer.kt$ServerConnectionMultiplexer$private fun startRouting()</ID>
+    <ID>TooGenericExceptionThrown:AuthClientConnectionTest.kt$AuthClientConnectionTest$throw RuntimeException("Refresh server down")</ID>
+    <ID>TooGenericExceptionThrown:AuthResultTest.kt$AuthResultTest$throw RuntimeException("stop")</ID>
+    <ID>TooGenericExceptionThrown:CentralNodeManagerTest.kt$CentralNodeManagerTest$throw RuntimeException("callback error")</ID>
+    <ID>TooGenericExceptionThrown:CentralNodeManagerTest.kt$CentralNodeManagerTest.&lt;no name provided&gt;$throw RuntimeException("send failed")</ID>
+    <ID>TooGenericExceptionThrown:ConcurrencyStrategyTest.kt$ConcurrencyStrategyTest.SequentialTests.&lt;no name provided&gt;$throw RuntimeException("Action 2 fails")</ID>
+    <ID>TooGenericExceptionThrown:DefaultTypedConnectionTest.kt$DefaultTypedConnectionTest.FailingActionCodec$throw RuntimeException("decode failed")</ID>
+    <ID>TooGenericExceptionThrown:DefaultTypedConnectionTest.kt$DefaultTypedConnectionTest.FailingActionCodec$throw RuntimeException("encode failed")</ID>
+    <ID>TooGenericExceptionThrown:DefaultTypedConnectionTest.kt$DefaultTypedConnectionTest.FailingMessageCodec$throw RuntimeException("message decode failed")</ID>
+    <ID>TooGenericExceptionThrown:DefaultTypedConnectionTest.kt$DefaultTypedConnectionTest.FailingMessageCodec$throw RuntimeException("server message decode failed")</ID>
+    <ID>TooGenericExceptionThrown:ErrorHandlingTest.kt$ErrorHandlingTest$throw RuntimeException("Immediate error!")</ID>
+    <ID>TooGenericExceptionThrown:ErrorHandlingTest.kt$ErrorHandlingTest$throw RuntimeException("Negative value error!")</ID>
+    <ID>TooGenericExceptionThrown:ErrorHandlingTest.kt$ErrorHandlingTest.&lt;no name provided&gt;$throw RuntimeException("Failed!")</ID>
+    <ID>TooGenericExceptionThrown:ErrorHandlingTest.kt$ErrorHandlingTest.&lt;no name provided&gt;$throw RuntimeException("IO Exception!")</ID>
+    <ID>TooGenericExceptionThrown:MultiClientSyncMiddlewareTest.kt$MultiClientSyncMiddlewareTest.&lt;no name provided&gt;$throw RuntimeException("Connection failed")</ID>
+    <ID>TooGenericExceptionThrown:NodeMediatorTest.kt$NodeMediatorTest$throw RuntimeException("event callback error")</ID>
+    <ID>TooGenericExceptionThrown:NodeMediatorTest.kt$NodeMediatorTest$throw RuntimeException("handler error")</ID>
+    <ID>TooGenericExceptionThrown:NodeMediatorTest.kt$NodeMediatorTest$throw RuntimeException("unknown room callback error")</ID>
+    <ID>TooGenericExceptionThrown:NodeMediatorTest.kt$NodeMediatorTest.&lt;no name provided&gt;$throw RuntimeException("transport error")</ID>
+    <ID>TooGenericExceptionThrown:NodeRoomServerTest.kt$NodeRoomServerTest.&lt;no name provided&gt;$throw RuntimeException("Central unreachable")</ID>
+    <ID>TooGenericExceptionThrown:ResilienceStrategyTest.kt$ResilienceStrategyTest.&lt;no name provided&gt;$throw RuntimeException("Always fails")</ID>
+    <ID>TooGenericExceptionThrown:ResilienceStrategyTest.kt$ResilienceStrategyTest.&lt;no name provided&gt;$throw RuntimeException("Simulated failure $attempt")</ID>
+    <ID>TooGenericExceptionThrown:ServerConnectionMultiplexerTest.kt$ServerConnectionMultiplexerTest$throw RuntimeException("callback error")</ID>
+    <ID>TooGenericExceptionThrown:SessionAwareSharedStateServerTest.kt$SessionAwareSharedStateServerTest.&lt;no name provided&gt;$throw RuntimeException("Connection failed")</ID>
+    <ID>TooGenericExceptionThrown:SessionBroadcasterTest.kt$SessionBroadcasterTest.&lt;no name provided&gt;$throw RuntimeException("Connection $id failed")</ID>
+    <ID>TooGenericExceptionThrown:StoreLoggerTest.kt$StoreLoggerTest.&lt;no name provided&gt;$throw RuntimeException("test error")</ID>
+    <ID>TooGenericExceptionThrown:StrategyChainingTest.kt$StrategyChainingTest.ChainedExecutionTests.&lt;no name provided&gt;$throw RuntimeException("First attempt fails")</ID>
+    <ID>TooGenericExceptionThrown:StrategyGroupTest.kt$StrategyGroupTest.&lt;no name provided&gt;$throw RuntimeException("Simulated failure $count")</ID>
+    <ID>TooGenericExceptionThrown:SyncMiddlewareTest.kt$SyncMiddlewareTest.&lt;no name provided&gt;$throw RuntimeException("Connection failed")</ID>
+    <ID>TooGenericExceptionThrown:TestFixtures.kt$throw RuntimeException("JWT decode failed")</ID>
+    <ID>UnusedPrivateProperty:KtorWebSocketServerConnectionTest.kt$KtorWebSocketServerConnectionTest$frame</ID>
+    <ID>UnusedPrivateProperty:NodeMediator.kt$NodeMediator$private val nodeId: String</ID>
+    <ID>UnusedPrivateProperty:build.gradle.kts$val jsMain by getting { dependencies { implementation(project(":kotlin:flowdux")) implementation(libs.kotlinx.coroutines.core) } }</ID>
+    <ID>UnusedPrivateProperty:build.gradle.kts$val wasmJsMain by getting { dependencies { implementation(project(":kotlin:flowdux")) implementation(libs.kotlinx.coroutines.core) implementation(libs.kotlinx.browser) } }</ID>
+    <ID>UseCheckOrError:KtorWebSocketClientConnection.kt$KtorWebSocketClientConnection$throw IllegalStateException("Cannot send message: WebSocket connection was closed")</ID>
+    <ID>UseCheckOrError:KtorWebSocketClientConnection.kt$KtorWebSocketClientConnection$throw IllegalStateException("Cannot send message: WebSocket is not connected")</ID>
+  </CurrentIssues>
+</SmellBaseline>

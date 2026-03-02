@@ -1,19 +1,22 @@
 package io.flowdux.remote.serialization
 
 import io.flowdux.Action
+import io.flowdux.remote.decodeOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SerializableActionCodecTest {
-
     @Serializable
     sealed interface TestAction : Action {
         @Serializable data object Increment : TestAction
+
         @Serializable data class Add(val value: Int) : TestAction
+
         @Serializable data class SetName(val name: String) : TestAction
     }
 
@@ -52,13 +55,14 @@ class SerializableActionCodecTest {
 
     @Test
     fun roundTripAllVariants() {
-        val actions = listOf(
-            TestAction.Increment,
-            TestAction.Add(0),
-            TestAction.Add(-1),
-            TestAction.SetName(""),
-            TestAction.SetName("test"),
-        )
+        val actions =
+            listOf(
+                TestAction.Increment,
+                TestAction.Add(0),
+                TestAction.Add(-1),
+                TestAction.SetName(""),
+                TestAction.SetName("test"),
+            )
         for (action in actions) {
             val encoded = codec.encode(action)
             val decoded = codec.decode(encoded)
@@ -91,5 +95,55 @@ class SerializableActionCodecTest {
         assertFailsWith<SerializationException> {
             codec.decode("""{"type":"io.flowdux.remote.serialization.SerializableActionCodecTest.TestAction.Add"}""")
         }
+    }
+
+    // --- decodeOrNull ---
+
+    @Test
+    fun decodeOrNullReturnsActionForValidJson() {
+        val json = codec.encode(TestAction.Add(42))
+        val decoded = codec.decodeOrNull(json)
+        assertEquals(TestAction.Add(42), decoded)
+    }
+
+    @Test
+    fun decodeOrNullReturnsNullForUnknownType() {
+        val result = codec.decodeOrNull("""{"type":"NonExistent","value":1}""")
+        assertNull(result)
+    }
+
+    @Test
+    fun decodeOrNullReturnsNullForMalformedJson() {
+        val result = codec.decodeOrNull("not json at all")
+        assertNull(result)
+    }
+
+    @Test
+    fun decodeOrNullReturnsNullForMissingRequiredField() {
+        val result = codec.decodeOrNull(
+            """{"type":"io.flowdux.remote.serialization.SerializableActionCodecTest.TestAction.Add"}""",
+        )
+        assertNull(result)
+    }
+
+    // --- ignoreUnknownKeys (forward compatibility) ---
+
+    private val typePrefix =
+        "io.flowdux.remote.serialization.SerializableActionCodecTest.TestAction"
+
+    @Test
+    fun decodeIgnoresUnknownFields() {
+        val json =
+            """{"type":"$typePrefix.Add","value":10,"newField":"ignored"}"""
+        val decoded = codec.decode(json)
+        assertEquals(TestAction.Add(10), decoded)
+    }
+
+    @Test
+    fun decodeIgnoresUnknownFieldsOnDataObject() {
+        val json =
+            """{"type":"$typePrefix.Increment","extraKey":true}"""
+        val decoded = codec.decode(json)
+        assertEquals(TestAction.Increment, decoded)
     }
 }

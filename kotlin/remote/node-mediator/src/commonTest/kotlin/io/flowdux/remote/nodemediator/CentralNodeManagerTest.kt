@@ -20,6 +20,7 @@ class CentralNodeManagerTest {
     @Serializable
     sealed interface TestAction : Action {
         @Serializable data class Message(val text: String) : TestAction
+
         @Serializable data class Ping(val id: Int) : TestAction
     }
 
@@ -333,9 +334,7 @@ class CentralNodeManagerTest {
             override val isActive: Boolean = true
             val incomingFlow = MutableSharedFlow<NodeAction<TestAction>>(extraBufferCapacity = 64)
             override val incoming: Flow<NodeAction<TestAction>> = incomingFlow
-            override suspend fun send(action: NodeAction<TestAction>) {
-                throw RuntimeException("send failed")
-            }
+            override suspend fun send(action: NodeAction<TestAction>): Unit = throw RuntimeException("send failed")
         }
 
         val healthyConn = FakeTypedServerConnection()
@@ -383,8 +382,10 @@ class CentralNodeManagerTest {
 
         // node-1 should receive room-A and room-B
         assertEquals(2, conn1.sentActions.size)
-        assertTrue(conn1.sentActions.contains(NodeAction<TestAction>("room-A", TestAction.Message("announcement"))))
-        assertTrue(conn1.sentActions.contains(NodeAction<TestAction>("room-B", TestAction.Message("announcement"))))
+        val expectedA = NodeAction<TestAction>("room-A", TestAction.Message("announcement"))
+        val expectedB = NodeAction<TestAction>("room-B", TestAction.Message("announcement"))
+        assertTrue(conn1.sentActions.contains(expectedA))
+        assertTrue(conn1.sentActions.contains(expectedB))
 
         // node-2 should receive room-C
         assertEquals(1, conn2.sentActions.size)
@@ -423,6 +424,119 @@ class CentralNodeManagerTest {
         assertFailsWith<IllegalStateException> {
             manager.handleNode("node-1", conn)
         }
+    }
+
+    @Test
+    fun reconnectingNodePreservesRoomAssignments() = runTest {
+        val registry = InMemoryRoomRegistry()
+        val events = mutableListOf<NodeMediatorEvent>()
+        val manager = CentralNodeManager<TestAction>(
+            roomRegistry = registry,
+            onUpstreamAction = { _, _, _ -> },
+            onEvent = { events.add(it) },
+        )
+
+        val conn1 = FakeTypedServerConnection()
+        val handleJob1 = launch { manager.handleNode("node-1", conn1) }
+        yield()
+
+        // Assign rooms to node-1
+        registry.assignRoom("room-1", "node-1")
+        registry.assignRoom("room-2", "node-1")
+
+        // Node reconnects with the same ID (simulates partition recovery)
+        val conn2 = FakeTypedServerConnection()
+        val handleJob2 = launch { manager.handleNode("node-1", conn2) }
+        yield()
+
+        // Old connection finishes — its cleanup must NOT unassign rooms
+        handleJob1.cancel()
+        handleJob1.join()
+
+        // Room assignments must still exist
+        assertEquals("node-1", registry.getNodeForRoom("room-1"))
+        assertEquals("node-1", registry.getNodeForRoom("room-2"))
+
+        // NodeReconnected event should have been emitted
+        assertTrue(
+            events.any { it is NodeMediatorEvent.NodeReconnected && it.nodeId == "node-1" },
+            "Expected NodeReconnected event",
+        )
+
+        // New connection should still be able to receive actions
+        manager.sendToRoom("room-1", TestAction.Message("after-reconnect"))
+        assertEquals(1, conn2.sentActions.size)
+        assertEquals(
+            NodeAction<TestAction>("room-1", TestAction.Message("after-reconnect")),
+            conn2.sentActions[0],
+        )
+
+        handleJob2.cancel()
+        handleJob2.join()
+        manager.close()
+    }
+
+    @Test
+    fun normalDisconnectStillCleansUpRooms() = runTest {
+        val registry = InMemoryRoomRegistry()
+        val manager = CentralNodeManager<TestAction>(
+            roomRegistry = registry,
+            onUpstreamAction = { _, _, _ -> },
+        )
+
+        val conn = FakeTypedServerConnection()
+        val handleJob = launch { manager.handleNode("node-1", conn) }
+        yield()
+
+        registry.assignRoom("room-1", "node-1")
+        registry.assignRoom("room-2", "node-1")
+
+        // Normal disconnect (no replacement) — rooms should be cleaned up
+        handleJob.cancel()
+        handleJob.join()
+
+        assertEquals(null, registry.getNodeForRoom("room-1"))
+        assertEquals(null, registry.getNodeForRoom("room-2"))
+
+        manager.close()
+    }
+
+    @Test
+    fun reconnectEmitsReconnectedNotConnected() = runTest {
+        val events = mutableListOf<NodeMediatorEvent>()
+        val manager = CentralNodeManager<TestAction>(
+            onUpstreamAction = { _, _, _ -> },
+            onEvent = { events.add(it) },
+        )
+
+        val conn1 = FakeTypedServerConnection()
+        val handleJob1 = launch { manager.handleNode("node-1", conn1) }
+        yield()
+
+        // First connection should emit NodeConnected
+        assertTrue(events.any { it is NodeMediatorEvent.NodeConnected && it.nodeId == "node-1" })
+        events.clear()
+
+        // Reconnect with same nodeId
+        val conn2 = FakeTypedServerConnection()
+        val handleJob2 = launch { manager.handleNode("node-1", conn2) }
+        yield()
+
+        // Should emit NodeReconnected, NOT NodeConnected
+        assertTrue(
+            events.any { it is NodeMediatorEvent.NodeReconnected && it.nodeId == "node-1" },
+            "Expected NodeReconnected event",
+        )
+        assertFalse(
+            events.any { it is NodeMediatorEvent.NodeConnected },
+            "Should not emit NodeConnected on reconnect",
+        )
+
+        handleJob1.cancel()
+        handleJob2.cancel()
+        handleJob1.join()
+        handleJob2.join()
+        manager.close()
     }
 
     @Test

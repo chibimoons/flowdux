@@ -146,14 +146,18 @@ CounterState counterReducer(CounterState state, CounterAction action) {
     DecrementAction() => state.copyWith(count: state.count - 1),
     AddAction(:final value) => state.copyWith(count: state.count + value),
     ResetAction() => CounterState(),
-    SetCountAction(:final value, :final source) =>
-      state.copyWith(count: value, source: source),
-    SetLoadingAction(:final isLoading) =>
-      state.copyWith(isLoading: isLoading),
-    SearchResultAction(:final results) =>
-      state.copyWith(searchResults: results),
-    FetchSuccessAction(:final id, :final value) =>
-      state.copyWith(count: value, source: 'fetch-$id'),
+    SetCountAction(:final value, :final source) => state.copyWith(
+        count: value,
+        source: source,
+      ),
+    SetLoadingAction(:final isLoading) => state.copyWith(isLoading: isLoading),
+    SearchResultAction(:final results) => state.copyWith(
+        searchResults: results,
+      ),
+    FetchSuccessAction(:final id, :final value) => state.copyWith(
+        count: value,
+        source: 'fetch-$id',
+      ),
     SubmitSuccessAction() => state.copyWith(source: 'submitted'),
     // Actions handled by middleware or FlowHolderMiddleware, not reducer
     ObserveCountAction() => state,
@@ -179,8 +183,10 @@ class ExecutionStrategyMiddleware
     });
 
     // debounce: Wait 200ms of no input before executing
-    apply(debounce(const Duration(milliseconds: 200)))
-        .on<FetchDataAction>((state, action) async* {
+    apply(debounce(const Duration(milliseconds: 200))).on<FetchDataAction>((
+      state,
+      action,
+    ) async* {
       print('    [debounce] Fetching data: ${action.id}');
       await Future<void>.delayed(const Duration(milliseconds: 100));
       yield FetchSuccessAction(action.id, 42);

@@ -6,7 +6,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class AuthResultTest {
-
     @Test
     fun getOrElse_returnsPrincipalOnSuccess() {
         val principal = TestPrincipal(userId = "user-1", name = "Alice")
@@ -20,11 +19,12 @@ class AuthResultTest {
     fun getOrElse_invokesOnFailureWithReason() {
         val result: AuthResult<TestPrincipal> = AuthResult.Failure("Invalid token")
 
-        val exception = assertFailsWith<IllegalStateException> {
-            result.getOrElse { reason ->
-                throw IllegalStateException("Auth failed: $reason")
+        val exception =
+            assertFailsWith<IllegalStateException> {
+                result.getOrElse { reason ->
+                    throw IllegalStateException("Auth failed: $reason")
+                }
             }
-        }
         assertEquals("Auth failed: Invalid token", exception.message)
     }
 
@@ -39,7 +39,9 @@ class AuthResultTest {
                 capturedReason = r
                 throw RuntimeException("stop")
             }
-        } catch (_: RuntimeException) { /* expected */ }
+        } catch (_: RuntimeException) {
+            // expected
+        }
 
         assertEquals(reason, capturedReason)
     }

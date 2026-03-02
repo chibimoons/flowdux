@@ -2,26 +2,26 @@ package io.flowdux.remote.nodemediator
 
 import io.flowdux.Action
 import io.flowdux.remote.serialization.actionCodecOf
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class NodeActionCodecTest {
-
     @Serializable
     sealed interface TestAction : Action {
         @Serializable data object Increment : TestAction
+
         @Serializable data class Add(val value: Int) : TestAction
+
         @Serializable data class SetName(val name: String) : TestAction
     }
 
     private val codec = actionCodecOf<NodeAction<TestAction>>()
 
-    private fun nodeAction(roomId: String, action: TestAction): NodeAction<TestAction> =
-        NodeAction(roomId, action)
+    private fun nodeAction(roomId: String, action: TestAction): NodeAction<TestAction> = NodeAction(roomId, action)
 
     @Test
     fun encodeDecodeNodeAction() {
@@ -50,14 +50,15 @@ class NodeActionCodecTest {
     @Test
     fun roundTripAllVariants() {
         val rooms = listOf("room-1", "room-2", "test-room", "")
-        val actions: List<TestAction> = listOf(
-            TestAction.Increment,
-            TestAction.Add(0),
-            TestAction.Add(-1),
-            TestAction.Add(Int.MAX_VALUE),
-            TestAction.SetName(""),
-            TestAction.SetName("hello"),
-        )
+        val actions: List<TestAction> =
+            listOf(
+                TestAction.Increment,
+                TestAction.Add(0),
+                TestAction.Add(-1),
+                TestAction.Add(Int.MAX_VALUE),
+                TestAction.SetName(""),
+                TestAction.SetName("hello"),
+            )
         for (roomId in rooms) {
             for (action in actions) {
                 val original = nodeAction(roomId, action)

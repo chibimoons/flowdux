@@ -77,20 +77,21 @@ class NodeRoomServer<S : State, A : Action>(
     val mediator: NodeMediator<A>
 
     init {
-        mediator = NodeMediator(
-            nodeId = nodeId,
-            transport = transport,
-            scope = scope,
-            onUnknownRoom = { roomId, action ->
-                // Central relayed to a room this node doesn't know about yet — auto-create it
-                val room = roomServer.getOrCreateRoom(roomId)
-                mediator.registerRoom(roomId) { centralAction ->
-                    room.store.dispatch(centralAction)
-                }
-                room.store.dispatch(action)
-            },
-            onEvent = onEvent,
-        )
+        mediator =
+            NodeMediator(
+                nodeId = nodeId,
+                transport = transport,
+                scope = scope,
+                onUnknownRoom = { roomId, action ->
+                    // Central relayed to a room this node doesn't know about yet — auto-create it
+                    val room = roomServer.getOrCreateRoom(roomId)
+                    mediator.registerRoom(roomId) { centralAction ->
+                        room.store.dispatch(centralAction)
+                    }
+                    room.store.dispatch(action)
+                },
+                onEvent = onEvent,
+            )
     }
 
     /**
@@ -122,11 +123,7 @@ class NodeRoomServer<S : State, A : Action>(
      * @param sessionId Unique identifier for this client session
      * @param connection Typed connection for sending/receiving actions
      */
-    suspend fun handleClient(
-        roomId: String,
-        sessionId: String,
-        connection: TypedServerConnection<A>,
-    ) {
+    suspend fun handleClient(roomId: String, sessionId: String, connection: TypedServerConnection<A>) {
         val room = roomServer.getOrCreateRoom(roomId)
         if (!mediator.hasRoom(roomId)) {
             mediator.registerRoom(roomId) { centralAction ->
@@ -219,18 +216,18 @@ private class ForwardingConnection<A : Action>(
     private val mediator: NodeMediator<A>,
     private val roomId: String,
 ) : TypedServerConnection<A> {
-
     override val isActive: Boolean get() = delegate.isActive
 
-    override val incoming: Flow<A> = delegate.incoming.onEach { action ->
-        try {
-            mediator.forwardToCentral(roomId, action)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            // Forwarding failure should not disconnect the client
+    override val incoming: Flow<A> =
+        delegate.incoming.onEach { action ->
+            try {
+                mediator.forwardToCentral(roomId, action)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Forwarding failure should not disconnect the client
+            }
         }
-    }
 
     override suspend fun send(action: A) = delegate.send(action)
 }

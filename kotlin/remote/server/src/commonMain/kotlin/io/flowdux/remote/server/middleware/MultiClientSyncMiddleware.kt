@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
 
 // -- New top-level FlowHolderActions (direct dispatch, no middleware intermediary) --
 
@@ -30,11 +31,14 @@ import kotlinx.coroutines.flow.map
  */
 internal class InternalSessionListener(
     private val connection: TypedServerConnection<*>,
+    private val onTerminate: (() -> Unit)? = null,
 ) : FlowHolderAction {
     override val delivery: FlowActionDelivery get() = FlowActionDelivery.Dispatch
     override val strategy: ExecutionStrategy get() = concurrent()
 
-    override fun toFlowAction(): Flow<Action> = connection.incoming.map { it }
+    override fun toFlowAction(): Flow<Action> = connection.incoming
+        .map { it }
+        .onCompletion { runCatching { onTerminate?.invoke() } }
 }
 
 /**
@@ -45,10 +49,8 @@ internal class InternalSessionListener(
  *
  * Dispatched directly from [createSharedStateServer][io.flowdux.remote.server.pattern.createSharedStateServer].
  */
-internal class InternalStateServing(
-    private val stateFlow: StateFlow<*>,
-    private val stateMapper: (Any) -> Action,
-) : FlowHolderAction {
+internal class InternalStateServing(private val stateFlow: StateFlow<*>, private val stateMapper: (Any) -> Action) :
+    FlowHolderAction {
     override val delivery: FlowActionDelivery get() = FlowActionDelivery.Dispatch
     override val strategy: ExecutionStrategy get() = sequential()
 
@@ -89,10 +91,7 @@ internal class InternalPerSessionStateServing(
 /**
  * Internal action dispatched to send an action to a specific client.
  */
-class InternalSendToClient(
-    val sessionId: String,
-    val action: Action,
-) : Action
+class InternalSendToClient(val sessionId: String, val action: Action) : Action
 
 /**
  * Internal middleware that routes actions for multiple client connections.
@@ -118,7 +117,6 @@ class MultiClientSyncMiddleware<S : State, A : Action>(
     override val processors: ActionProcessorMap<S, A> = emptyMap(),
     internal val broadcaster: SessionBroadcaster<A>,
 ) : Middleware<S, A> {
-
     @Suppress("UNCHECKED_CAST")
     override fun process(getState: () -> S, action: A): Flow<A> = flow {
         // 1. InternalSendToClient: send action to specific client

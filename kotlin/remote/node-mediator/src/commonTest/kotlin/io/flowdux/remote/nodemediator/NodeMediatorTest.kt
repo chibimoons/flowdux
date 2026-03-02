@@ -18,10 +18,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class NodeMediatorTest {
-
     @Serializable
     sealed interface TestAction : Action {
         @Serializable data class Message(val text: String) : TestAction
+
         @Serializable data class Ping(val id: Int) : TestAction
     }
 
@@ -36,11 +36,25 @@ class NodeMediatorTest {
         var connected = false
             private set
 
-        override suspend fun send(action: NodeAction<TestAction>) { sentActions.add(action) }
-        override suspend fun subscribeRoom(roomId: String) { subscribedRooms.add(roomId) }
-        override suspend fun unsubscribeRoom(roomId: String) { unsubscribedRooms.add(roomId) }
-        override suspend fun connect() { connected = true }
-        override suspend fun disconnect() { connected = false }
+        override suspend fun send(action: NodeAction<TestAction>) {
+            sentActions.add(action)
+        }
+
+        override suspend fun subscribeRoom(roomId: String) {
+            subscribedRooms.add(roomId)
+        }
+
+        override suspend fun unsubscribeRoom(roomId: String) {
+            unsubscribedRooms.add(roomId)
+        }
+
+        override suspend fun connect() {
+            connected = true
+        }
+
+        override suspend fun disconnect() {
+            connected = false
+        }
 
         fun simulateIncoming(action: NodeAction<TestAction>) {
             incomingFlow.tryEmit(action)
@@ -50,11 +64,12 @@ class NodeMediatorTest {
     @Test
     fun registerAndUnregisterRoom() = runTest {
         val connection = FakeNodeTransport()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -72,11 +87,12 @@ class NodeMediatorTest {
     @Test
     fun multipleRooms() = runTest {
         val connection = FakeNodeTransport()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -95,11 +111,12 @@ class NodeMediatorTest {
         val room1Actions = mutableListOf<TestAction>()
         val room2Actions = mutableListOf<TestAction>()
 
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -111,10 +128,11 @@ class NodeMediatorTest {
         connection.simulateIncoming(NodeAction("room-1", TestAction.Message("world")))
         yield()
 
-        val expectedRoom1: List<TestAction> = listOf(
-            TestAction.Message("hello"),
-            TestAction.Message("world"),
-        )
+        val expectedRoom1: List<TestAction> =
+            listOf(
+                TestAction.Message("hello"),
+                TestAction.Message("world"),
+            )
         assertEquals(expectedRoom1, room1Actions)
         val expectedRoom2: List<TestAction> = listOf(TestAction.Ping(42))
         assertEquals(expectedRoom2, room2Actions)
@@ -125,11 +143,12 @@ class NodeMediatorTest {
     @Test
     fun upstreamForwardToCentral() = runTest {
         val connection = FakeNodeTransport()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -150,11 +169,12 @@ class NodeMediatorTest {
         val connection = FakeNodeTransport()
         val room1Actions = mutableListOf<TestAction>()
 
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -176,12 +196,13 @@ class NodeMediatorTest {
         val connection = FakeNodeTransport()
         val unknownActions = mutableListOf<Pair<String, TestAction>>()
 
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-            onUnknownRoom = { roomId, action -> unknownActions.add(roomId to action) },
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+                onUnknownRoom = { roomId, action -> unknownActions.add(roomId to action) },
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -197,11 +218,12 @@ class NodeMediatorTest {
     @Test
     fun connectDisconnectLifecycle() = runTest {
         val connection = FakeNodeTransport()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
 
         assertFalse(connection.connected)
 
@@ -228,11 +250,12 @@ class NodeMediatorTest {
     @Test
     fun closeThrowsOnSubsequentUse() = runTest {
         val connection = FakeNodeTransport()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -252,11 +275,12 @@ class NodeMediatorTest {
     @Test
     fun closeClearsRooms() = runTest {
         val connection = FakeNodeTransport()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -271,19 +295,21 @@ class NodeMediatorTest {
     @Test
     fun concurrentRegisterRooms() = runTest {
         val connection = FakeNodeTransport()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
-        val deferreds = (1..50).map { i ->
-            async {
-                mediator.registerRoom("room-$i") { }
+        val deferreds =
+            (1..50).map { i ->
+                async {
+                    mediator.registerRoom("room-$i") { }
+                }
             }
-        }
         deferreds.awaitAll()
 
         assertEquals(50, mediator.roomIds().size)
@@ -295,11 +321,12 @@ class NodeMediatorTest {
     fun rapidRegisterUnregisterRegister() = runTest {
         val connection = FakeNodeTransport()
         val actions = mutableListOf<TestAction>()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -319,11 +346,12 @@ class NodeMediatorTest {
     @Test
     fun connectIsIdempotent() = runTest {
         val connection = FakeNodeTransport()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
 
         mediator.connect()
         mediator.connect() // Should not throw or create duplicate jobs
@@ -340,12 +368,13 @@ class NodeMediatorTest {
         val events = mutableListOf<NodeMediatorEvent>()
         val room2Actions = mutableListOf<TestAction>()
 
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-            onEvent = { events.add(it) },
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+                onEvent = { events.add(it) },
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -371,13 +400,14 @@ class NodeMediatorTest {
         val events = mutableListOf<NodeMediatorEvent>()
         val room1Actions = mutableListOf<TestAction>()
 
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-            onUnknownRoom = { _, _ -> throw RuntimeException("unknown room callback error") },
-            onEvent = { events.add(it) },
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+                onUnknownRoom = { _, _ -> throw RuntimeException("unknown room callback error") },
+                onEvent = { events.add(it) },
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -402,12 +432,13 @@ class NodeMediatorTest {
         val connection = FakeNodeTransport()
         val room1Actions = mutableListOf<TestAction>()
 
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-            onEvent = { throw RuntimeException("event callback error") },
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+                onEvent = { throw RuntimeException("event callback error") },
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -431,26 +462,33 @@ class NodeMediatorTest {
     fun transportErrorTriggersRoutingStoppedEvent() = runTest {
         val errorSignal = CompletableDeferred<Unit>()
 
-        val errorTransport = object : NodeTransport<TestAction> {
-            override val incoming: Flow<NodeAction<TestAction>> = flow {
-                errorSignal.await()
-                throw RuntimeException("transport error")
+        val errorTransport =
+            object : NodeTransport<TestAction> {
+                override val incoming: Flow<NodeAction<TestAction>> =
+                    flow {
+                        errorSignal.await()
+                        throw RuntimeException("transport error")
+                    }
+
+                override suspend fun send(action: NodeAction<TestAction>) {}
+
+                override suspend fun subscribeRoom(roomId: String) {}
+
+                override suspend fun unsubscribeRoom(roomId: String) {}
+
+                override suspend fun connect() {}
+
+                override suspend fun disconnect() {}
             }
 
-            override suspend fun send(action: NodeAction<TestAction>) {}
-            override suspend fun subscribeRoom(roomId: String) {}
-            override suspend fun unsubscribeRoom(roomId: String) {}
-            override suspend fun connect() {}
-            override suspend fun disconnect() {}
-        }
-
         val events = mutableListOf<NodeMediatorEvent>()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = errorTransport,
-            scope = this,
-            onEvent = { events.add(it) },
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = errorTransport,
+                scope = this,
+                onEvent = { events.add(it) },
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -468,11 +506,12 @@ class NodeMediatorTest {
         val connection = FakeNodeTransport()
         val room1Actions = mutableListOf<TestAction>()
 
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -500,11 +539,12 @@ class NodeMediatorTest {
     @Test
     fun unregisterNonexistentRoomDoesNothing() = runTest {
         val connection = FakeNodeTransport()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -518,11 +558,12 @@ class NodeMediatorTest {
     @Test
     fun registerRoomCallsTransportSubscribe() = runTest {
         val connection = FakeNodeTransport()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 
@@ -537,11 +578,12 @@ class NodeMediatorTest {
     @Test
     fun unregisterRoomCallsTransportUnsubscribe() = runTest {
         val connection = FakeNodeTransport()
-        val mediator = NodeMediator<TestAction>(
-            nodeId = "node-1",
-            transport = connection,
-            scope = this,
-        )
+        val mediator =
+            NodeMediator<TestAction>(
+                nodeId = "node-1",
+                transport = connection,
+                scope = this,
+            )
         mediator.connect()
         testScheduler.advanceUntilIdle()
 

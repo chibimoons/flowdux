@@ -39,21 +39,32 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // Shared action markers (ServerSharedAction, ClientSharedAction)
-            implementation("io.github.chibimoons:flowdux-remote-core:1.17.0")
+            implementation("io.github.chibimoons:flowdux-remote-core:1.18.0")
             // Client middleware (SyncMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-client:1.17.0")
+            implementation("io.github.chibimoons:flowdux-remote-client:1.18.0")
             // Server middleware (SingleClientSyncMiddleware, MultiClientSyncMiddleware)
-            implementation("io.github.chibimoons:flowdux-remote-server:1.17.0")
+            implementation("io.github.chibimoons:flowdux-remote-server:1.18.0")
             // kotlinx.serialization codecs (ActionCodec, MessageCodec)
-            implementation("io.github.chibimoons:flowdux-remote-serialization:1.17.0")
+            implementation("io.github.chibimoons:flowdux-remote-serialization:1.18.0")
             // Ktor WebSocket transport (JVM, iOS, JS — WASM not supported)
-            implementation("io.github.chibimoons:flowdux-remote-ktor:1.17.0")
+            implementation("io.github.chibimoons:flowdux-remote-ktor:1.18.0")
             // Optional: In-band WebSocket authentication
-            implementation("io.github.chibimoons:flowdux-remote-auth:1.17.0")
+            implementation("io.github.chibimoons:flowdux-remote-auth:1.18.0")
         }
     }
 }
 ```
+
+> **WASM not supported**: `flowdux-remote-ktor` uses Ktor's WebSocket client, which does not support WASM targets. If your project targets WASM, implement `ClientConnection` / `ServerConnection` with a WASM-compatible WebSocket library and use `flowdux-remote-client` / `flowdux-remote-server` directly without the Ktor transport module.
+
+### Platform Support (flowdux-remote-ktor)
+
+| Platform | Status |
+|----------|--------|
+| JVM | Supported |
+| iOS | Supported |
+| JS | Supported |
+| WASM | Not supported (Ktor client unavailable) |
 
 ## Version Compatibility
 

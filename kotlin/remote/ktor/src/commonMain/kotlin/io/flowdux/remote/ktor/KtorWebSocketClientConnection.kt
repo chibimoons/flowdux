@@ -1,9 +1,8 @@
 package io.flowdux.remote.ktor
 
-import io.flowdux.remote.ConnectionState
 import io.flowdux.remote.ClientConnection
+import io.flowdux.remote.ConnectionState
 import io.ktor.client.HttpClient
-import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.websocket.Frame
 import io.ktor.websocket.WebSocketSession
@@ -19,6 +18,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.Volatile
 
 /**
  * Ktor-based WebSocket client implementation of [ClientConnection].
@@ -30,14 +30,38 @@ import kotlinx.coroutines.sync.withLock
  * [connect] suspends until the connection is closed — the caller is responsible
  * for launching it in an appropriate coroutine scope.
  *
+ * ## Single-use lifecycle
+ *
+ * Each instance supports a single connection lifecycle. Once the connection terminates —
+ * whether by calling [disconnect], a server-initiated close, or a connection failure —
+ * the internal channels are closed and cannot be reopened. Calling [connect] again on the
+ * same instance throws [IllegalStateException]. Create a new instance to reconnect:
+ *
+ * ```kotlin
+ * val conn1 = KtorWebSocketClientConnection(url)
+ * conn1.connect()   // suspends until disconnected
+ * conn1.disconnect()
+ *
+ * // Create a new instance for reconnection
+ * val conn2 = KtorWebSocketClientConnection(url)
+ * conn2.connect()
+ * ```
+ *
+ * ## Backpressure
+ *
+ * Both incoming and outgoing channels use [Channel.BUFFERED] (64 elements, SUSPEND overflow):
+ *
+ * - **Incoming**: When the buffer fills up, the WebSocket receive loop suspends until the
+ *   consumer collects messages from [incoming]. Consumers should collect promptly to avoid
+ *   blocking WebSocket frame processing, which applies backpressure to the server.
+ * - **Outgoing**: [send] suspends when the outgoing buffer is full, applying backpressure
+ *   to the caller until the WebSocket can transmit buffered messages.
+ *
  * @param url WebSocket URL to connect to (e.g., "ws://localhost:8080/path" or "wss://example.com/path")
- * @param httpClient Optional pre-configured HttpClient. If not provided, uses platform-default engine.
+ * @param httpClient Optional pre-configured HttpClient. If not provided, a dedicated HttpClient
+ *   is created and closed on [disconnect]. If provided, the caller manages its lifecycle.
  */
-class KtorWebSocketClientConnection(
-    private val url: String,
-    httpClient: HttpClient? = null,
-) : ClientConnection {
-
+class KtorWebSocketClientConnection(private val url: String, httpClient: HttpClient? = null) : ClientConnection {
     private val httpClient: HttpClient
     private val isClientOwned: Boolean
 
@@ -54,12 +78,16 @@ class KtorWebSocketClientConnection(
     private val _connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
     override val connectionState: StateFlow<ConnectionState> = _connectionState
 
-    private val incomingChannel = Channel<String>(Channel.UNLIMITED)
+    private val incomingChannel = Channel<String>(Channel.BUFFERED)
     override val incoming: Flow<String> = incomingChannel.receiveAsFlow()
 
-    private val outgoingChannel = Channel<String>(Channel.UNLIMITED)
+    private val outgoingChannel = Channel<String>(Channel.BUFFERED)
 
+    @Volatile
     private var session: WebSocketSession? = null
+
+    @Volatile
+    private var terminated = false
     private val connectMutex = Mutex()
 
     override suspend fun send(message: String) {
@@ -76,6 +104,12 @@ class KtorWebSocketClientConnection(
     override suspend fun connect() {
         connectMutex.withLock {
             if (_connectionState.value != ConnectionState.DISCONNECTED) return
+            if (terminated) {
+                throw IllegalStateException(
+                    "Cannot reconnect: this instance has already been used. " +
+                        "Create a new KtorWebSocketClientConnection instance to reconnect.",
+                )
+            }
             _connectionState.value = ConnectionState.CONNECTING
         }
 
@@ -86,10 +120,23 @@ class KtorWebSocketClientConnection(
                 try {
                     coroutineScope {
                         launch {
-                            for (frame in incoming) {
-                                if (frame is Frame.Text) {
-                                    incomingChannel.send(frame.readText())
+                            try {
+                                for (frame in incoming) {
+                                    if (frame is Frame.Text) {
+                                        try {
+                                            incomingChannel.send(frame.readText())
+                                        } catch (_: ClosedSendChannelException) {
+                                            // disconnect() closed incomingChannel concurrently.
+                                            // This is expected — break and let connect() terminate.
+                                            break
+                                        }
+                                    }
                                 }
+                            } finally {
+                                // Close outgoingChannel so the outgoing loop terminates
+                                // and any blocked senders fail fast. This is consistent
+                                // with disconnect() which also closes channels.
+                                outgoingChannel.close()
                             }
                         }
                         launch {
@@ -103,11 +150,13 @@ class KtorWebSocketClientConnection(
                 }
             }
         } finally {
+            terminated = true
             _connectionState.value = ConnectionState.DISCONNECTED
         }
     }
 
     override suspend fun disconnect() {
+        terminated = true
         _connectionState.value = ConnectionState.DISCONNECTED
         session?.close()
         session = null

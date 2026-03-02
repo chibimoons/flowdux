@@ -31,64 +31,69 @@ import kotlinx.coroutines.withContext
  * - /quit — Exit
  */
 fun main(args: Array<String>) = runBlocking {
-    val userId = args.getOrNull(0) ?: run {
-        print("Enter user ID: ")
-        System.out.flush()
-        readlnOrNull()?.trim()?.ifEmpty { null }
-    } ?: run {
-        println("No user ID provided. Exiting.")
-        return@runBlocking
-    }
+    val userId =
+        args.getOrNull(0) ?: run {
+            print("Enter user ID: ")
+            System.out.flush()
+            readlnOrNull()?.trim()?.ifEmpty { null }
+        } ?: run {
+            println("No user ID provided. Exiting.")
+            return@runBlocking
+        }
 
-    val deviceName = args.getOrNull(1) ?: run {
-        print("Enter device name (phone/tablet/desktop): ")
-        System.out.flush()
-        readlnOrNull()?.trim()?.ifEmpty { null }
-    } ?: run {
-        println("No device name provided. Exiting.")
-        return@runBlocking
-    }
+    val deviceName =
+        args.getOrNull(1) ?: run {
+            print("Enter device name (phone/tablet/desktop): ")
+            System.out.flush()
+            readlnOrNull()?.trim()?.ifEmpty { null }
+        } ?: run {
+            println("No device name provided. Exiting.")
+            return@runBlocking
+        }
 
-    println("""
+    println(
+        """
 
-        ╔══════════════════════════════════════════════════════╗
-        ║     FlowDux Multi-Device Notes Client                ║
-        ╠══════════════════════════════════════════════════════╣
-        ║  User: $userId
-        ║  Device: $deviceName
-        ╠══════════════════════════════════════════════════════╣
-        ║  Commands:                                           ║
-        ║    /add <title> | <content>       - Add a note      ║
-        ║    /edit <id> <title> | <content> - Edit a note     ║
-        ║    /delete <id>                   - Delete a note   ║
-        ║    /list                          - List all notes  ║
-        ║    /devices                       - Show devices    ║
-        ║    /quit                          - Exit            ║
-        ╚══════════════════════════════════════════════════════╝
+            ╔══════════════════════════════════════════════════════╗
+            ║     FlowDux Multi-Device Notes Client                ║
+            ╠══════════════════════════════════════════════════════╣
+            ║  User: $userId
+            ║  Device: $deviceName
+            ╠══════════════════════════════════════════════════════╣
+            ║  Commands:                                           ║
+            ║    /add <title> | <content>       - Add a note      ║
+            ║    /edit <id> <title> | <content> - Edit a note     ║
+            ║    /delete <id>                   - Delete a note   ║
+            ║    /list                          - List all notes  ║
+            ║    /devices                       - Show devices    ║
+            ║    /quit                          - Exit            ║
+            ╚══════════════════════════════════════════════════════╝
 
-    """.trimIndent())
+        """.trimIndent(),
+    )
 
     // Connect to the user's room (roomId = userId)
     val store = createNoteStore(userId)
 
     // Observe state changes
-    val collectorJob = launch {
-        store.state.collect { state ->
-            when (val event = state.lastEvent) {
-                is NoteEvent.NoteAdded ->
-                    println("  + Note added: [${event.note.id}] ${event.note.title}")
-                is NoteEvent.NoteDeleted ->
-                    println("  - Note deleted: ${event.noteId}")
-                is NoteEvent.NoteEdited ->
-                    println("  ~ Note edited: [${event.note.id}] ${event.note.title}")
-                is NoteEvent.DeviceJoined ->
-                    println("  * Device joined: ${event.deviceName} (online: ${state.connectedDevices})")
-                is NoteEvent.DeviceLeft ->
-                    println("  * Device left: ${event.deviceName} (online: ${state.connectedDevices})")
-                null -> {}
+    val collectorJob =
+        launch {
+            store.state.collect { state ->
+                when (val event = state.lastEvent) {
+                    is NoteEvent.NoteAdded ->
+                        println("  + Note added: [${event.note.id}] ${event.note.title}")
+                    is NoteEvent.NoteDeleted ->
+                        println("  - Note deleted: ${event.noteId}")
+                    is NoteEvent.NoteEdited ->
+                        println("  ~ Note edited: [${event.note.id}] ${event.note.title}")
+                    is NoteEvent.DeviceJoined ->
+                        println("  * Device joined: ${event.deviceName} (online: ${state.connectedDevices})")
+                    is NoteEvent.DeviceLeft ->
+                        println("  * Device left: ${event.deviceName} (online: ${state.connectedDevices})")
+                    null -> {}
+                }
             }
         }
-    }
 
     // Connect and announce device
     store.dispatch(ClientNoteAction.Connect)
@@ -183,11 +188,13 @@ fun main(args: Array<String>) = runBlocking {
 
 @Suppress("UNCHECKED_CAST")
 private fun createNoteStore(userId: String): Store<ClientNoteState, NoteAction> {
-    val connection = KtorWebSocketClientConnection.create(
-        host = "localhost",
-        port = 8080,
-        path = "/sync/$userId",
-    ).typedJson<SharedNoteAction>() as TypedClientConnection<NoteAction>
+    val connection =
+        KtorWebSocketClientConnection
+            .create(
+                host = "localhost",
+                port = 8080,
+                path = "/sync/$userId",
+            ).typedJson<SharedNoteAction>() as TypedClientConnection<NoteAction>
 
     return createClientStore(
         initialState = ClientNoteState(userId = userId),

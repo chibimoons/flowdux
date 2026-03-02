@@ -54,7 +54,7 @@ fun main() {
                     messages = state.messages,
                     users = state.users,
                     lastEvent = state.lastEvent,
-                )
+                ),
             )
         },
         scope = applicationScope,
@@ -79,7 +79,8 @@ fun main() {
         }
     }
 
-    println("""
+    println(
+        """
         ╔══════════════════════════════════════════════════╗
         ║     FlowDux Multi-Room Chat Server               ║
         ╠══════════════════════════════════════════════════╣
@@ -89,7 +90,8 @@ fun main() {
         ╠══════════════════════════════════════════════════╣
         ║  Example rooms: general, random, kotlin, java    ║
         ╚══════════════════════════════════════════════════╝
-    """.trimIndent())
+        """.trimIndent(),
+    )
     println()
 
     embeddedServer(CIO, port = 8080) {
@@ -142,7 +144,9 @@ private suspend fun printStatus(roomServer: io.flowdux.remote.server.pattern.Roo
     } else {
         roomIds.forEach { roomId ->
             @Suppress("UNCHECKED_CAST")
-            val room = roomServer.getRoom(roomId) as? io.flowdux.remote.server.pattern.SharedStateServer<ServerChatState, ChatAction>
+            val room = roomServer.getRoom(
+                roomId,
+            ) as? io.flowdux.remote.server.pattern.SharedStateServer<ServerChatState, ChatAction>
             room?.let {
                 val state = it.currentState
                 println("  [$roomId] users=${state.users}, messages=${state.messages.size}")
@@ -152,15 +156,14 @@ private suspend fun printStatus(roomServer: io.flowdux.remote.server.pattern.Roo
     println("===================\n")
 }
 
-private fun chatProcessors() =
-    Middleware.ActionProcessorBuilder<ServerChatState, ChatAction>().apply {
-        on<SharedChatAction.SendMessage> { _, action ->
-            emit(ServerChatAction.MessageReceived(user = action.user, text = action.text))
-        }
-        on<SharedChatAction.JoinRoom> { _, action ->
-            emit(ServerChatAction.UserJoined(user = action.user))
-        }
-        on<SharedChatAction.LeaveRoom> { _, action ->
-            emit(ServerChatAction.UserLeft(user = action.user))
-        }
-    }.build()
+private fun chatProcessors() = Middleware.ActionProcessorBuilder<ServerChatState, ChatAction>().apply {
+    on<SharedChatAction.SendMessage> { _, action ->
+        emit(ServerChatAction.MessageReceived(user = action.user, text = action.text))
+    }
+    on<SharedChatAction.JoinRoom> { _, action ->
+        emit(ServerChatAction.UserJoined(user = action.user))
+    }
+    on<SharedChatAction.LeaveRoom> { _, action ->
+        emit(ServerChatAction.UserLeft(user = action.user))
+    }
+}.build()

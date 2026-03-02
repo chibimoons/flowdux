@@ -3,18 +3,15 @@ package io.flowdux
 import app.cash.turbine.test
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StoreLoggerTest {
-
     private class TestLogger : StoreLogger<CounterState, CounterAction> {
         val dispatched = mutableListOf<CounterAction>()
         val middlewareProcessing = mutableListOf<Pair<String, CounterAction>>()
@@ -61,13 +58,14 @@ class StoreLoggerTest {
     @Test
     fun `onActionDispatched is called for each dispatch`() = runTest {
         val logger = TestLogger()
-        val store = createStore(
-            initialState = CounterState(),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            logger = logger,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                logger = logger,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             awaitItem()
@@ -89,13 +87,14 @@ class StoreLoggerTest {
     @Test
     fun `onStateReduced is called with correct previous and new state`() = runTest {
         val logger = TestLogger()
-        val store = createStore(
-            initialState = CounterState(count = 0),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            logger = logger,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(count = 0),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                logger = logger,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             awaitItem()
@@ -125,21 +124,24 @@ class StoreLoggerTest {
     @Test
     fun `onMiddlewareProcessing is called for each middleware`() = runTest {
         val logger = TestLogger()
-        val passthrough = object : Middleware<CounterState, CounterAction> {
-            override val name = "PassthroughMiddleware"
-            override val processors: ActionProcessorMap<CounterState, CounterAction> = emptyMap()
-            override fun process(getState: () -> CounterState, action: CounterAction): Flow<CounterAction> =
-                flowOf(action)
-        }
+        val passthrough =
+            object : Middleware<CounterState, CounterAction> {
+                override val name = "PassthroughMiddleware"
+                override val processors: ActionProcessorMap<CounterState, CounterAction> = emptyMap()
 
-        val store = createStore(
-            initialState = CounterState(),
-            reducer = counterReducer,
-            middlewares = listOf(passthrough),
-            errorProcessor = testErrorProcessor,
-            logger = logger,
-            scope = backgroundScope,
-        )
+                override fun process(getState: () -> CounterState, action: CounterAction): Flow<CounterAction> =
+                    flowOf(action)
+            }
+
+        val store =
+            createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                middlewares = listOf(passthrough),
+                errorProcessor = testErrorProcessor,
+                logger = logger,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             awaitItem()
@@ -159,13 +161,14 @@ class StoreLoggerTest {
     @Test
     fun `onMiddlewaresCompleted is called after middleware chain`() = runTest {
         val logger = TestLogger()
-        val store = createStore(
-            initialState = CounterState(),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            logger = logger,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                logger = logger,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             awaitItem()
@@ -183,13 +186,14 @@ class StoreLoggerTest {
     @Test
     fun `onFlowHolderActionEmitted is called for FlowHolderAction inner actions`() = runTest {
         val logger = TestLogger()
-        val store = createStore(
-            initialState = CounterState(),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            logger = logger,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                logger = logger,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             awaitItem()
@@ -209,30 +213,32 @@ class StoreLoggerTest {
     fun `onErrorOccurred and onErrorHandled are called on middleware error`() = runTest {
         val logger = TestLogger()
 
-        val errorProcessor = object : ErrorProcessor<CounterAction> {
-            override fun process(throwable: Throwable): Flow<CounterAction> =
-                flowOf(CounterAction.SetValue(-1))
-        }
+        val errorProcessor =
+            object : ErrorProcessor<CounterAction> {
+                override fun process(throwable: Throwable): Flow<CounterAction> = flowOf(CounterAction.SetValue(-1))
+            }
 
-        val throwingMiddleware = object : Middleware<CounterState, CounterAction> {
-            override val processors: ActionProcessorMap<CounterState, CounterAction> = emptyMap()
-            override fun process(getState: () -> CounterState, action: CounterAction): Flow<CounterAction> =
-                flow {
+        val throwingMiddleware =
+            object : Middleware<CounterState, CounterAction> {
+                override val processors: ActionProcessorMap<CounterState, CounterAction> = emptyMap()
+
+                override fun process(getState: () -> CounterState, action: CounterAction): Flow<CounterAction> = flow {
                     if (action is CounterAction.FetchData) {
                         throw RuntimeException("test error")
                     }
                     emit(action)
                 }
-        }
+            }
 
-        val store = createStore(
-            initialState = CounterState(),
-            reducer = counterReducer,
-            middlewares = listOf(throwingMiddleware),
-            errorProcessor = errorProcessor,
-            logger = logger,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                middlewares = listOf(throwingMiddleware),
+                errorProcessor = errorProcessor,
+                logger = logger,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             awaitItem()
@@ -253,13 +259,14 @@ class StoreLoggerTest {
     @Test
     fun `onDispatchAfterClose is called when dispatching after close`() = runTest {
         val logger = TestLogger()
-        val store = createStore(
-            initialState = CounterState(),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            logger = logger,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                logger = logger,
+                scope = backgroundScope,
+            )
 
         store.close()
 
@@ -277,19 +284,25 @@ class StoreLoggerTest {
     fun `NoOpStoreLogger subclass with overrides receives callbacks`() = runTest {
         val reducedActions = mutableListOf<CounterAction>()
 
-        val subclassLogger = object : NoOpStoreLogger<CounterState, CounterAction>() {
-            override fun onStateReduced(action: CounterAction, previousState: CounterState, newState: CounterState) {
-                reducedActions.add(action)
+        val subclassLogger =
+            object : NoOpStoreLogger<CounterState, CounterAction>() {
+                override fun onStateReduced(
+                    action: CounterAction,
+                    previousState: CounterState,
+                    newState: CounterState,
+                ) {
+                    reducedActions.add(action)
+                }
             }
-        }
 
-        val store = createStore(
-            initialState = CounterState(),
-            reducer = counterReducer,
-            errorProcessor = testErrorProcessor,
-            logger = subclassLogger,
-            scope = backgroundScope,
-        )
+        val store =
+            createStore(
+                initialState = CounterState(),
+                reducer = counterReducer,
+                errorProcessor = testErrorProcessor,
+                logger = subclassLogger,
+                scope = backgroundScope,
+            )
 
         store.state.test {
             awaitItem()
