@@ -26,7 +26,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * Usage:
  * ```kotlin
  * val authed = KtorWebSocketServerConnection(session)
- *     .withAuth(jwtVerifier) { detail -> logger.warn("Auth failed: $detail") }
+ *     .withAuth(jwtVerifier, AuthConfig()) { detail -> logger.warn("Auth failed: $detail") }
  *
  * val principal = authed.awaitAuth(scope).getOrElse {
  *     // Use a generic message for the close reason — do NOT forward
@@ -179,6 +179,8 @@ class AuthServerConnection<P : AuthPrincipal>(
     private fun notifyAuthError(detail: String) {
         try {
             onAuthError?.invoke(detail)
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             // Never let a logging callback abort the auth handshake
         }
