@@ -63,11 +63,14 @@ class FlowHolderMiddleware<S, A extends Action> extends Middleware<S, A> {
   }
 
   /// Gets or creates a wrapped processor for the given FlowHolderAction type.
-  Stream<A> Function(S, A) _getOrCreateWrappedProcessor(FlowHolderAction action) {
+  Stream<A> Function(S, A) _getOrCreateWrappedProcessor(
+    FlowHolderAction action,
+  ) {
     return _wrappedProcessors.putIfAbsent(action.runtimeType, () {
       Stream<A> baseProcessor(S state, A a) {
         return (a as FlowHolderAction).toStreamAction().cast<A>();
       }
+
       return action.strategy.wrap<S, A, A>(baseProcessor);
     });
   }

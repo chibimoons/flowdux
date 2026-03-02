@@ -29,8 +29,10 @@ class AppMiddleware extends Middleware<AppState, Action> {
 
     // Search with debounce strategy
     // Waits for user to stop typing before searching
-    apply(debounce(const Duration(milliseconds: 500)))
-        .on<SearchAction>((state, action) async* {
+    apply(debounce(const Duration(milliseconds: 500))).on<SearchAction>((
+      state,
+      action,
+    ) async* {
       if (action.query.isEmpty) {
         yield SearchResultsAction('', []);
         return;

@@ -63,7 +63,8 @@ class AppState {
       flowHolderSymbol: flowHolderSymbol ?? this.flowHolderSymbol,
       flowHolderPrice: flowHolderPrice ?? this.flowHolderPrice,
       flowHolderHistory: flowHolderHistory ?? this.flowHolderHistory,
-      isFlowHolderStreaming: isFlowHolderStreaming ?? this.isFlowHolderStreaming,
+      isFlowHolderStreaming:
+          isFlowHolderStreaming ?? this.isFlowHolderStreaming,
     );
   }
 

@@ -29,14 +29,17 @@ void main() {
         final executionOrder = <String>[];
 
         // debounce(100ms) then takeLatest
-        final strategy = debounce(Duration(milliseconds: 100)).then(takeLatest());
+        final strategy = debounce(
+          Duration(milliseconds: 100),
+        ).then(takeLatest());
 
-        final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>(
-          (state, action) async* {
-            executionOrder.add('executed:${action.id}');
-            yield DataAction(action.id);
-          },
-        );
+        final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>((
+          state,
+          action,
+        ) async* {
+          executionOrder.add('executed:${action.id}');
+          yield DataAction(action.id);
+        });
 
         final state = AppState();
         final results = <int>[];
@@ -85,7 +88,10 @@ void main() {
         fail('Should have thrown DuplicateCategoryException');
       } on DuplicateCategoryException catch (e) {
         expect(e.category, StrategyCategory.concurrency);
-        expect(e.toString(), contains('Cannot chain strategies of the same category'));
+        expect(
+          e.toString(),
+          contains('Cannot chain strategies of the same category'),
+        );
         expect(e.toString(), contains('concurrency'));
         expect(e.toString(), contains('TakeLatestStrategy'));
         expect(e.toString(), contains('TakeLeadingStrategy'));
@@ -94,16 +100,18 @@ void main() {
 
     test('allows chaining different categories', () {
       // This should not throw
-      final strategy = debounce(Duration(milliseconds: 100))
-          .then(takeLatest())
-          .then(retry(3));
+      final strategy = debounce(
+        Duration(milliseconds: 100),
+      ).then(takeLatest()).then(retry(3));
 
       expect(strategy.category, StrategyCategory.chained);
     });
 
     test('validates nested chains for duplicate categories', () {
       // debounce -> takeLatest (OK)
-      final firstChain = debounce(Duration(milliseconds: 100)).then(takeLatest());
+      final firstChain = debounce(
+        Duration(milliseconds: 100),
+      ).then(takeLatest());
 
       // Trying to add another concurrency strategy should fail
       expect(
@@ -133,15 +141,18 @@ void main() {
 
         // Use debounce(100ms).then(takeLatest())
         // debounce is outer, so it should debounce first, then takeLatest applies
-        final strategy = debounce(Duration(milliseconds: 100)).then(takeLatest());
+        final strategy = debounce(
+          Duration(milliseconds: 100),
+        ).then(takeLatest());
 
-        final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>(
-          (state, action) async* {
-            debounceExecuted = true;
-            takeLatestExecuted = true;
-            yield DataAction(action.id);
-          },
-        );
+        final wrappedProcessor = strategy.wrap<AppState, Action, FetchAction>((
+          state,
+          action,
+        ) async* {
+          debounceExecuted = true;
+          takeLatestExecuted = true;
+          yield DataAction(action.id);
+        });
 
         final state = AppState();
 
@@ -279,16 +290,18 @@ void main() {
 // Test Reducer
 class _AppReducer extends ReducerBase<AppState, Action> {
   _AppReducer() {
-    on<DataAction>((state, action) =>
-        state.copyWith(results: [...state.results, action.id]));
+    on<DataAction>(
+      (state, action) => state.copyWith(results: [...state.results, action.id]),
+    );
   }
 }
 
 // Test Middlewares using new DSL
 class _DebounceTakeLatestMiddleware extends Middleware<AppState, Action> {
   _DebounceTakeLatestMiddleware() {
-    apply(debounce(Duration(milliseconds: 50)).then(takeLatest()))
-        .on<FetchAction>((state, action) async* {
+    apply(
+      debounce(Duration(milliseconds: 50)).then(takeLatest()),
+    ).on<FetchAction>((state, action) async* {
       yield DataAction(action.id);
     });
   }
@@ -296,18 +309,20 @@ class _DebounceTakeLatestMiddleware extends Middleware<AppState, Action> {
 
 class _ThrottleRetryMiddleware extends Middleware<AppState, Action> {
   _ThrottleRetryMiddleware({required void Function() onProcess}) {
-    apply(throttle(Duration(milliseconds: 100)).then(retry(3)))
-        .on<FetchAction>((state, action) async* {
-      onProcess();
-      yield DataAction(action.id);
-    });
+    apply(throttle(Duration(milliseconds: 100)).then(retry(3))).on<FetchAction>(
+      (state, action) async* {
+        onProcess();
+        yield DataAction(action.id);
+      },
+    );
   }
 }
 
 class _ThreeWayChainMiddleware extends Middleware<AppState, Action> {
   _ThreeWayChainMiddleware({required void Function() onProcess}) {
-    apply(debounce(Duration(milliseconds: 30)).then(takeLatest()).then(retry(2)))
-        .on<FetchAction>((state, action) async* {
+    apply(
+      debounce(Duration(milliseconds: 30)).then(takeLatest()).then(retry(2)),
+    ).on<FetchAction>((state, action) async* {
       onProcess();
       yield DataAction(action.id);
     });

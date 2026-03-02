@@ -63,7 +63,9 @@ class CounterState {
 class CounterReducer extends ReducerBase<CounterState, Action> {
   CounterReducer() {
     on<IncrementAction>((state, _) => state.copyWith(count: state.count + 1));
-    on<AddAction>((state, action) => state.copyWith(count: state.count + action.value));
+    on<AddAction>(
+      (state, action) => state.copyWith(count: state.count + action.value),
+    );
   }
 }
 
@@ -121,43 +123,46 @@ void main() {
       await store.close();
     });
 
-    test('explicit Dispatch delivery sends inner actions through full middleware pipeline',
-        () async {
-      final trackingMiddleware = TrackingMiddleware();
-      final store = createStore<CounterState, Action>(
-        initialState: CounterState(0),
-        reducer: reducer,
-        middlewares: [trackingMiddleware],
-      );
+    test(
+      'explicit Dispatch delivery sends inner actions through full middleware pipeline',
+      () async {
+        final trackingMiddleware = TrackingMiddleware();
+        final store = createStore<CounterState, Action>(
+          initialState: CounterState(0),
+          reducer: reducer,
+          middlewares: [trackingMiddleware],
+        );
 
-      final controller = StreamController<int>();
+        final controller = StreamController<int>();
 
-      store.dispatch(DispatchDeliveryStreamAction(controller.stream));
+        store.dispatch(DispatchDeliveryStreamAction(controller.stream));
 
-      controller.add(5);
-      await Future.delayed(const Duration(milliseconds: 50));
-      expect(store.currentState, CounterState(5));
+        controller.add(5);
+        await Future.delayed(const Duration(milliseconds: 50));
+        expect(store.currentState, CounterState(5));
 
-      controller.add(3);
-      await Future.delayed(const Duration(milliseconds: 50));
-      expect(store.currentState, CounterState(8));
+        controller.add(3);
+        await Future.delayed(const Duration(milliseconds: 50));
+        expect(store.currentState, CounterState(8));
 
-      await controller.close();
+        await controller.close();
 
-      // Inner AddAction should pass through the tracking middleware
-      final innerActions =
-          trackingMiddleware.processedActions.whereType<AddAction>().toList();
-      expect(
-        innerActions,
-        isNotEmpty,
-        reason: 'Dispatch delivery should send inner actions through middlewares',
-      );
-      expect(innerActions.length, 2);
-      expect(innerActions[0].value, 5);
-      expect(innerActions[1].value, 3);
+        // Inner AddAction should pass through the tracking middleware
+        final innerActions =
+            trackingMiddleware.processedActions.whereType<AddAction>().toList();
+        expect(
+          innerActions,
+          isNotEmpty,
+          reason:
+              'Dispatch delivery should send inner actions through middlewares',
+        );
+        expect(innerActions.length, 2);
+        expect(innerActions[0].value, 5);
+        expect(innerActions[1].value, 3);
 
-      await store.close();
-    });
+        await store.close();
+      },
+    );
 
     test('FlowHolderAction has default delivery of Emit', () {
       final action = StreamConnectedAction(const Stream.empty());

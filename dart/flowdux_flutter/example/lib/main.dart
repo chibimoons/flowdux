@@ -14,10 +14,5 @@ void main() {
     logger: DebugStoreLogger(tag: 'FlowDux'),
   );
 
-  runApp(
-    StoreProvider<AppState, Action>(
-      store: store,
-      child: const MyApp(),
-    ),
-  );
+  runApp(StoreProvider<AppState, Action>(store: store, child: const MyApp()));
 }

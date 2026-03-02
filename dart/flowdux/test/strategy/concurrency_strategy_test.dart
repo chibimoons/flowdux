@@ -75,20 +75,25 @@ class AppState {
       );
 
   @override
-  String toString() => 'AppState(results: $results, submitting: $submitting, savedValues: $savedValues)';
+  String toString() =>
+      'AppState(results: $results, submitting: $submitting, savedValues: $savedValues)';
 }
 
 // Test Reducer
 class AppReducer extends ReducerBase<AppState, Action> {
   AppReducer() {
-    on<ResultAction>((state, action) =>
-        state.copyWith(results: [...state.results, action.id]));
+    on<ResultAction>(
+      (state, action) => state.copyWith(results: [...state.results, action.id]),
+    );
     on<SubmittingAction>((state, _) => state.copyWith(submitting: true));
     on<SubmittedAction>((state, _) => state.copyWith(submitting: false));
-    on<SavedAction>((state, action) =>
-        state.copyWith(savedValues: [...state.savedValues, action.value]));
-    on<SearchResultAction>((state, action) =>
-        state.copyWith(searchResults: action.results));
+    on<SavedAction>(
+      (state, action) =>
+          state.copyWith(savedValues: [...state.savedValues, action.value]),
+    );
+    on<SearchResultAction>(
+      (state, action) => state.copyWith(searchResults: action.results),
+    );
   }
 }
 
@@ -297,31 +302,40 @@ void main() {
       final executionOrder = <String>[];
 
       // Start three concurrent operations
-      unawaited(lock.synchronized(() async {
-        executionOrder.add('a:start');
-        await Future.delayed(Duration(milliseconds: 30));
-        executionOrder.add('a:end');
-      }));
+      unawaited(
+        lock.synchronized(() async {
+          executionOrder.add('a:start');
+          await Future.delayed(Duration(milliseconds: 30));
+          executionOrder.add('a:end');
+        }),
+      );
 
-      unawaited(lock.synchronized(() async {
-        executionOrder.add('b:start');
-        await Future.delayed(Duration(milliseconds: 20));
-        executionOrder.add('b:end');
-      }));
+      unawaited(
+        lock.synchronized(() async {
+          executionOrder.add('b:start');
+          await Future.delayed(Duration(milliseconds: 20));
+          executionOrder.add('b:end');
+        }),
+      );
 
-      unawaited(lock.synchronized(() async {
-        executionOrder.add('c:start');
-        await Future.delayed(Duration(milliseconds: 10));
-        executionOrder.add('c:end');
-      }));
+      unawaited(
+        lock.synchronized(() async {
+          executionOrder.add('c:start');
+          await Future.delayed(Duration(milliseconds: 10));
+          executionOrder.add('c:end');
+        }),
+      );
 
       await Future.delayed(Duration(milliseconds: 150));
 
       // Should execute in order: a complete, then b complete, then c complete
       expect(executionOrder, [
-        'a:start', 'a:end',
-        'b:start', 'b:end',
-        'c:start', 'c:end',
+        'a:start',
+        'a:end',
+        'b:start',
+        'b:end',
+        'c:start',
+        'c:end',
       ]);
     });
 
@@ -384,19 +398,17 @@ class _TakeLatestSingleMiddleware extends Middleware<AppState, Action> {
 class _TakeLatestGroupMiddleware extends Middleware<AppState, Action> {
   _TakeLatestGroupMiddleware(List<String> executionOrder) {
     final strategy = takeLatest();
-    apply(strategy)
-        .on<TestAction>((state, action) async* {
-          executionOrder.add('test:start:${action.id}');
-          await Future.delayed(Duration(milliseconds: 50));
-          executionOrder.add('test:end:${action.id}');
-          yield ResultAction(action.id);
-        })
-        .on<SearchAction>((state, action) async* {
-          executionOrder.add('search:start:${action.query}');
-          await Future.delayed(Duration(milliseconds: 50));
-          executionOrder.add('search:end:${action.query}');
-          yield SearchResultAction(action.query, [action.query]);
-        });
+    apply(strategy).on<TestAction>((state, action) async* {
+      executionOrder.add('test:start:${action.id}');
+      await Future.delayed(Duration(milliseconds: 50));
+      executionOrder.add('test:end:${action.id}');
+      yield ResultAction(action.id);
+    }).on<SearchAction>((state, action) async* {
+      executionOrder.add('search:start:${action.query}');
+      await Future.delayed(Duration(milliseconds: 50));
+      executionOrder.add('search:end:${action.query}');
+      yield SearchResultAction(action.query, [action.query]);
+    });
   }
 }
 

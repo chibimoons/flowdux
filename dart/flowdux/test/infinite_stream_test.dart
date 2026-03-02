@@ -56,129 +56,146 @@ class AppReducer extends ReducerBase<AppState, Action> {
 
 void main() {
   group('Infinite Stream Tests', () {
-    test('other actions are processed while infinite stream is running', () async {
-      // Simulates WebSocket-like infinite stream
-      final streamController = StreamController<int>.broadcast();
+    test(
+      'other actions are processed while infinite stream is running',
+      () async {
+        // Simulates WebSocket-like infinite stream
+        final streamController = StreamController<int>.broadcast();
 
-      final middleware = _InfiniteStreamMiddleware(streamController.stream);
-      final store = createStore<AppState, Action>(
-        initialState: AppState(),
-        reducer: AppReducer().reducer,
-        middlewares: [middleware],
-      );
+        final middleware = _InfiniteStreamMiddleware(streamController.stream);
+        final store = createStore<AppState, Action>(
+          initialState: AppState(),
+          reducer: AppReducer().reducer,
+          middlewares: [middleware],
+        );
 
-      // Start infinite stream subscription
-      store.dispatch(SubscribeAction('price'));
-      await Future.delayed(Duration(milliseconds: 10));
+        // Start infinite stream subscription
+        store.dispatch(SubscribeAction('price'));
+        await Future.delayed(Duration(milliseconds: 10));
 
-      // Send data through stream
-      streamController.add(100);
-      await Future.delayed(Duration(milliseconds: 10));
+        // Send data through stream
+        streamController.add(100);
+        await Future.delayed(Duration(milliseconds: 10));
 
-      // While stream is running, dispatch other actions
-      // These should NOT be blocked by the infinite stream
-      store.dispatch(IncrementAction());
-      store.dispatch(IncrementAction());
-      store.dispatch(IncrementAction());
-      await Future.delayed(Duration(milliseconds: 10));
+        // While stream is running, dispatch other actions
+        // These should NOT be blocked by the infinite stream
+        store.dispatch(IncrementAction());
+        store.dispatch(IncrementAction());
+        store.dispatch(IncrementAction());
+        await Future.delayed(Duration(milliseconds: 10));
 
-      // Verify both stream data and increment actions were processed
-      expect(store.currentState.count, 3);
-      expect(store.currentState.channelData['price'], contains(100));
+        // Verify both stream data and increment actions were processed
+        expect(store.currentState.count, 3);
+        expect(store.currentState.channelData['price'], contains(100));
 
-      // Send more data through stream
-      streamController.add(200);
-      await Future.delayed(Duration(milliseconds: 10));
-      expect(store.currentState.channelData['price'], contains(200));
+        // Send more data through stream
+        streamController.add(200);
+        await Future.delayed(Duration(milliseconds: 10));
+        expect(store.currentState.channelData['price'], contains(200));
 
-      // Dispatch more actions while stream continues
-      store.dispatch(SetValueAction(42));
-      await Future.delayed(Duration(milliseconds: 10));
-      expect(store.currentState.count, 42);
+        // Dispatch more actions while stream continues
+        store.dispatch(SetValueAction(42));
+        await Future.delayed(Duration(milliseconds: 10));
+        expect(store.currentState.count, 42);
 
-      await streamController.close();
-      await store.close();
-    });
+        await streamController.close();
+        await store.close();
+      },
+    );
 
-    test('takeLatest cancels previous stream - only latest result reaches reducer', () async {
-      // In Dart, async generators continue running after subscription cancellation,
-      // but their yielded values are discarded. The key behavior is that only
-      // the latest action's result reaches the reducer.
+    test(
+      'takeLatest cancels previous stream - only latest result reaches reducer',
+      () async {
+        // In Dart, async generators continue running after subscription cancellation,
+        // but their yielded values are discarded. The key behavior is that only
+        // the latest action's result reaches the reducer.
 
-      final middleware = _TakeLatestDelayedMiddleware();
+        final middleware = _TakeLatestDelayedMiddleware();
 
-      final store = createStore<AppState, Action>(
-        initialState: AppState(),
-        reducer: AppReducer().reducer,
-        middlewares: [middleware],
-      );
+        final store = createStore<AppState, Action>(
+          initialState: AppState(),
+          reducer: AppReducer().reducer,
+          middlewares: [middleware],
+        );
 
-      // Subscribe to first channel - starts processing
-      store.dispatch(SubscribeAction('btc'));
-      await Future.delayed(Duration(milliseconds: 10)); // Short wait, btc still processing
+        // Subscribe to first channel - starts processing
+        store.dispatch(SubscribeAction('btc'));
+        await Future.delayed(
+          Duration(milliseconds: 10),
+        ); // Short wait, btc still processing
 
-      // Subscribe to second channel while first is still processing
-      // takeLatest should cancel first's output
-      store.dispatch(SubscribeAction('eth'));
-      await Future.delayed(Duration(milliseconds: 10));
+        // Subscribe to second channel while first is still processing
+        // takeLatest should cancel first's output
+        store.dispatch(SubscribeAction('eth'));
+        await Future.delayed(Duration(milliseconds: 10));
 
-      // Subscribe to third channel
-      store.dispatch(SubscribeAction('sol'));
+        // Subscribe to third channel
+        store.dispatch(SubscribeAction('sol'));
 
-      // Wait for all processing to complete
-      await Future.delayed(Duration(milliseconds: 150));
+        // Wait for all processing to complete
+        await Future.delayed(Duration(milliseconds: 150));
 
-      // Only the LAST subscription's result should be in state
-      // btc and eth's yields were discarded due to takeLatest
-      expect(store.currentState.channelData.keys, contains('sol'));
-      expect(store.currentState.channelData.keys, isNot(contains('btc')));
-      expect(store.currentState.channelData.keys, isNot(contains('eth')));
+        // Only the LAST subscription's result should be in state
+        // btc and eth's yields were discarded due to takeLatest
+        expect(store.currentState.channelData.keys, contains('sol'));
+        expect(store.currentState.channelData.keys, isNot(contains('btc')));
+        expect(store.currentState.channelData.keys, isNot(contains('eth')));
 
-      await store.close();
-    });
+        await store.close();
+      },
+    );
 
-    test('multiple infinite streams can run concurrently without blocking', () async {
-      final stream1Controller = StreamController<int>.broadcast();
-      final stream2Controller = StreamController<int>.broadcast();
+    test(
+      'multiple infinite streams can run concurrently without blocking',
+      () async {
+        final stream1Controller = StreamController<int>.broadcast();
+        final stream2Controller = StreamController<int>.broadcast();
 
-      final middleware = _MultiStreamMiddleware({
-        'price': stream1Controller.stream,
-        'orderbook': stream2Controller.stream,
-      });
+        final middleware = _MultiStreamMiddleware({
+          'price': stream1Controller.stream,
+          'orderbook': stream2Controller.stream,
+        });
 
-      final store = createStore<AppState, Action>(
-        initialState: AppState(),
-        reducer: AppReducer().reducer,
-        middlewares: [middleware],
-      );
+        final store = createStore<AppState, Action>(
+          initialState: AppState(),
+          reducer: AppReducer().reducer,
+          middlewares: [middleware],
+        );
 
-      // Subscribe to both streams concurrently
-      store.dispatch(SubscribeAction('price'));
-      store.dispatch(SubscribeAction('orderbook'));
-      await Future.delayed(Duration(milliseconds: 20));
+        // Subscribe to both streams concurrently
+        store.dispatch(SubscribeAction('price'));
+        store.dispatch(SubscribeAction('orderbook'));
+        await Future.delayed(Duration(milliseconds: 20));
 
-      // Send data to both streams
-      stream1Controller.add(100);
-      stream2Controller.add(1);
-      await Future.delayed(Duration(milliseconds: 20));
+        // Send data to both streams
+        stream1Controller.add(100);
+        stream2Controller.add(1);
+        await Future.delayed(Duration(milliseconds: 20));
 
-      stream1Controller.add(101);
-      stream2Controller.add(2);
-      await Future.delayed(Duration(milliseconds: 20));
+        stream1Controller.add(101);
+        stream2Controller.add(2);
+        await Future.delayed(Duration(milliseconds: 20));
 
-      // Verify both streams are being processed
-      expect(store.currentState.channelData['price'], containsAll([100, 101]));
-      expect(store.currentState.channelData['orderbook'], containsAll([1, 2]));
+        // Verify both streams are being processed
+        expect(
+          store.currentState.channelData['price'],
+          containsAll([100, 101]),
+        );
+        expect(
+          store.currentState.channelData['orderbook'],
+          containsAll([1, 2]),
+        );
 
-      // Other actions should still work (not blocked)
-      store.dispatch(IncrementAction());
-      await Future.delayed(Duration(milliseconds: 10));
-      expect(store.currentState.count, 1);
+        // Other actions should still work (not blocked)
+        store.dispatch(IncrementAction());
+        await Future.delayed(Duration(milliseconds: 10));
+        expect(store.currentState.count, 1);
 
-      await stream1Controller.close();
-      await stream2Controller.close();
-      await store.close();
-    });
+        await stream1Controller.close();
+        await stream2Controller.close();
+        await store.close();
+      },
+    );
 
     test('concurrent default: actions do not block each other', () async {
       // This test verifies FlowDux's default concurrent behavior
@@ -204,7 +221,10 @@ void main() {
       await Future.delayed(Duration(milliseconds: 50));
 
       // Fast actions should complete before slow action
-      expect(results.where((r) => r.contains('Increment')).length, 4); // 2 start + 2 end
+      expect(
+        results.where((r) => r.contains('Increment')).length,
+        4,
+      ); // 2 start + 2 end
 
       await Future.delayed(Duration(milliseconds: 100));
       expect(results.last, 'slow-end');
@@ -255,125 +275,174 @@ void main() {
   });
 
   group('FlowHolderAction Strategy Tests', () {
-    test('TakeLatest FlowHolderAction cancels previous stream when new one is dispatched', () async {
-      final store = createStore<AppState, Action>(
-        initialState: AppState(),
-        reducer: ExtendedAppReducer().reducer,
-      );
+    test(
+      'TakeLatest FlowHolderAction cancels previous stream when new one is dispatched',
+      () async {
+        final store = createStore<AppState, Action>(
+          initialState: AppState(),
+          reducer: ExtendedAppReducer().reducer,
+        );
 
-      // Start first infinite stream
-      store.dispatch(InfiniteStreamFlowAction('stream1', emitInterval: Duration(milliseconds: 50)));
+        // Start first infinite stream
+        store.dispatch(
+          InfiniteStreamFlowAction(
+            'stream1',
+            emitInterval: Duration(milliseconds: 50),
+          ),
+        );
 
-      // Wait for a few emissions
-      await Future.delayed(Duration(milliseconds: 120));
-      final countAfterFirstStream = store.currentState.count;
-      expect(countAfterFirstStream, greaterThanOrEqualTo(2));
+        // Wait for a few emissions
+        await Future.delayed(Duration(milliseconds: 120));
+        final countAfterFirstStream = store.currentState.count;
+        expect(countAfterFirstStream, greaterThanOrEqualTo(2));
 
-      final countBeforeNewStream = store.currentState.count;
+        final countBeforeNewStream = store.currentState.count;
 
-      // Start second stream - should cancel the first
-      store.dispatch(InfiniteStreamFlowAction('stream2', emitInterval: Duration(milliseconds: 50)));
+        // Start second stream - should cancel the first
+        store.dispatch(
+          InfiniteStreamFlowAction(
+            'stream2',
+            emitInterval: Duration(milliseconds: 50),
+          ),
+        );
 
-      // Wait for emissions from the new stream
-      await Future.delayed(Duration(milliseconds: 180));
+        // Wait for emissions from the new stream
+        await Future.delayed(Duration(milliseconds: 180));
 
-      final countAfter = store.currentState.count;
+        final countAfter = store.currentState.count;
 
-      // If both streams were running, count would increase much faster
-      // Should have roughly countBeforeNewStream + 3 emissions (not double)
-      expect(
-        countAfter,
-        lessThanOrEqualTo(countBeforeNewStream + 5),
-        reason: 'Expected count to be around ${countBeforeNewStream + 3}, but was $countAfter. '
-            'Both streams might be running concurrently.',
-      );
+        // If both streams were running, count would increase much faster
+        // Should have roughly countBeforeNewStream + 3 emissions (not double)
+        expect(
+          countAfter,
+          lessThanOrEqualTo(countBeforeNewStream + 5),
+          reason:
+              'Expected count to be around ${countBeforeNewStream + 3}, but was $countAfter. '
+              'Both streams might be running concurrently.',
+        );
 
-      await store.close();
-    });
+        await store.close();
+      },
+    );
 
-    test('Concurrent FlowHolderAction allows multiple streams to run concurrently', () async {
-      final store = createStore<AppState, Action>(
-        initialState: AppState(),
-        reducer: ExtendedAppReducer().reducer,
-      );
+    test(
+      'Concurrent FlowHolderAction allows multiple streams to run concurrently',
+      () async {
+        final store = createStore<AppState, Action>(
+          initialState: AppState(),
+          reducer: ExtendedAppReducer().reducer,
+        );
 
-      // Start two concurrent streams
-      // stream1: adds 1 three times = 3
-      // stream2: adds 10 three times = 30
-      // Total: 33
-      store.dispatch(ConcurrentAdditiveFlowAction('stream1', addValue: 1, count: 3, delayBetween: Duration(milliseconds: 30)));
-      store.dispatch(ConcurrentAdditiveFlowAction('stream2', addValue: 10, count: 3, delayBetween: Duration(milliseconds: 30)));
+        // Start two concurrent streams
+        // stream1: adds 1 three times = 3
+        // stream2: adds 10 three times = 30
+        // Total: 33
+        store.dispatch(
+          ConcurrentAdditiveFlowAction(
+            'stream1',
+            addValue: 1,
+            count: 3,
+            delayBetween: Duration(milliseconds: 30),
+          ),
+        );
+        store.dispatch(
+          ConcurrentAdditiveFlowAction(
+            'stream2',
+            addValue: 10,
+            count: 3,
+            delayBetween: Duration(milliseconds: 30),
+          ),
+        );
 
-      // Wait for both streams to complete
-      await Future.delayed(Duration(milliseconds: 200));
+        // Wait for both streams to complete
+        await Future.delayed(Duration(milliseconds: 200));
 
-      expect(
-        store.currentState.count,
-        equals(33),
-        reason: 'Expected both streams to contribute (33), but got ${store.currentState.count}',
-      );
+        expect(
+          store.currentState.count,
+          equals(33),
+          reason:
+              'Expected both streams to contribute (33), but got ${store.currentState.count}',
+        );
 
-      await store.close();
-    });
+        await store.close();
+      },
+    );
 
-    test('TakeLatest FlowHolderAction is cancelled when store is closed', () async {
-      final store = createStore<AppState, Action>(
-        initialState: AppState(),
-        reducer: ExtendedAppReducer().reducer,
-      );
+    test(
+      'TakeLatest FlowHolderAction is cancelled when store is closed',
+      () async {
+        final store = createStore<AppState, Action>(
+          initialState: AppState(),
+          reducer: ExtendedAppReducer().reducer,
+        );
 
-      // Start infinite stream
-      store.dispatch(InfiniteStreamFlowAction('stream1', emitInterval: Duration(milliseconds: 50)));
+        // Start infinite stream
+        store.dispatch(
+          InfiniteStreamFlowAction(
+            'stream1',
+            emitInterval: Duration(milliseconds: 50),
+          ),
+        );
 
-      // Wait for a few emissions
-      await Future.delayed(Duration(milliseconds: 120));
-      expect(store.currentState.count, greaterThanOrEqualTo(2));
+        // Wait for a few emissions
+        await Future.delayed(Duration(milliseconds: 120));
+        expect(store.currentState.count, greaterThanOrEqualTo(2));
 
-      final countBeforeClose = store.currentState.count;
+        final countBeforeClose = store.currentState.count;
 
-      // Close the store
-      await store.close();
+        // Close the store
+        await store.close();
 
-      // Give some time for any pending emissions
-      await Future.delayed(Duration(milliseconds: 200));
+        // Give some time for any pending emissions
+        await Future.delayed(Duration(milliseconds: 200));
 
-      // Count should not have increased significantly after close
-      expect(
-        store.currentState.count,
-        lessThanOrEqualTo(countBeforeClose + 1),
-        reason: 'Stream should have been cancelled on store close',
-      );
-    });
+        // Count should not have increased significantly after close
+        expect(
+          store.currentState.count,
+          lessThanOrEqualTo(countBeforeClose + 1),
+          reason: 'Stream should have been cancelled on store close',
+        );
+      },
+    );
 
-    test('other actions are processed while TakeLatest infinite stream is running', () async {
-      final store = createStore<AppState, Action>(
-        initialState: AppState(),
-        reducer: ExtendedAppReducer().reducer,
-      );
+    test(
+      'other actions are processed while TakeLatest infinite stream is running',
+      () async {
+        final store = createStore<AppState, Action>(
+          initialState: AppState(),
+          reducer: ExtendedAppReducer().reducer,
+        );
 
-      // Start infinite stream
-      store.dispatch(InfiniteStreamFlowAction('stream1', emitInterval: Duration(milliseconds: 100)));
+        // Start infinite stream
+        store.dispatch(
+          InfiniteStreamFlowAction(
+            'stream1',
+            emitInterval: Duration(milliseconds: 100),
+          ),
+        );
 
-      // Wait for first emission
-      await Future.delayed(Duration(milliseconds: 120));
-      expect(store.currentState.count, greaterThanOrEqualTo(1));
+        // Wait for first emission
+        await Future.delayed(Duration(milliseconds: 120));
+        expect(store.currentState.count, greaterThanOrEqualTo(1));
 
-      // Dispatch a regular action while stream is running
-      store.dispatch(SetValueAction(100));
+        // Dispatch a regular action while stream is running
+        store.dispatch(SetValueAction(100));
 
-      // Wait a bit
-      await Future.delayed(Duration(milliseconds: 50));
+        // Wait a bit
+        await Future.delayed(Duration(milliseconds: 50));
 
-      // The SetValueAction should have been processed
-      // Stream emissions will continue adding, so count should be >= 100
-      expect(
-        store.currentState.count,
-        greaterThanOrEqualTo(100),
-        reason: 'Regular action should be processed while infinite stream is running',
-      );
+        // The SetValueAction should have been processed
+        // Stream emissions will continue adding, so count should be >= 100
+        expect(
+          store.currentState.count,
+          greaterThanOrEqualTo(100),
+          reason:
+              'Regular action should be processed while infinite stream is running',
+        );
 
-      await store.close();
-    });
+        await store.close();
+      },
+    );
   });
 }
 
@@ -439,7 +508,10 @@ class _ConcurrentTestMiddleware extends Middleware<AppState, Action> {
 
 /// Middleware that counts stream data
 class _CountingStreamMiddleware extends Middleware<AppState, Action> {
-  _CountingStreamMiddleware(Stream<int> dataStream, {required void Function() onData}) {
+  _CountingStreamMiddleware(
+    Stream<int> dataStream, {
+    required void Function() onData,
+  }) {
     on<SubscribeAction>((state, action) async* {
       await for (final value in dataStream) {
         onData();
@@ -457,7 +529,10 @@ class InfiniteStreamFlowAction with FlowHolderAction {
   final String id;
   final Duration emitInterval;
 
-  InfiniteStreamFlowAction(this.id, {this.emitInterval = const Duration(milliseconds: 50)});
+  InfiniteStreamFlowAction(
+    this.id, {
+    this.emitInterval = const Duration(milliseconds: 50),
+  });
 
   @override
   Stream<Action> toStreamAction() async* {
@@ -466,6 +541,7 @@ class InfiniteStreamFlowAction with FlowHolderAction {
       yield IncrementAction();
     }
   }
+
   // Uses default TakeLatestStrategy
 }
 
@@ -530,7 +606,9 @@ class ExtendedAppReducer extends ReducerBase<AppState, Action> {
   ExtendedAppReducer() {
     on<IncrementAction>((state, _) => state.copyWith(count: state.count + 1));
     on<SetValueAction>((state, action) => state.copyWith(count: action.value));
-    on<_AddAction>((state, action) => state.copyWith(count: state.count + action.value));
+    on<_AddAction>(
+      (state, action) => state.copyWith(count: state.count + action.value),
+    );
     on<DataReceivedAction>((state, action) {
       final newData = Map<String, List<int>>.from(state.channelData);
       final channelList = List<int>.from(newData[action.channel] ?? []);
