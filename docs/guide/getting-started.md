@@ -12,7 +12,7 @@ FlowDux 시작 가이드입니다. 기본 Store 생성부터 Middleware, Remote 
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("io.github.chibimoons:flowdux:1.17.0")
+            implementation("io.github.chibimoons:flowdux:1.18.0")
         }
     }
 }
@@ -26,7 +26,7 @@ KMP가 아닌 프로젝트에서는 직접 추가합니다:
 
 ```kotlin
 dependencies {
-    implementation("io.github.chibimoons:flowdux:1.17.0")
+    implementation("io.github.chibimoons:flowdux:1.18.0")
 }
 ```
 
@@ -212,12 +212,12 @@ FlowDux Remote를 사용하면 클라이언트와 서버 간 실시간 상태 �
 
 ```kotlin
 commonMain.dependencies {
-    implementation("io.github.chibimoons:flowdux:1.17.0")
-    implementation("io.github.chibimoons:flowdux-remote-core:1.17.0")
-    implementation("io.github.chibimoons:flowdux-remote-client:1.17.0")
-    implementation("io.github.chibimoons:flowdux-remote-server:1.17.0")
-    implementation("io.github.chibimoons:flowdux-remote-serialization:1.17.0")
-    implementation("io.github.chibimoons:flowdux-remote-ktor:1.17.0")
+    implementation("io.github.chibimoons:flowdux:1.18.0")
+    implementation("io.github.chibimoons:flowdux-remote-core:1.18.0")
+    implementation("io.github.chibimoons:flowdux-remote-client:1.18.0")
+    implementation("io.github.chibimoons:flowdux-remote-server:1.18.0")
+    implementation("io.github.chibimoons:flowdux-remote-serialization:1.18.0")
+    implementation("io.github.chibimoons:flowdux-remote-ktor:1.18.0")
 }
 ```
 
