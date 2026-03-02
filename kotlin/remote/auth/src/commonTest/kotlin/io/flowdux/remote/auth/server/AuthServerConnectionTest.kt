@@ -12,6 +12,7 @@ import io.flowdux.remote.auth.tokenVerifier
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
@@ -68,10 +69,11 @@ class AuthServerConnectionTest {
         assertIs<AuthResult.Failure>(result)
         assertEquals("Access denied", result.reason)
 
-        // Verify auth_error was sent back
+        // Verify sanitized auth_error was sent back (no detailed reason leaked)
         assertEquals(1, mock.sentMessages.size)
         assertTrue(mock.sentMessages[0].contains("auth_error"))
-        assertTrue(mock.sentMessages[0].contains("Access denied"))
+        assertTrue(mock.sentMessages[0].contains("Authentication failed"))
+        assertFalse(mock.sentMessages[0].contains("Access denied"))
     }
 
     @Test
@@ -211,7 +213,7 @@ class AuthServerConnectionTest {
     }
 
     @Test
-    fun verifierThrows_returnsFailureAndSendsAuthError() = runTest {
+    fun verifierThrows_returnsFailureWithSanitizedMessage() = runTest {
         val mock = MockServerConnection()
         val authConn =
             AuthServerConnection(
@@ -224,11 +226,12 @@ class AuthServerConnectionTest {
         val result = authConn.awaitAuth(backgroundScope)
 
         assertIs<AuthResult.Failure>(result)
-        assertTrue(result.reason.contains("Verifier error"))
-        assertTrue(result.reason.contains("JWT decode failed"))
+        // Sanitized: no internal exception details exposed
+        assertEquals("Authentication failed", result.reason)
 
-        // Verify auth_error was sent back (not a crash)
+        // Verify sanitized auth_error was sent back (no internal details)
         assertTrue(mock.sentMessages.any { it.contains("auth_error") })
+        assertTrue(mock.sentMessages.all { !it.contains("JWT decode failed") })
     }
 
     @Test
@@ -345,5 +348,103 @@ class AuthServerConnectionTest {
         assertIs<AuthResult.Failure>(result)
         assertEquals("Invalid token", result.reason)
         assertEquals(1, mock.sentMessages.size)
+    }
+
+    // --- onAuthError callback tests ---
+
+    @Test
+    fun onAuthError_receivesDetailForVerifierException() = runTest {
+        val mock = MockServerConnection()
+        val errors = mutableListOf<String>()
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = throwingVerifier,
+                onAuthError = { errors.add(it) },
+            )
+
+        mock.simulateIncoming(AuthProtocol.encodeAuthRequest("any-token"))
+        authConn.awaitAuth(backgroundScope)
+
+        assertEquals(1, errors.size)
+        assertTrue(errors[0].contains("Verifier error"))
+        assertTrue(errors[0].contains("JWT decode failed"))
+    }
+
+    @Test
+    fun onAuthError_receivesDetailForNonAuthMessage() = runTest {
+        val mock = MockServerConnection()
+        val errors = mutableListOf<String>()
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = acceptAllVerifier,
+                onAuthError = { errors.add(it) },
+            )
+
+        mock.simulateIncoming("""{"type":"action","data":"oops"}""")
+        authConn.awaitAuth(backgroundScope)
+
+        assertEquals(1, errors.size)
+        assertTrue(errors[0].contains("Expected auth message"))
+        assertTrue(errors[0].contains("action"))
+    }
+
+    @Test
+    fun onAuthError_receivesDetailForMalformedAuth() = runTest {
+        val mock = MockServerConnection()
+        val errors = mutableListOf<String>()
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = acceptAllVerifier,
+                onAuthError = { errors.add(it) },
+            )
+
+        mock.simulateIncoming("""{"type":"auth"}""")
+        authConn.awaitAuth(backgroundScope)
+
+        assertEquals(1, errors.size)
+        assertTrue(errors[0].contains("Malformed auth message"))
+    }
+
+    @Test
+    fun onAuthError_receivesReasonForVerifierRejection() = runTest {
+        val mock = MockServerConnection()
+        val errors = mutableListOf<String>()
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = rejectAllVerifier,
+                onAuthError = { errors.add(it) },
+            )
+
+        mock.simulateIncoming(AuthProtocol.encodeAuthRequest("bad-token"))
+        authConn.awaitAuth(backgroundScope)
+
+        assertEquals(1, errors.size)
+        assertEquals("Access denied", errors[0])
+    }
+
+    @Test
+    fun wireMessages_neverContainInternalDetails() = runTest {
+        val mock = MockServerConnection()
+        val authConn =
+            AuthServerConnection(
+                delegate = mock,
+                verifier = throwingVerifier,
+            )
+
+        mock.simulateIncoming(AuthProtocol.encodeAuthRequest("any-token"))
+        authConn.awaitAuth(backgroundScope)
+
+        // Wire messages must only contain the generic error
+        for (msg in mock.sentMessages) {
+            if (msg.contains("auth_error")) {
+                assertTrue(msg.contains("Authentication failed"))
+                assertTrue(!msg.contains("JWT decode failed"))
+                assertTrue(!msg.contains("Verifier error"))
+            }
+        }
     }
 }
