@@ -54,8 +54,11 @@ import kotlin.concurrent.Volatile
  *   and converted to [IllegalStateException].
  * - [connect] is guarded by an internal [Mutex]; concurrent calls are serialized and only
  *   the first one establishes a WebSocket session.
- * - [disconnect] is safe to call concurrently or multiple times. Channel close operations
- *   are idempotent, and `@Volatile` fields ensure visibility across threads.
+ * - [disconnect] may be called concurrently or multiple times. This is safe in practice
+ *   because close operations on the underlying Ktor channels, WebSocket session, and
+ *   [HttpClient] are idempotent by contract. The `@Volatile` fields in this class are
+ *   used to ensure visibility across threads, but they do not make compound operations
+ *   (such as checking a field and then closing) atomic or provide additional locking.
  *
  * ## Backpressure
  *
