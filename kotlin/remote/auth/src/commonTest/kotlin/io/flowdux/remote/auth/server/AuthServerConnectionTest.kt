@@ -12,6 +12,7 @@ import io.flowdux.remote.auth.tokenVerifier
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
@@ -72,6 +73,7 @@ class AuthServerConnectionTest {
         assertEquals(1, mock.sentMessages.size)
         assertTrue(mock.sentMessages[0].contains("auth_error"))
         assertTrue(mock.sentMessages[0].contains("Authentication failed"))
+        assertFalse(mock.sentMessages[0].contains("Access denied"))
     }
 
     @Test

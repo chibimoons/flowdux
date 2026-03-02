@@ -143,6 +143,7 @@ class AuthServerConnection<P : AuthPrincipal>(
                             }
 
                             is AuthResult.Failure -> {
+                                onAuthError?.invoke(verifyResult.reason)
                                 delegate.send(AuthProtocol.encodeAuthError(CLIENT_ERROR_MESSAGE))
                                 lastFailure = verifyResult
                             }
