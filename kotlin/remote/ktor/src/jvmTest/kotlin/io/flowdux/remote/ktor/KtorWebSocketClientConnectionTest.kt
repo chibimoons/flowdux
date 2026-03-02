@@ -526,40 +526,43 @@ class KtorWebSocketClientConnectionTest {
             repeat(5) {
                 val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
                 val sendsStarted = AtomicInteger(0)
+                try {
+                    val connectJob = launch(Dispatchers.Default) { connection.connect() }
+                    withTimeout(5_000) {
+                        connection.connectionState.first { it == ConnectionState.CONNECTED }
+                    }
 
-                val connectJob = launch(Dispatchers.Default) { connection.connect() }
-                withTimeout(5_000) {
-                    connection.connectionState.first { it == ConnectionState.CONNECTED }
-                }
-
-                // Launch sends from multiple coroutines
-                val sendJobs = (1..5).map { threadId ->
-                    launch(Dispatchers.Default) {
-                        for (i in 0 until 20) {
-                            try {
-                                connection.send("t$threadId-msg$i")
-                                sendsStarted.incrementAndGet()
-                            } catch (_: IllegalStateException) {
-                                // Expected: disconnect() may close channels concurrently
-                                break
+                    // Launch sends from multiple coroutines
+                    val sendJobs = (1..5).map { threadId ->
+                        launch(Dispatchers.Default) {
+                            for (i in 0 until 20) {
+                                try {
+                                    connection.send("t$threadId-msg$i")
+                                    sendsStarted.incrementAndGet()
+                                } catch (_: IllegalStateException) {
+                                    // Expected: disconnect() may close channels concurrently
+                                    break
+                                }
                             }
                         }
                     }
-                }
 
-                // Wait until at least some sends are in-flight, then disconnect
-                withTimeout(5_000) {
-                    while (sendsStarted.get() == 0) {
-                        delay(1)
+                    // Wait until at least one send has completed, then disconnect
+                    withTimeout(5_000) {
+                        while (sendsStarted.get() == 0) {
+                            delay(1)
+                        }
                     }
-                }
-                connection.disconnect()
+                    connection.disconnect()
 
-                withTimeout(10_000) {
-                    sendJobs.forEach { it.join() }
-                    connectJob.join()
+                    withTimeout(10_000) {
+                        sendJobs.forEach { it.join() }
+                        connectJob.join()
+                    }
+                    assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+                } finally {
+                    connection.disconnect()
                 }
-                assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
             }
         } finally {
             server.stop(500, 1_000)
@@ -577,9 +580,10 @@ class KtorWebSocketClientConnectionTest {
             }
         }.start(wait = false)
 
+        var connection: KtorWebSocketClientConnection? = null
         try {
             val port = server.engine.resolvedConnectors().first().port
-            val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+            connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
 
             val connectJob = launch(Dispatchers.Default) { connection.connect() }
             withTimeout(5_000) {
@@ -597,6 +601,7 @@ class KtorWebSocketClientConnectionTest {
             }
             assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
         } finally {
+            connection?.disconnect()
             server.stop(500, 1_000)
         }
     }

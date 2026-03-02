@@ -29,8 +29,8 @@ interface ClientConnection {
     /**
      * Establish the connection and suspend until disconnected.
      *
-     * Implementations should be safe against concurrent calls (e.g., via [Mutex]).
-     * Only one connection should be established per call.
+     * Implementations should be safe against concurrent calls (e.g., via a mutex).
+     * Even when called concurrently, at most one active connection should be established.
      */
     suspend fun connect()
 
