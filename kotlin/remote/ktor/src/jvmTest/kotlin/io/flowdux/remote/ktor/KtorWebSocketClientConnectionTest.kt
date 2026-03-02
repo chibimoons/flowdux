@@ -507,6 +507,106 @@ class KtorWebSocketClientConnectionTest {
     }
 
     @Test
+    fun `concurrent send and disconnect completes without hanging`() = runBlocking {
+        val server = embeddedServer(CIO, port = 0) {
+            install(WebSockets)
+            routing {
+                webSocket("/test") {
+                    for (frame in incoming) {
+                        // Consume incoming frames to drain client's outgoing buffer
+                    }
+                }
+            }
+        }.start(wait = false)
+
+        try {
+            val port = server.engine.resolvedConnectors().first().port
+
+            // Repeat to increase chance of hitting race window
+            repeat(5) {
+                val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+                val sendsStarted = AtomicInteger(0)
+                try {
+                    val connectJob = launch(Dispatchers.Default) { connection.connect() }
+                    withTimeout(5_000) {
+                        connection.connectionState.first { it == ConnectionState.CONNECTED }
+                    }
+
+                    // Launch sends from multiple coroutines
+                    val sendJobs = (1..5).map { threadId ->
+                        launch(Dispatchers.Default) {
+                            for (i in 0 until 20) {
+                                try {
+                                    connection.send("t$threadId-msg$i")
+                                    sendsStarted.incrementAndGet()
+                                } catch (_: IllegalStateException) {
+                                    // Expected: disconnect() may close channels concurrently
+                                    break
+                                }
+                            }
+                        }
+                    }
+
+                    // Wait until at least one send has completed, then disconnect
+                    withTimeout(5_000) {
+                        while (sendsStarted.get() == 0) {
+                            delay(1)
+                        }
+                    }
+                    connection.disconnect()
+
+                    withTimeout(10_000) {
+                        sendJobs.forEach { it.join() }
+                        connectJob.join()
+                    }
+                    assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+                } finally {
+                    connection.disconnect()
+                }
+            }
+        } finally {
+            server.stop(500, 1_000)
+        }
+    }
+
+    @Test
+    fun `multiple concurrent disconnect calls complete safely`() = runBlocking {
+        val server = embeddedServer(CIO, port = 0) {
+            install(WebSockets)
+            routing {
+                webSocket("/test") {
+                    for (frame in incoming) { /* keep alive */ }
+                }
+            }
+        }.start(wait = false)
+
+        var connection: KtorWebSocketClientConnection? = null
+        try {
+            val port = server.engine.resolvedConnectors().first().port
+            connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
+
+            val connectJob = launch(Dispatchers.Default) { connection.connect() }
+            withTimeout(5_000) {
+                connection.connectionState.first { it == ConnectionState.CONNECTED }
+            }
+
+            // Launch multiple concurrent disconnect calls
+            val disconnectJobs = (1..10).map {
+                launch(Dispatchers.Default) { connection.disconnect() }
+            }
+
+            withTimeout(5_000) {
+                disconnectJobs.forEach { it.join() }
+                connectJob.join()
+            }
+            assertEquals(ConnectionState.DISCONNECTED, connection.connectionState.value)
+        } finally {
+            connection?.disconnect()
+            server.stop(500, 1_000)
+        }
+    }
+
+    @Test
     fun `slow consumer receives messages in order under sustained backpressure`() = runBlocking {
         val messageCount = 200 // Well above buffer size of 64
         val server = embeddedServer(CIO, port = 0) {

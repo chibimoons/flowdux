@@ -18,13 +18,28 @@ interface ClientConnection {
     /** Incoming raw messages from the server. */
     val incoming: Flow<String>
 
-    /** Send a raw message to the server. */
+    /**
+     * Send a raw message to the server.
+     *
+     * Implementations should be thread-safe: multiple coroutines may call this concurrently.
+     * Throws [IllegalStateException] if the connection is not active.
+     */
     suspend fun send(message: String)
 
-    /** Establish the connection and suspend until disconnected. */
+    /**
+     * Establish the connection and suspend until disconnected.
+     *
+     * Implementations should be safe against concurrent calls (e.g., via a mutex).
+     * Even when called concurrently, at most one active connection should be established.
+     */
     suspend fun connect()
 
-    /** Close the connection. */
+    /**
+     * Close the connection.
+     *
+     * Implementations should be idempotent: calling this multiple times or concurrently
+     * must not throw.
+     */
     suspend fun disconnect()
 }
 

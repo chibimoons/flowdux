@@ -47,6 +47,19 @@ import kotlin.concurrent.Volatile
  * conn2.connect()
  * ```
  *
+ * ## Concurrency & Thread Safety
+ *
+ * - [send] is thread-safe: multiple coroutines may call it concurrently. If the connection
+ *   closes while a send is in progress, [ClosedSendChannelException] is caught internally
+ *   and converted to [IllegalStateException].
+ * - [connect] is guarded by an internal [Mutex]; concurrent calls are serialized and only
+ *   the first one establishes a WebSocket session.
+ * - [disconnect] may be called concurrently or multiple times. This is safe in practice
+ *   because close operations on the underlying Ktor channels, WebSocket session, and
+ *   [HttpClient] are idempotent by contract. The `@Volatile` fields in this class are
+ *   used to ensure visibility across threads, but they do not make compound operations
+ *   (such as checking a field and then closing) atomic or provide additional locking.
+ *
  * ## Backpressure
  *
  * Both incoming and outgoing channels use [Channel.BUFFERED] (64 elements, SUSPEND overflow):
@@ -91,6 +104,9 @@ class KtorWebSocketClientConnection(private val url: String, httpClient: HttpCli
     private val connectMutex = Mutex()
 
     override suspend fun send(message: String) {
+        // Best-effort fast-fail guard. The authoritative safety net is the
+        // ClosedSendChannelException catch below, which handles the race between
+        // this check and a concurrent disconnect() closing the channel.
         if (_connectionState.value != ConnectionState.CONNECTED) {
             throw IllegalStateException("Cannot send message: WebSocket is not connected")
         }
