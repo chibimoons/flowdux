@@ -89,19 +89,19 @@ class AppState {
 
   @override
   int get hashCode => Object.hash(
-    count,
-    isLoading,
-    searchQuery,
-    searchResults.length,
-    error,
-    message,
-    activeSymbol,
-    currentPrice,
-    priceHistory.length,
-    isStreaming,
-    flowHolderSymbol,
-    flowHolderPrice,
-    flowHolderHistory.length,
-    isFlowHolderStreaming,
-  );
+        count,
+        isLoading,
+        searchQuery,
+        searchResults.length,
+        error,
+        message,
+        activeSymbol,
+        currentPrice,
+        priceHistory.length,
+        isStreaming,
+        flowHolderSymbol,
+        flowHolderPrice,
+        flowHolderHistory.length,
+        isFlowHolderStreaming,
+      );
 }

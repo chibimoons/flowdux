@@ -112,9 +112,8 @@ void main() {
 
       // StreamConnectedAction itself passes through the middleware,
       // but inner AddAction should NOT appear in the tracking middleware
-      final innerActions = trackingMiddleware.processedActions
-          .whereType<AddAction>()
-          .toList();
+      final innerActions =
+          trackingMiddleware.processedActions.whereType<AddAction>().toList();
       expect(
         innerActions,
         isEmpty,
@@ -149,9 +148,8 @@ void main() {
         await controller.close();
 
         // Inner AddAction should pass through the tracking middleware
-        final innerActions = trackingMiddleware.processedActions
-            .whereType<AddAction>()
-            .toList();
+        final innerActions =
+            trackingMiddleware.processedActions.whereType<AddAction>().toList();
         expect(
           innerActions,
           isNotEmpty,

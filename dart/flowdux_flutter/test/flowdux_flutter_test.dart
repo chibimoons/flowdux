@@ -25,9 +25,9 @@ class CounterState {
   CounterState({this.count = 0, this.message});
 
   CounterState copyWith({int? count, String? message}) => CounterState(
-    count: count ?? this.count,
-    message: message ?? this.message,
-  );
+        count: count ?? this.count,
+        message: message ?? this.message,
+      );
 
   @override
   bool operator ==(Object other) =>

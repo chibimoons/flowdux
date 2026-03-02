@@ -53,12 +53,12 @@ class Store<S, A extends Action> {
     required List<Middleware<S, A>> middlewares,
     required ErrorProcessor<A> errorProcessor,
     required StoreLogger<S, A> logger,
-  }) : _actionController = StreamController<A>.broadcast(),
-       _reducer = reducer,
-       _middlewares = middlewares,
-       _errorProcessor = errorProcessor,
-       _logger = logger,
-       _isLoggingEnabled = logger is! NoOpStoreLogger {
+  })  : _actionController = StreamController<A>.broadcast(),
+        _reducer = reducer,
+        _middlewares = middlewares,
+        _errorProcessor = errorProcessor,
+        _logger = logger,
+        _isLoggingEnabled = logger is! NoOpStoreLogger {
     _flowHolderMiddleware = FlowHolderMiddleware<S, A>(logger, dispatch);
     _allMiddlewares = [..._middlewares, _flowHolderMiddleware];
     _currentState = initialState;

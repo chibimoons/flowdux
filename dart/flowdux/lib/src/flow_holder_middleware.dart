@@ -25,9 +25,9 @@ class FlowHolderMiddleware<S, A extends Action> extends Middleware<S, A> {
 
   /// Creates a [FlowHolderMiddleware] with the specified [logger] and [dispatch].
   FlowHolderMiddleware(StoreLogger<S, A> logger, void Function(A) dispatch)
-    : _logger = logger,
-      _isLoggingEnabled = logger is! NoOpStoreLogger,
-      _dispatch = dispatch;
+      : _logger = logger,
+        _isLoggingEnabled = logger is! NoOpStoreLogger,
+        _dispatch = dispatch;
 
   @override
   Stream<A> process(S Function() getState, A action) {

@@ -171,11 +171,14 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 50));
 
       // Only initial, first change, and final change should be recorded
-      expect(emissions, [
-        0,
-        10,
-        20,
-      ], reason: 'Consecutive identical states should be deduplicated');
+      expect(
+          emissions,
+          [
+            0,
+            10,
+            20,
+          ],
+          reason: 'Consecutive identical states should be deduplicated');
 
       await subscription.cancel();
       await store.close();

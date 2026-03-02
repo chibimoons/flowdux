@@ -203,9 +203,8 @@ class _SymbolButton extends StatelessWidget {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: isActive
-            ? Theme.of(context).colorScheme.primary
-            : null,
+        backgroundColor:
+            isActive ? Theme.of(context).colorScheme.primary : null,
         foregroundColor: isActive ? Colors.white : null,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       ),

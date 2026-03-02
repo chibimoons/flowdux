@@ -29,8 +29,8 @@ class StoreProvider<S, A extends Action> extends InheritedWidget {
   /// store.dispatch(IncrementAction());
   /// ```
   static Store<S, A> of<S, A extends Action>(BuildContext context) {
-    final provider = context
-        .dependOnInheritedWidgetOfExactType<StoreProvider<S, A>>();
+    final provider =
+        context.dependOnInheritedWidgetOfExactType<StoreProvider<S, A>>();
 
     if (provider == null) {
       throw FlutterError(
@@ -59,8 +59,8 @@ class StoreProvider<S, A extends Action> extends InheritedWidget {
   /// }
   /// ```
   static Store<S, A>? maybeOf<S, A extends Action>(BuildContext context) {
-    final provider = context
-        .dependOnInheritedWidgetOfExactType<StoreProvider<S, A>>();
+    final provider =
+        context.dependOnInheritedWidgetOfExactType<StoreProvider<S, A>>();
     return provider?.store;
   }
 

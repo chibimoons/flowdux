@@ -45,9 +45,8 @@ class CounterState {
   @override
   String toString() {
     final sourceInfo = source.isNotEmpty ? ' [$source]' : '';
-    final searchInfo = searchResults.isNotEmpty
-        ? ' results=$searchResults'
-        : '';
+    final searchInfo =
+        searchResults.isNotEmpty ? ' results=$searchResults' : '';
     return 'CounterState(count: $count$sourceInfo$searchInfo)';
   }
 }
@@ -148,17 +147,17 @@ CounterState counterReducer(CounterState state, CounterAction action) {
     AddAction(:final value) => state.copyWith(count: state.count + value),
     ResetAction() => CounterState(),
     SetCountAction(:final value, :final source) => state.copyWith(
-      count: value,
-      source: source,
-    ),
+        count: value,
+        source: source,
+      ),
     SetLoadingAction(:final isLoading) => state.copyWith(isLoading: isLoading),
     SearchResultAction(:final results) => state.copyWith(
-      searchResults: results,
-    ),
+        searchResults: results,
+      ),
     FetchSuccessAction(:final id, :final value) => state.copyWith(
-      count: value,
-      source: 'fetch-$id',
-    ),
+        count: value,
+        source: 'fetch-$id',
+      ),
     SubmitSuccessAction() => state.copyWith(source: 'submitted'),
     // Actions handled by middleware or FlowHolderMiddleware, not reducer
     ObserveCountAction() => state,

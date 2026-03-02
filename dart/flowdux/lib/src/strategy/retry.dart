@@ -38,8 +38,8 @@ class RetryStrategy implements ExecutionStrategy {
   RetryStrategy({
     required this.maxAttempts,
     bool Function(Object error)? retryIf,
-  }) : assert(maxAttempts >= 1, 'maxAttempts must be >= 1'),
-       retryIf = retryIf ?? ((_) => true);
+  })  : assert(maxAttempts >= 1, 'maxAttempts must be >= 1'),
+        retryIf = retryIf ?? ((_) => true);
 
   @override
   StrategyCategory get category => StrategyCategory.resilience;
@@ -146,4 +146,5 @@ class RetryStrategy implements ExecutionStrategy {
 ExecutionStrategy retry(
   int maxAttempts, {
   bool Function(Object error)? retryIf,
-}) => RetryStrategy(maxAttempts: maxAttempts, retryIf: retryIf);
+}) =>
+    RetryStrategy(maxAttempts: maxAttempts, retryIf: retryIf);

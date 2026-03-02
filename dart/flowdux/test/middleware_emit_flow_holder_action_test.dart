@@ -156,8 +156,7 @@ void main() {
         expect(
           sawIncrementByOne && sawIncrementByTen,
           isTrue,
-          reason:
-              'Expected both FlowHolderActions to run concurrently. '
+          reason: 'Expected both FlowHolderActions to run concurrently. '
               'sawIncrementByOne=$sawIncrementByOne, sawIncrementByTen=$sawIncrementByTen. '
               'If only sawIncrementByOne=true, the second yield was blocked.',
         );

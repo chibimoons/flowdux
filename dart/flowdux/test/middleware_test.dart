@@ -42,10 +42,10 @@ class AppState {
   AppState({this.count = 0, this.loading = false, this.data});
 
   AppState copyWith({int? count, bool? loading, String? data}) => AppState(
-    count: count ?? this.count,
-    loading: loading ?? this.loading,
-    data: data ?? this.data,
-  );
+        count: count ?? this.count,
+        loading: loading ?? this.loading,
+        data: data ?? this.data,
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -370,9 +370,8 @@ void main() {
       store.dispatch(IncrementAction());
       await Future.delayed(Duration(milliseconds: 50));
 
-      final middlewareProcessingLogs = logger.logs
-          .where((log) => log.startsWith('middleware:'))
-          .toList();
+      final middlewareProcessingLogs =
+          logger.logs.where((log) => log.startsWith('middleware:')).toList();
       // 2 user middlewares + 1 FlowHolderMiddleware
       expect(middlewareProcessingLogs.length, 3);
 
@@ -434,13 +433,11 @@ class _StrategyMiddleware extends Middleware<AppState, Action> {
 
 class _GroupMiddleware extends Middleware<AppState, Action> {
   _GroupMiddleware() {
-    apply(_NoOpStrategy())
-        .on<IncrementAction>((state, action) async* {
-          yield action;
-        })
-        .on<DecrementAction>((state, action) async* {
-          yield action;
-        });
+    apply(_NoOpStrategy()).on<IncrementAction>((state, action) async* {
+      yield action;
+    }).on<DecrementAction>((state, action) async* {
+      yield action;
+    });
   }
 }
 

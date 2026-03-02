@@ -22,8 +22,7 @@ class DuplicateCategoryException implements Exception {
   });
 
   @override
-  String toString() =>
-      'Cannot chain strategies of the same category. '
+  String toString() => 'Cannot chain strategies of the same category. '
       'Conflicting category: $category. '
       'First: $firstName, Second: $secondName';
 }

@@ -28,7 +28,7 @@ import 'store_provider.dart';
 class StoreConsumer<S, A extends Action> extends StatefulWidget {
   /// Builder function that receives both the store and current state.
   final Widget Function(BuildContext context, Store<S, A> store, S state)
-  builder;
+      builder;
 
   /// Optional store to use instead of getting it from context.
   final Store<S, A>? store;
@@ -54,7 +54,7 @@ class StoreConsumer<S, A extends Action> extends StatefulWidget {
   /// )
   /// ```
   final void Function(BuildContext context, Store<S, A> store, S state)?
-  listener;
+      listener;
 
   /// Creates a [StoreConsumer].
   const StoreConsumer({
@@ -123,7 +123,7 @@ class _StoreConsumerState<S, A extends Action>
 class StoreListener<S, A extends Action> extends StatefulWidget {
   /// Listener function called when state changes.
   final void Function(BuildContext context, Store<S, A> store, S state)
-  listener;
+      listener;
 
   /// Optional condition to determine whether to call the listener.
   ///
@@ -172,7 +172,7 @@ class _StoreListenerState<S, A extends Action>
 
         final shouldListen =
             widget.listenWhen?.call(_previousState as S, currentState) ??
-            (_previousState != currentState);
+                (_previousState != currentState);
 
         if (shouldListen) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
