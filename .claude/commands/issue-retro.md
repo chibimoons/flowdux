@@ -147,7 +147,7 @@ rule 추가 시 파일명과 내용을, mistake 추가 시 상황/원인/규칙�
 변경 사항을 커밋합니다:
 
 ```bash
-git add .claude/ docs/issue/$ARGUMENTS/
+git add .claude/rules/ .claude/mistakes.md .claude/commands/ docs/issue/$ARGUMENTS/
 git commit -m "$(cat <<'EOF'
 chore: apply retrospective improvements from #$ARGUMENTS
 

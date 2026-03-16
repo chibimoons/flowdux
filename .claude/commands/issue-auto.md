@@ -122,7 +122,7 @@ git checkout -b {branch-name} origin/develop
 
 ### 4-2. 코드 수정
 
-Phase 3에서 출력한 계획에 따라 코드를 수정합니다.
+Phase 3에서 출력한 계획과 `docs/issue/$ARGUMENTS/plan.md`를 참조하여 코드를 수정합니다.
 
 **각 Step 완료 시 `docs/issue/$ARGUMENTS/plan.md`의 진행 상태를 업데이트합니다:**
 - `⏳ 대기` → `✅ 완료` (성공 시)
@@ -245,7 +245,10 @@ Skill: issue-retro
 Args: $ARGUMENTS
 ```
 
-회고에서 승인된 개선 사항이 있으면 커밋 → 푸시합니다.
+> **자율 모드 오버라이드**: `issue-retro`의 Phase 4-2 사용자 승인 단계는 건너뜁니다.
+> 개선 제안을 출력만 하고, 모든 항목을 자동 승인하여 적용합니다.
+
+회고에서 적용된 개선 사항이 있으면 커밋 → 푸시합니다.
 
 ---
 
