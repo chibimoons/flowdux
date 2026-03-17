@@ -58,8 +58,9 @@ gh issue view $ARGUMENTS --repo chibimoons/flowdux --json number,title,body,labe
 현재 브랜치의 변경 사항을 수집:
 
 ```bash
-git diff develop...HEAD --stat
-git diff develop...HEAD
+git fetch origin develop
+git diff origin/develop...HEAD --stat
+git diff origin/develop...HEAD
 ```
 
 ---
@@ -146,7 +147,7 @@ gh issue create --repo chibimoons/flowdux \
 ```markdown
 ## 작업 완료 리뷰 (issue-review)
 
-- **리뷰어**: Claude Agent (general-purpose)
+- **리뷰어**: Agent (general-purpose)
 - **시점**: PR 머지 전
 
 | # | 항목 | 평가 | 상세 |

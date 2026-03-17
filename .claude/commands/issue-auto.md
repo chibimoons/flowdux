@@ -200,12 +200,12 @@ PR 워크플로우 진행 중 리뷰 결과를 `docs/issue/$ARGUMENTS/review-log
 
 ## 로컬 코드 리뷰
 
-- **리뷰어**: Claude Agent (general-purpose)
+- **리뷰어**: Agent (general-purpose)
 - **시점**: PR 생성 전
 
 | # | 심각도 | 파일 | 내용 | 대응 |
 |---|--------|------|------|------|
-| 1 | CRITICAL/IMPORTANT/WARNING | ... | ... | 수정/스킵 (사유) |
+| 1 | CRITICAL/WARNING/INFO | ... | ... | 수정/스킵 (사유) |
 
 ## Copilot 리뷰
 
