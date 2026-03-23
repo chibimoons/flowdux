@@ -26,10 +26,11 @@ git checkout -b release/<version>
 아래 파일들의 버전을 업데이트하세요:
 
 - `gradle.properties` → `flowdux.version=<version>`
+- `README.md` → 모든 dependency 버전
 - `docs/guide/remote.md` → 모든 dependency 버전
 - `docs/guide/timetravel.md` → 모든 dependency 버전
 - `docs/guide/getting-started.md` → 모든 dependency 버전
-- 기타 버전 참조가 있는 문서 확인: `grep -r "chibimoons:flowdux" docs/`
+- 기타 버전 참조가 있는 문서 확인: `grep -r "chibimoons:flowdux" .`
 
 ## 5. 커밋 & 푸시
 
