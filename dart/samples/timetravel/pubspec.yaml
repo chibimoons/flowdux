@@ -1,0 +1,10 @@
+name: timetravel_sample
+description: TimeTravelStore CLI sample app — interactive counter with undo/redo
+version: 0.1.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flowdux:
+    path: ../../flowdux

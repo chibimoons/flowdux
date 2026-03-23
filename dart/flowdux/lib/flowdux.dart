@@ -24,3 +24,7 @@ export 'src/strategy/concurrent.dart';
 
 // Utilities
 export 'src/util/async_lock.dart';
+
+// Time Travel
+export 'src/timetravel/state_snapshot.dart';
+export 'src/timetravel/time_travel_store.dart';
