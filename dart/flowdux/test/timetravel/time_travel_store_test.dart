@@ -5,7 +5,7 @@ import 'test_fixtures.dart';
 
 void main() {
   group('TimeTravelStore', () {
-    test('initial state is recorded in history', () {
+    test('initial state is recorded in history', () async {
       final store = createTimeTravelStore<CounterState, CounterAction>(
         initialState: CounterState(5),
         reducer: counterReducer,
@@ -17,7 +17,7 @@ void main() {
       expect(store.history[0].action, isNull);
       expect(store.history[0].previousState, isNull);
 
-      store.close();
+      await store.close();
     });
 
     test('dispatch records state changes in history', () async {

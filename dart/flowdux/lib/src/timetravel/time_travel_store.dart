@@ -186,9 +186,13 @@ class TimeTravelStore<S, A extends Action> {
       });
 
   /// Closes the underlying store and releases resources.
+  ///
+  /// This method is idempotent - calling it multiple times has no effect.
   Future<void> close() async {
     await _innerStore.close();
-    await _stateSubject.close();
+    if (!_stateSubject.isClosed) {
+      await _stateSubject.close();
+    }
   }
 }
 
