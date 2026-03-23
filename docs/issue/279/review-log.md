@@ -38,3 +38,27 @@
 | # | 파일 | 코멘트 | 대응 |
 |---|------|--------|------|
 | 1 | time_travel_store.dart:123 | plan.md에 "close 후 dispatch throws"라고 기술되어 있으나 실제 동작은 무시 | 수정 — plan.md 문구를 실제 동작에 맞게 수정 |
+
+## 작업 완료 리뷰 (issue-review)
+
+- **리뷰어**: Agent (general-purpose)
+- **시점**: PR 머지 전
+
+| # | 항목 | 평가 | 상세 |
+|---|------|------|------|
+| 1 | 완성도 | ✅ | plan.md 6개 Step 전부 완료 |
+| 2 | 정확성 | ✅ | 이슈 요구사항 전체 충족, Kotlin 기능 대등성 확보 |
+| 3 | 코드 품질 | ✅ | 기존 컨벤션 준수 (Store 패턴, 팩토리, import 스타일) |
+| 4 | 테스트 | ✅ | 16/16 통과, 전체 121개 회귀 없음 |
+| 5 | 문서 일관성 | ✅ | context.md 6개 결정사항 전부 반영 |
+
+### 즉시 수정
+
+없음.
+
+### 이슈 등록
+
+| # | 이슈 | 제목 |
+|---|------|------|
+| 1 | #284 | feat(dart): sync middleware state with TimeTravelStore after undo/redo |
+| 2 | #285 | test(dart): add middleware integration tests for TimeTravelStore |
