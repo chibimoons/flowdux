@@ -28,6 +28,7 @@ git checkout -b release/<version>
 - `gradle.properties` → `flowdux.version=<version>`
 - `docs/guide/remote.md` → 모든 dependency 버전
 - `docs/guide/timetravel.md` → 모든 dependency 버전
+- `docs/guide/getting-started.md` → 모든 dependency 버전
 - 기타 버전 참조가 있는 문서 확인: `grep -r "chibimoons:flowdux" docs/`
 
 ## 5. 커밋 & 푸시
