@@ -101,7 +101,7 @@ Agent(general-purpose) 서브에이전트에 아래 프롬프트를 전달하여
 - plan.md 내용
 - context.md 내용
 - GitHub 이슈 본문
-- `git diff develop...HEAD` 결과
+- `git diff origin/develop...HEAD` 결과
 - CLAUDE.md (프로젝트 컨벤션)
 
 ### 3-2. 리뷰 결과 정리

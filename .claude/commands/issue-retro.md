@@ -40,8 +40,9 @@ allowed-tools: [Bash, Read, Edit, Write, Glob, Grep, Agent]
 ### 2-2. 작업 이력 수집
 
 ```bash
-git log --oneline develop..HEAD
-git diff develop...HEAD --stat
+git fetch origin develop
+git log --oneline origin/develop..HEAD
+git diff origin/develop...HEAD --stat
 ```
 
 ### 2-3. 기존 rules·mistakes 읽기
