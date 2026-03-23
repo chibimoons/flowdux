@@ -44,10 +44,6 @@ void main() async {
     reducer: counterReducer,
   );
 
-  store.state.listen((state) {
-    // State changes are printed by the command handler
-  });
-
   print('=== TimeTravelStore Sample ===');
   print('Commands:');
   print('  +       Increment counter');
