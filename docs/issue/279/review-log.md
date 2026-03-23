@@ -32,3 +32,9 @@
 | 1 | time_travel_store.dart:66 | `initialState as S` cast — 검증 전에 TypeError 발생 가능 | 수정 — 생성자를 `seedState` 파라미터로 리팩터링. 팩토리에서 미리 계산한 seed를 전달하여 cast 제거. |
 | 2 | time_travel_store.dart:292 | undo/redo 후 내부 Store의 currentState가 middleware와 불일치 | 스킵 — Kotlin 구현과 동일한 알려진 제한. TimeTravelStore는 디버깅 도구이며, middleware 상태 동기화는 향후 개선 사항. |
 | 3 | time_travel_store_test.dart:12 | middleware 동작 테스트 누락 | 스킵 — Kotlin 테스트 스위트와 1:1 포팅 범위. middleware 테스트는 향후 이슈로 추적 가능. |
+
+### Round 3 (commit: 3a4014b)
+
+| # | 파일 | 코멘트 | 대응 |
+|---|------|--------|------|
+| 1 | time_travel_store.dart:123 | plan.md에 "close 후 dispatch throws"라고 기술되어 있으나 실제 동작은 무시 | 수정 — plan.md 문구를 실제 동작에 맞게 수정 |

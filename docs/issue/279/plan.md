@@ -69,7 +69,7 @@ Kotlin의 `flowdux-timetravel` 모듈을 Dart로 포팅합니다. 디버깅 시 
   7. reset → 초기 상태로 복원
   8. clear → 히스토리 초기화, 현재 상태 유지
   9. maxHistorySize 초과 시 오래된 항목 제거
-  10. close 후 dispatch throws
+  10. close 후 isClosed 확인 (dispatch는 무시됨 — Store 동작과 일치)
   11. 타임스탬프 기록 확인
   12. 히스토리 인덱스 순차 확인
   13. fromHistory 복원
