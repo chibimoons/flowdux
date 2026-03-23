@@ -38,7 +38,8 @@ interface ClientConnection {
      * Close the connection.
      *
      * Implementations should be idempotent: calling this multiple times or concurrently
-     * must not throw.
+     * must not throw non-cancellation exceptions. Like any suspend function, it may still
+     * throw [kotlinx.coroutines.CancellationException] if the calling coroutine is cancelled.
      */
     suspend fun disconnect()
 }

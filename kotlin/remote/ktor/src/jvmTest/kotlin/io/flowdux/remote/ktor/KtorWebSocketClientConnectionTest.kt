@@ -525,7 +525,7 @@ class KtorWebSocketClientConnectionTest {
             // Repeat to increase chance of hitting race window
             repeat(5) {
                 val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
-                val sendsStarted = AtomicInteger(0)
+                val sendsCompleted = AtomicInteger(0)
                 try {
                     val connectJob = launch(Dispatchers.Default) { connection.connect() }
                     withTimeout(5_000) {
@@ -538,7 +538,7 @@ class KtorWebSocketClientConnectionTest {
                             for (i in 0 until 20) {
                                 try {
                                     connection.send("t$threadId-msg$i")
-                                    sendsStarted.incrementAndGet()
+                                    sendsCompleted.incrementAndGet()
                                 } catch (_: IllegalStateException) {
                                     // Expected: disconnect() may close channels concurrently
                                     break
@@ -549,7 +549,7 @@ class KtorWebSocketClientConnectionTest {
 
                     // Wait until at least one send has completed, then disconnect
                     withTimeout(5_000) {
-                        while (sendsStarted.get() == 0) {
+                        while (sendsCompleted.get() == 0) {
                             delay(1)
                         }
                     }
