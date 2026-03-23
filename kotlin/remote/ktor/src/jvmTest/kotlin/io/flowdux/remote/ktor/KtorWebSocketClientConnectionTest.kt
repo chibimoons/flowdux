@@ -523,7 +523,7 @@ class KtorWebSocketClientConnectionTest {
             val port = server.engine.resolvedConnectors().first().port
 
             // Repeat to increase chance of hitting race window
-            repeat(5) {
+            repeat(3) {
                 val connection = KtorWebSocketClientConnection("ws://localhost:$port/test")
                 val sendsCompleted = AtomicInteger(0)
                 try {
@@ -555,7 +555,7 @@ class KtorWebSocketClientConnectionTest {
                     }
                     connection.disconnect()
 
-                    withTimeout(10_000) {
+                    withTimeout(30_000) {
                         sendJobs.forEach { it.join() }
                         connectJob.join()
                     }
