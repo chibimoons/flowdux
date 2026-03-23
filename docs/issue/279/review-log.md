@@ -24,3 +24,11 @@
 | 1 | time_travel_store.dart:191 | `close()` 비멱등 — BehaviorSubject.close() 이중호출 문제 | 수정 — `_stateSubject.isClosed` 체크 추가 |
 | 2 | time_travel_store_test.dart:21 | `store.close()` await 누락 | 수정 — `await store.close()` 로 변경 |
 | 3 | review-log.md:11 | 테이블 `||` 포맷 오류 지적 | 스킵 — 실제 파일 확인 시 정상 마크다운 (`| # |` 형식). Copilot 오탐. |
+
+### Round 2 (commit: f822396)
+
+| # | 파일 | 코멘트 | 대응 |
+|---|------|--------|------|
+| 1 | time_travel_store.dart:66 | `initialState as S` cast — 검증 전에 TypeError 발생 가능 | 수정 — 생성자를 `seedState` 파라미터로 리팩터링. 팩토리에서 미리 계산한 seed를 전달하여 cast 제거. |
+| 2 | time_travel_store.dart:292 | undo/redo 후 내부 Store의 currentState가 middleware와 불일치 | 스킵 — Kotlin 구현과 동일한 알려진 제한. TimeTravelStore는 디버깅 도구이며, middleware 상태 동기화는 향후 개선 사항. |
+| 3 | time_travel_store_test.dart:12 | middleware 동작 테스트 누락 | 스킵 — Kotlin 테스트 스위트와 1:1 포팅 범위. middleware 테스트는 향후 이슈로 추적 가능. |

@@ -8,8 +8,7 @@ class CounterState {
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is CounterState && count == other.count;
+      identical(this, other) || other is CounterState && count == other.count;
 
   @override
   int get hashCode => count.hashCode;

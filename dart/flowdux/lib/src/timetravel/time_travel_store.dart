@@ -41,28 +41,21 @@ class TimeTravelStore<S, A extends Action> {
   TimeTravelStore._({
     required Store<S, A> innerStore,
     required this.maxHistorySize,
-    S? initialState,
+    required S seedState,
     List<StateSnapshot<S, A>>? initialHistory,
   })  : _innerStore = innerStore,
-        _stateSubject = BehaviorSubject.seeded(
-          initialHistory != null && initialHistory.isNotEmpty
-              ? initialHistory.last.currentState
-              : initialState as S,
-        ) {
+        _stateSubject = BehaviorSubject.seeded(seedState) {
     if (initialHistory != null && initialHistory.isNotEmpty) {
       for (var i = 0; i < initialHistory.length; i++) {
         _history.add(initialHistory[i].copyWith(index: i));
       }
       _currentIndex = _history.length - 1;
-    } else if (initialState != null) {
+    } else {
       _history.add(StateSnapshot(
         index: 0,
-        currentState: initialState,
+        currentState: seedState,
         timestamp: DateTime.now(),
       ));
-    } else {
-      throw ArgumentError(
-          'Either initialState or initialHistory must be provided');
     }
   }
 
@@ -278,10 +271,10 @@ TimeTravelStore<S, A> _createTimeTravelStoreInternal<S, A extends Action>({
     },
   );
 
-  final effectiveInitialState = initialHistory != null &&
-          initialHistory.isNotEmpty
-      ? initialHistory.last.currentState
-      : initialState!;
+  final effectiveInitialState =
+      initialHistory != null && initialHistory.isNotEmpty
+          ? initialHistory.last.currentState
+          : initialState!;
 
   final innerStore = createStore<S, A>(
     initialState: effectiveInitialState,
@@ -294,7 +287,7 @@ TimeTravelStore<S, A> _createTimeTravelStoreInternal<S, A extends Action>({
   timeTravelStore = TimeTravelStore<S, A>._(
     innerStore: innerStore,
     maxHistorySize: maxHistorySize,
-    initialState: initialState,
+    seedState: effectiveInitialState,
     initialHistory: initialHistory,
   );
 
