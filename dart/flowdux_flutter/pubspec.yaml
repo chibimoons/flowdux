@@ -2,7 +2,7 @@ name: flowdux_flutter
 description: >
   Flutter bindings for FlowDux state management library.
   Provides StoreProvider, StoreBuilder, and StoreConsumer widgets.
-version: 0.2.5
+version: 0.3.0
 homepage: https://github.com/chibimoons/flowdux
 repository: https://github.com/chibimoons/flowdux
 issue_tracker: https://github.com/chibimoons/flowdux/issues
