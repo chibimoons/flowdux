@@ -26,9 +26,11 @@ git checkout -b release/<version>
 아래 파일들의 버전을 업데이트하세요:
 
 - `gradle.properties` → `flowdux.version=<version>`
+- `README.md` → 모든 dependency 버전
 - `docs/guide/remote.md` → 모든 dependency 버전
 - `docs/guide/timetravel.md` → 모든 dependency 버전
-- 기타 버전 참조가 있는 문서 확인: `grep -r "chibimoons:flowdux" docs/`
+- `docs/guide/getting-started.md` → 모든 dependency 버전
+- 기타 버전 참조가 있는 문서 확인: `grep -r "chibimoons:flowdux" .`
 
 ## 5. 커밋 & 푸시
 
@@ -43,9 +45,12 @@ EOF
 git push -u origin release/<version>
 ```
 
-## 6. PR 생성 (main 타겟)
+## 6. PR 생성 (main + develop 양쪽)
+
+같은 브랜치에서 `main`과 `develop` 양쪽으로 PR을 생성합니다:
 
 ```bash
+# main 타겟 (배포용)
 gh pr create --base main --title "release: <version>" --body "$(cat <<'EOF'
 ## Summary
 <이번 릴리즈에 포함된 변경 사항>
@@ -57,11 +62,26 @@ gh pr create --base main --title "release: <version>" --body "$(cat <<'EOF'
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
+
+# develop 타겟 (버전 동기화)
+gh pr create --base develop --title "chore: sync release <version> to develop" --body "$(cat <<'EOF'
+## Summary
+- Sync version bump (<version>) to develop
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+```
+
+```
+release/x.x.x
+  ├── PR → main    (배포용)
+  └── PR → develop (버전 동기화)
 ```
 
 ## 7. 머지 후 태그 & 배포
 
-PR이 머지되면:
+**양쪽 PR 모두 머지한 후** 태그를 생성합니다:
 
 ```bash
 git fetch origin main --tags
