@@ -61,5 +61,6 @@ library flowdux_flutter;
 export 'package:flowdux/flowdux.dart';
 
 export 'src/store_provider.dart';
+export 'src/store_scope.dart';
 export 'src/store_builder.dart';
 export 'src/store_consumer.dart';

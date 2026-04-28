@@ -8,6 +8,7 @@ Flutter bindings for [FlowDux](https://pub.dev/packages/flowdux) state managemen
 ## Features
 
 - **StoreProvider** - Provide store to widget tree via InheritedWidget
+- **StoreScope** - Lifecycle-aware provider that creates/closes a store automatically
 - **StoreBuilder** - Rebuild widgets when state changes
 - **StoreSelector** - Optimized rebuilds with selectors
 - **StoreConsumer** - Access both store and state
@@ -97,6 +98,31 @@ final store = context.store<AppState, AppAction>();
 // Safe access (returns null if not found)
 final store = StoreProvider.maybeOf<AppState, AppAction>(context);
 ```
+
+### StoreScope
+
+Owns a store's lifecycle: creates it once via `create` and closes it on dispose.
+Use this anywhere the build function may run multiple times — e.g. inside a
+`PageRoute`'s `pageBuilder`, a custom route builder, or a `NestedRoute`. Without
+it, building a fresh `Store` inline causes the store to be replaced on rebuild
+while child `State` objects keep stale references, dropping dispatched actions
+silently.
+
+```dart
+PageRouteBuilder(
+  pageBuilder: (_, __, ___) => StoreScope<AppState, AppAction>(
+    create: () => createStore<AppState, AppAction>(
+      initialState: AppState(),
+      reducer: appReducer,
+    ),
+    child: MyScreen(),
+  ),
+);
+```
+
+The created store is exposed to descendants via `StoreProvider`, so all the
+widgets below (`StoreBuilder`, `StoreSelector`, `StoreConsumer`,
+`StoreListener`, `context.store`, `context.dispatch`) work unchanged.
 
 ### StoreBuilder
 

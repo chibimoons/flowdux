@@ -390,6 +390,131 @@ void main() {
     });
   });
 
+  group('StoreScope', () {
+    testWidgets('creates store and provides it to descendants', (tester) async {
+      var createCalls = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StoreScope<CounterState, Action>(
+            create: () {
+              createCalls++;
+              return createStore<CounterState, Action>(
+                initialState: CounterState(),
+                reducer: reducer,
+              );
+            },
+            child: Builder(
+              builder: (context) {
+                final providedStore =
+                    StoreProvider.of<CounterState, Action>(context);
+                return Text('Count: ${providedStore.currentState.count}');
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(createCalls, 1);
+      expect(find.text('Count: 0'), findsOneWidget);
+    });
+
+    testWidgets('does not recreate store across rebuilds', (tester) async {
+      var createCalls = 0;
+
+      Widget buildTree(String label) => MaterialApp(
+            home: StoreScope<CounterState, Action>(
+              create: () {
+                createCalls++;
+                return createStore<CounterState, Action>(
+                  initialState: CounterState(),
+                  reducer: reducer,
+                );
+              },
+              child: Text(label),
+            ),
+          );
+
+      await tester.pumpWidget(buildTree('first'));
+      expect(createCalls, 1);
+
+      // Rebuild parent — `create` must not run again because the State is reused.
+      await tester.pumpWidget(buildTree('second'));
+      await tester.pumpWidget(buildTree('third'));
+
+      expect(createCalls, 1);
+    });
+
+    testWidgets('closes store on dispose', (tester) async {
+      late Store<CounterState, Action> created;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StoreScope<CounterState, Action>(
+            create: () {
+              created = createStore<CounterState, Action>(
+                initialState: CounterState(),
+                reducer: reducer,
+              );
+              return created;
+            },
+            child: const SizedBox(),
+          ),
+        ),
+      );
+
+      // Replace the tree so the StoreScope is removed and disposed.
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpAndSettle();
+
+      // Dispatching after close is logged and ignored — state stays put.
+      created.dispatch(IncrementAction());
+      await tester.runAsync(() async {
+        await Future.delayed(const Duration(milliseconds: 50));
+      });
+
+      expect(created.currentState.count, 0);
+    });
+
+    testWidgets('descendants can dispatch actions through the scoped store',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StoreScope<CounterState, Action>(
+            create: () => createStore<CounterState, Action>(
+              initialState: CounterState(),
+              reducer: reducer,
+            ),
+            child: StoreConsumer<CounterState, Action>(
+              builder: (context, store, state) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Count: ${state.count}'),
+                    ElevatedButton(
+                      onPressed: () => store.dispatch(IncrementAction()),
+                      child: const Text('Increment'),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Count: 0'), findsOneWidget);
+
+      await tester.tap(find.text('Increment'));
+      await tester.runAsync(() async {
+        await Future.delayed(const Duration(milliseconds: 50));
+      });
+      await tester.pumpAndSettle();
+
+      expect(find.text('Count: 1'), findsOneWidget);
+    });
+  });
+
   group('StoreListener', () {
     testWidgets('calls listener on state change', (tester) async {
       final listenerCalls = <int>[];
