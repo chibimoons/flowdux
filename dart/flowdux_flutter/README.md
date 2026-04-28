@@ -18,8 +18,8 @@ Flutter bindings for [FlowDux](https://pub.dev/packages/flowdux) state managemen
 
 ```yaml
 dependencies:
-  flowdux: ^0.2.4
-  flowdux_flutter: ^0.2.4
+  flowdux: ^0.3.2
+  flowdux_flutter: ^0.3.0
 ```
 
 ## Quick Start
