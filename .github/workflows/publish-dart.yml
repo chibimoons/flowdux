@@ -15,10 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract version from tag
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/dart-v}" >> $GITHUB_OUTPUT
-
       - name: Set up Dart
         uses: dart-lang/setup-dart@v1
         with:
@@ -35,18 +31,88 @@ jobs:
           mkdir -p "$HOME/.config/dart"
           echo '${{ secrets.PUB_CREDENTIALS }}' > "$HOME/.config/dart/pub-credentials.json"
 
-      - name: Publish flowdux
-        run: dart pub publish --force
+      - name: Read flowdux pubspec version
+        id: flowdux_version
         working-directory: dart/flowdux
+        run: |
+          v=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          v=${v:-unknown}
+          echo "VERSION=$v" >> "$GITHUB_OUTPUT"
+          echo "flowdux pubspec version: $v"
+
+      - name: Check flowdux on pub.dev
+        id: flowdux_check
+        run: |
+          v="${{ steps.flowdux_version.outputs.VERSION }}"
+          status=$(curl -s -o /dev/null -w '%{http_code}' "https://pub.dev/api/packages/flowdux/versions/$v" || echo "000")
+          status=${status:-000}
+          if [ "$status" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "flowdux $v already on pub.dev — will skip publish"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "flowdux $v not on pub.dev (status=$status) — will publish"
+          fi
+
+      - name: Publish flowdux
+        if: steps.flowdux_check.outputs.exists == 'false'
+        working-directory: dart/flowdux
+        run: dart pub publish --force
 
       - name: Wait for pub.dev to index flowdux
+        if: steps.flowdux_check.outputs.exists == 'false'
         run: sleep 30
 
-      - name: Update flowdux_flutter dependency to published version
-        run: |
-          sed -i '/flowdux:/{N;s|  flowdux:\n    path: ../flowdux|  flowdux: ^${{ steps.version.outputs.VERSION }}|}' pubspec.yaml
+      - name: Update flowdux_flutter dependency to flowdux version
         working-directory: dart/flowdux_flutter
+        run: |
+          sed -i '/flowdux:/{N;s|  flowdux:\n    path: ../flowdux|  flowdux: ^${{ steps.flowdux_version.outputs.VERSION }}|}' pubspec.yaml
+
+      - name: Read flowdux_flutter pubspec version
+        id: flutter_version
+        working-directory: dart/flowdux_flutter
+        run: |
+          v=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          v=${v:-unknown}
+          echo "VERSION=$v" >> "$GITHUB_OUTPUT"
+          echo "flowdux_flutter pubspec version: $v"
+
+      - name: Check flowdux_flutter on pub.dev
+        id: flutter_check
+        run: |
+          v="${{ steps.flutter_version.outputs.VERSION }}"
+          status=$(curl -s -o /dev/null -w '%{http_code}' "https://pub.dev/api/packages/flowdux_flutter/versions/$v" || echo "000")
+          status=${status:-000}
+          if [ "$status" = "200" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "flowdux_flutter $v already on pub.dev — will skip publish"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "flowdux_flutter $v not on pub.dev (status=$status) — will publish"
+          fi
 
       - name: Publish flowdux_flutter
-        run: flutter pub publish --force
+        if: steps.flutter_check.outputs.exists == 'false'
         working-directory: dart/flowdux_flutter
+        run: flutter pub publish --force
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Dart publish summary"
+            fv="${{ steps.flowdux_version.outputs.VERSION }}"
+            fe="${{ steps.flowdux_check.outputs.exists }}"
+            if [ "$fe" = "true" ]; then
+              echo "- flowdux $fv: already on pub.dev (skipped)"
+            else
+              echo "- flowdux $fv: published"
+            fi
+            ffv="${{ steps.flutter_version.outputs.VERSION }}"
+            ffe="${{ steps.flutter_check.outputs.exists }}"
+            if [ "$ffe" = "true" ]; then
+              echo "- flowdux_flutter $ffv: already on pub.dev (skipped)"
+            else
+              echo "- flowdux_flutter $ffv: published"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
